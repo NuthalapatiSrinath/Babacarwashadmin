@@ -2,8 +2,9 @@ import axios from "axios";
 import toast from "react-hot-toast";
 
 const api = axios.create({
-  // UPDATED: Matches your log (port 4000) and includes /api prefix
-  baseURL: "http://3.29.249.5:3000/api/",
+  // UPDATED: Changed to relative path '/api' to work with Vercel Rewrites
+  // This prevents the "Mixed Content" error by proxying through Vercel.
+  baseURL: "/api",
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -15,7 +16,7 @@ api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
     if (token) {
-      // Send token exactly as backend expects (try without 'Bearer ' prefix first based on your backend code)
+      // Send token exactly as backend expects
       config.headers["Authorization"] = token;
     }
     return config;
