@@ -84,7 +84,7 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
         {/* Header */}
         <div className="h-header-h flex items-center px-5 border-b border-border/50 shrink-0 gap-3 relative bg-card">
           <img
-            src="/logo-icon.png"
+            src="/carwash.jpeg"
             alt="Logo"
             className="w-10 h-10 object-contain shrink-0"
           />

@@ -1,13 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import {
-  Lock,
-  Smartphone,
-  ArrowRight,
-  Loader2,
-  ShieldCheck,
-} from "lucide-react";
+import { Lock, Smartphone, ArrowRight, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { authService } from "../api/authService";
 
@@ -39,13 +33,12 @@ const Login = () => {
     setLoading(true);
 
     try {
-      // Explicitly construct the payload to prevent sending stray data
       const payload = {
-        number: String(formData.number).trim(), // Ensure it's a string
+        number: String(formData.number).trim(),
         password: formData.password,
       };
 
-      console.log("Sending Login Payload:", payload); // Debugging
+      console.log("Sending Login Payload:", payload);
 
       const response = await authService.login(payload);
 
@@ -71,6 +64,19 @@ const Login = () => {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#0f172a] relative overflow-hidden font-sans">
+      {/* --- CSS FIX FOR AUTOFILL BACKGROUND --- */}
+      <style>{`
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover, 
+        input:-webkit-autofill:focus, 
+        input:-webkit-autofill:active {
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: #ffffff !important;
+            transition: background-color 5000s ease-in-out 0s;
+            box-shadow: inset 0 0 20px 20px #23232329;
+        }
+      `}</style>
+
       {/* Background Effects */}
       <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-purple-600/20 rounded-full blur-[120px] pointer-events-none" />
@@ -87,9 +93,14 @@ const Login = () => {
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ type: "spring", stiffness: 200, damping: 20 }}
-              className="w-16 h-16 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-indigo-500/25"
+              className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-indigo-500/25 overflow-hidden bg-white"
             >
-              <ShieldCheck className="w-8 h-8 text-white" />
+              {/* Image from public folder */}
+              <img
+                src="/carwash.jpeg"
+                alt="Car Wash Logo"
+                className="w-full h-full object-cover"
+              />
             </motion.div>
             <h1 className="text-3xl font-bold text-white tracking-tight mb-2">
               Admin Portal
