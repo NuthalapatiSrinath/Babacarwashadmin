@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
-import Footer from "./Footer"; // <--- Import Footer
+import Footer from "./Footer";
 
 const MainLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024);
@@ -23,9 +23,11 @@ const MainLayout = () => {
     const handleResize = () => {
       const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
+
       if (mobile) setIsSidebarOpen(false);
       if (!mobile && !isSidebarOpen) setIsSidebarOpen(true);
     };
+
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -50,14 +52,14 @@ const MainLayout = () => {
           toggleTheme={toggleTheme}
         />
 
-        {/* Content grows to push Footer down */}
-        <main className="flex-1 p-4 md:p-8 overflow-y-auto">
-          <div className="max-w-7xl mx-auto animate-fade-in">
+        {/* Content — padding removed */}
+        <main className="flex-1 overflow-y-auto">
+          {/* container spacing removed */}
+          <div className="animate-fade-in">
             <Outlet />
           </div>
         </main>
 
-        {/* Footer placed here */}
         <Footer />
       </div>
     </div>

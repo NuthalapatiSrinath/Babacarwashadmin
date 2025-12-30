@@ -37,6 +37,11 @@ import Customers from "./pages/Customers";
 import CustomerHistory from "./pages/CustomerHistory"; // NEW IMPORT
 import OneWash from "./pages/OneWash";
 import Residence from "./pages/Residence";
+import Payments from "./pages/Payments";
+import OneWashPayments from "./pages/OneWashPayments";
+import ResidencePayments from "./pages/ResidencePayments";
+import WorkRecords from "./pages/WorkRecords";
+import CollectionSheet from "./pages/CollectionSheet";
 
 export const routes = [
   // --- OVERVIEW ---
@@ -117,24 +122,38 @@ export const routes = [
     component: <Residence />,
     icon: Droplets,
   },
-
   // --- FINANCE ---
   {
     path: "/payments",
     title: "Payment Transactions",
-    component: <PlaceholderPage title="Payments" />,
+    component: <OneWashPayments />, // Transaction History (default)
     icon: DollarSign,
   },
+
+  {
+    path: "/payments/onewash",
+    title: "One Wash Payments",
+    component: <OneWashPayments />, // or different component if you prefer
+    icon: DollarSign,
+  },
+
+  {
+    path: "/payments/residence",
+    title: "Residence Payments",
+    component: <ResidencePayments />, // <-- use your Residence payments page
+    icon: DollarSign,
+  },
+
   {
     path: "/work-records",
     title: "Work Records",
-    component: <PlaceholderPage title="Work Records" />,
+    component: <WorkRecords />,
     icon: FileText,
   },
   {
     path: "/collection-sheet",
     title: "Collection Sheet",
-    component: <PlaceholderPage title="Collection Sheet" />,
+    component: <CollectionSheet />,
     icon: Receipt,
   },
   {

@@ -34,9 +34,21 @@ const OneWash = () => {
 
   const [workers, setWorkers] = useState([]);
 
+  // -----------------------------
+  // DATE HELPERS
+  // -----------------------------
+  const getToday = () => new Date().toISOString().split("T")[0];
+
+  const getYesterday = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().split("T")[0];
+  };
+
+  // DEFAULT DATES: yesterday ➜ today
   const [filters, setFilters] = useState({
-    startDate: "",
-    endDate: "",
+    startDate: getYesterday(),
+    endDate: getToday(),
     service_type: "",
     worker: "",
   });
@@ -71,7 +83,7 @@ const OneWash = () => {
   }, []);
 
   // --------------------------------
-  // FETCH DATA (SERVER PAGINATION)
+  // FETCH DATA
   // --------------------------------
   const fetchData = async (page = 1, limit = 10) => {
     setLoading(true);
@@ -105,7 +117,12 @@ const OneWash = () => {
   // --------------------------------
   const handleDateChange = (field, value) => {
     if (field === "clear") {
-      setFilters((prev) => ({ ...prev, startDate: "", endDate: "" }));
+      // 🔁 reset again to yesterday → today
+      setFilters((prev) => ({
+        ...prev,
+        startDate: getYesterday(),
+        endDate: getToday(),
+      }));
     } else {
       setFilters((prev) => ({ ...prev, [field]: value }));
     }
@@ -120,7 +137,7 @@ const OneWash = () => {
   };
 
   // --------------------------------
-  // CRUD HANDLERS
+  // CRUD
   // --------------------------------
   const handleCreate = () => {
     setSelectedJob(null);
@@ -217,11 +234,13 @@ const OneWash = () => {
       render: (row) => (
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5 mb-0.5">
-            {row.service_type === "mall" ? (
-              <MapPin className="w-3 h-3 text-purple-500" />
-            ) : (
-              <MapPin className="w-3 h-3 text-orange-500" />
-            )}
+            <MapPin
+              className={`w-3 h-3 ${
+                row.service_type === "mall"
+                  ? "text-purple-500"
+                  : "text-orange-500"
+              }`}
+            />
             <span className="text-xs font-bold uppercase text-slate-500">
               {row.service_type}
             </span>
@@ -314,28 +333,32 @@ const OneWash = () => {
   ];
 
   return (
-    // FIX 1: Main container height calculation + overflow-hidden
     <div className="p-6 w-full h-[calc(100vh-80px)] flex flex-col font-sans overflow-hidden">
-      {/* HEADER SECTION - Always visible */}
+      {/* HEADER */}
       <div className="mb-6 flex flex-col xl:flex-row xl:items-center justify-between gap-4 flex-shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">One Wash Jobs</h1>
+
           <div className="flex flex-wrap gap-3 mt-2 text-xs font-medium text-slate-500">
             <span className="bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">
               Total Jobs: <b className="text-indigo-600">{stats.totalJobs}</b>
             </span>
+
             <span className="bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">
               Revenue:{" "}
               <b className="text-emerald-600">{stats.totalAmount} AED</b>
             </span>
+
             <span className="bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">
               Cash: <b>{stats.cash}</b>
             </span>
+
             <span className="bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">
               Card: <b>{stats.card}</b>
             </span>
           </div>
         </div>
+
         <div className="flex gap-3">
           <button
             onClick={handleExport}
@@ -343,6 +366,7 @@ const OneWash = () => {
           >
             <Download className="w-4 h-4" /> Export
           </button>
+
           <button
             onClick={handleCreate}
             className="px-5 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center gap-2"
@@ -352,9 +376,8 @@ const OneWash = () => {
         </div>
       </div>
 
-      {/* FILTER BAR - Always visible */}
+      {/* FILTERS */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-4 flex flex-col xl:flex-row gap-4 items-end flex-shrink-0">
-        {/* Date Range */}
         <div className="w-full xl:w-auto">
           <RichDateRangePicker
             startDate={filters.startDate}
@@ -363,7 +386,6 @@ const OneWash = () => {
           />
         </div>
 
-        {/* Dropdown Filters */}
         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
           <div className="relative">
             <select
@@ -397,7 +419,6 @@ const OneWash = () => {
           </div>
         </div>
 
-        {/* Search input */}
         <div className="flex-1 w-full relative h-[50px]">
           <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
           <input
@@ -412,7 +433,6 @@ const OneWash = () => {
           />
         </div>
 
-        {/* Apply */}
         <button
           onClick={applyFilters}
           className="h-[50px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-md transition-all flex items-center gap-2"
@@ -421,8 +441,7 @@ const OneWash = () => {
         </button>
       </div>
 
-      {/* TABLE CONTAINER */}
-      {/* FIX 2: min-h-0 is critical for flex scrolling. flex-1 makes it fill remaining space. */}
+      {/* TABLE */}
       <div className="flex-1 min-h-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
         <DataTable
           columns={columns}

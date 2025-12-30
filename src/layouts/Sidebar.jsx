@@ -222,7 +222,6 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
             <li className="px-4 text-[11px] font-extrabold text-text-muted uppercase tracking-widest mb-2 mt-6">
               Finance
             </li>
-
             <li>
               <MenuButton
                 label="Payments"
@@ -233,9 +232,17 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
               />
 
               <SubMenu isOpen={openMenus.payments}>
+                {/* 🟣 NEW — One Wash Payments */}
                 <SubNavItem
-                  to="/payments"
-                  label="Transaction History"
+                  to="/payments/onewash"
+                  label="One Wash"
+                  onClick={handleLinkClick}
+                />
+
+                {/* 🟣 NEW — Residence Payments */}
+                <SubNavItem
+                  to="/payments/residence"
+                  label="Residence"
                   onClick={handleLinkClick}
                 />
               </SubMenu>

@@ -5,12 +5,12 @@ import { Suspense, useState, useEffect } from "react";
 // Layouts & Pages
 import MainLayout from "./layouts/MainLayout";
 import Login from "./pages/Login";
-import { routes } from "./routes";
+import { routes } from "./routes"; // Your route config file
 
 // Components
-import ProtectedRoute from "./components/ProtectedRoute"; // Imported centralized protection
+import ProtectedRoute from "./components/ProtectedRoute";
 
-// --- Loading Screen Component ---
+// --- Custom Loading Screen ---
 const LoadingScreen = () => (
   <div className="fixed inset-0 bg-white flex flex-col items-center justify-center z-[9999]">
     <div className="relative">
@@ -29,7 +29,7 @@ const LoadingScreen = () => (
   </div>
 );
 
-// --- Public Route Wrapper (Prevents logged-in users from seeing login) ---
+// --- Public Route (Prevents logged-in users from seeing login page) ---
 const PublicRoute = ({ children }) => {
   const token = localStorage.getItem("token");
   if (token) {
@@ -42,8 +42,8 @@ function App() {
   const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
-    // Simulate initial app loading checks
-    const timer = setTimeout(() => setAppReady(true), 1000);
+    // Simulate initial app boot (optional, makes it feel smoother)
+    const timer = setTimeout(() => setAppReady(true), 800);
     return () => clearTimeout(timer);
   }, []);
 
@@ -51,30 +51,27 @@ function App() {
 
   return (
     <BrowserRouter>
-      {/* --- MASTER TOASTER CONFIGURATION --- */}
+      {/* --- TOASTER SETTINGS --- */}
       <Toaster
         position="top-right"
         reverseOrder={false}
         gutter={8}
         toastOptions={{
-          duration: 2000,
+          duration: 3000,
           style: {
-            background: "#1e293b", // Slate-800
+            background: "#1e293b",
             color: "#fff",
-            border: "1px solid rgba(255,255,255,0.1)",
-            padding: "12px 20px",
-            borderRadius: "8px",
+            padding: "16px",
+            borderRadius: "12px",
             fontSize: "14px",
-            fontWeight: "500",
             boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.3)",
           },
           success: {
-            duration: 2000,
             iconTheme: { primary: "#10B981", secondary: "#fff" },
             style: { borderLeft: "4px solid #10B981" },
           },
           error: {
-            duration: 3000,
+            duration: 4000,
             iconTheme: { primary: "#EF4444", secondary: "#fff" },
             style: { borderLeft: "4px solid #EF4444" },
           },
@@ -82,7 +79,7 @@ function App() {
       />
 
       <Routes>
-        {/* Login Route (Public but guarded) */}
+        {/* 1. PUBLIC ROUTE (Login) */}
         <Route
           path="/login"
           element={
@@ -92,10 +89,10 @@ function App() {
           }
         />
 
-        {/* Protected Application Routes */}
+        {/* 2. PROTECTED ROUTES (Dashboard, Customers, etc.) */}
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<MainLayout />}>
-            {/* Dashboard Default Route */}
+            {/* Index Route (Default Dashboard) */}
             <Route
               index
               element={
@@ -105,7 +102,7 @@ function App() {
               }
             />
 
-            {/* Dynamic Routes from routes.js */}
+            {/* Dynamic Routes mapped from routes.js */}
             {routes.map((route) => (
               <Route
                 key={route.path}
@@ -120,7 +117,7 @@ function App() {
           </Route>
         </Route>
 
-        {/* Fallback Route */}
+        {/* 3. FALLBACK (Redirect unknown URLs to home) */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

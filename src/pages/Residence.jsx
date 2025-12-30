@@ -25,11 +25,18 @@ const Residence = () => {
 
   const [workers, setWorkers] = useState([]);
 
-  // --- FIX 1: Set Default Date to TODAY to avoid fetching 400k records ---
+  // --- DATE HELPERS ---
   const getToday = () => new Date().toISOString().split("T")[0];
 
+  const getYesterday = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().split("T")[0];
+  };
+
+  // 🔹 DEFAULT RANGE = Yesterday → Today
   const [filters, setFilters] = useState({
-    startDate: getToday(),
+    startDate: getYesterday(),
     endDate: getToday(),
     worker: "",
     status: "",
@@ -57,25 +64,24 @@ const Residence = () => {
         console.error(e);
       }
     };
-    loadWorkers();
 
-    // Fetch data using the default 'Today' filters set in state
+    loadWorkers();
     fetchData(1, 10);
-  }, []); // Empty dependency array means this runs once on mount
+  }, []);
 
   // --- Fetch Data ---
   const fetchData = async (page = 1, limit = 10) => {
     setLoading(true);
     try {
-      // NOTE: Using current 'filters' state which now has default dates
       const res = await jobService.list(page, limit, searchTerm, filters);
 
       setData(res.data || []);
 
       const totalCount = res.total || 0;
+
       setPagination({
-        page: page,
-        limit: limit,
+        page,
+        limit,
         total: totalCount,
         totalPages: Math.ceil(totalCount / limit) || 1,
       });
@@ -86,12 +92,15 @@ const Residence = () => {
     }
   };
 
-  // --- Handlers ---
+  // --- Date Change Handler ---
   const handleDateChange = (field, value) => {
     if (field === "clear") {
-      // Reset to TODAY, not empty, to prevent system overload
-      const today = getToday();
-      setFilters((prev) => ({ ...prev, startDate: today, endDate: today }));
+      // 🔹 Reset to Yesterday → Today
+      setFilters((prev) => ({
+        ...prev,
+        startDate: getYesterday(),
+        endDate: getToday(),
+      }));
     } else {
       setFilters((prev) => ({ ...prev, [field]: value }));
     }
@@ -117,6 +126,7 @@ const Residence = () => {
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this job?")) return;
+
     try {
       await jobService.delete(id);
       toast.success("Job deleted");
@@ -128,6 +138,7 @@ const Residence = () => {
 
   const handleExport = async () => {
     const toastId = toast.loading("Preparing download...");
+
     try {
       const exportParams = {
         search: searchTerm,
@@ -138,10 +149,13 @@ const Residence = () => {
       };
 
       const blob = await jobService.exportData(exportParams);
+
       const url = window.URL.createObjectURL(new Blob([blob]));
       const link = document.createElement("a");
-      link.href = url;
+
       const dateStr = new Date().toISOString().split("T")[0];
+
+      link.href = url;
       link.setAttribute("download", `residence_jobs_${dateStr}.xlsx`);
       document.body.appendChild(link);
       link.click();
@@ -199,9 +213,11 @@ const Residence = () => {
       accessor: "status",
       render: (row) => {
         const status = (row.status || "pending").toUpperCase();
+
         let colorClass = "text-amber-500";
         if (status === "COMPLETED") colorClass = "text-emerald-500";
         if (status === "CANCELLED") colorClass = "text-red-500";
+
         return (
           <span className={`text-xs font-bold ${colorClass}`}>{status}</span>
         );
@@ -264,6 +280,7 @@ const Residence = () => {
           >
             <Edit2 className="w-4 h-4" />
           </button>
+
           <button
             onClick={() => handleDelete(row._id)}
             className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-red-600 rounded transition-colors"
@@ -277,7 +294,6 @@ const Residence = () => {
   ];
 
   return (
-    // FIX 2: Ensure proper Flexbox height calculation so footer sticks
     <div className="p-6 w-full h-[calc(100vh-80px)] flex flex-col font-sans">
       {/* Header */}
       <div className="mb-6 flex flex-col xl:flex-row xl:items-center justify-between gap-4 flex-shrink-0">
@@ -287,6 +303,7 @@ const Residence = () => {
             Daily Work Schedule & Status
           </p>
         </div>
+
         <div className="flex gap-3">
           <button
             onClick={handleExport}
@@ -294,6 +311,7 @@ const Residence = () => {
           >
             <Download className="w-4 h-4" /> Export
           </button>
+
           <button
             onClick={handleCreate}
             className="px-5 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center gap-2"
@@ -367,8 +385,7 @@ const Residence = () => {
         </button>
       </div>
 
-      {/* Table Container */}
-      {/* min-h-0 is CRITICAL here to allow the flex child to scroll properly */}
+      {/* Table */}
       <div className="flex-1 min-h-0 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col">
         <DataTable
           columns={columns}

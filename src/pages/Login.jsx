@@ -65,6 +65,7 @@ const Login = () => {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#0f172a] relative overflow-hidden font-sans">
       {/* --- CSS FIX FOR AUTOFILL BACKGROUND --- */}
+      {/* This forces the browser to keep the background transparent even when autofilled */}
       <style>{`
         input:-webkit-autofill,
         input:-webkit-autofill:hover, 
