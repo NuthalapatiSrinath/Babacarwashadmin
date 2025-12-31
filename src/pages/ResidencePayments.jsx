@@ -21,8 +21,8 @@ import DataTable from "../components/DataTable";
 import RichDateRangePicker from "../components/inputs/RichDateRangePicker";
 
 // Modals
-import InvoiceModal from "../components/modals/InvoiceModal"; // Use the new InvoiceModal
-import ReceiptModal from "../components/modals/ReceiptModal"; // Use the new ReceiptModal
+import InvoiceModal from "../components/modals/InvoiceModal";
+import ReceiptModal from "../components/modals/ReceiptModal";
 import EditPaymentModal from "../components/modals/EditPaymentModal";
 import ViewPaymentModal from "../components/modals/ViewPaymentModal";
 
@@ -138,6 +138,18 @@ const ResidencePayments = () => {
     }
   };
 
+  // --- NEW: Handle Local Updates from Receipt Modal ---
+  // This saves the "Temporary Edits" to the main list so they persist when re-opening
+  const handleLocalUpdate = (updatedItem) => {
+    setData((prevData) =>
+      prevData.map((row) => (row.id === updatedItem.id ? updatedItem : row))
+    );
+    // If the currently open modal is this one, update it too
+    if (receiptData && receiptData.id === updatedItem.id) {
+      setReceiptData(updatedItem);
+    }
+  };
+
   const handleUpdatePayment = async (id, formData) => {
     try {
       const payload = {
@@ -194,7 +206,6 @@ const ResidencePayments = () => {
     }
   };
 
-  // --- COLUMNS ---
   const columns = [
     {
       header: "Id",
@@ -402,7 +413,6 @@ const ResidencePayments = () => {
           />
         </div>
 
-        {/* --- FILTERS GRID --- */}
         <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
           {/* Status */}
           <div className="relative">
@@ -494,19 +504,20 @@ const ResidencePayments = () => {
         />
       </div>
 
-      {/* --- INTEGRATED MODALS --- */}
       <InvoiceModal
         isOpen={!!invoiceData}
         onClose={() => setInvoiceData(null)}
         data={invoiceData}
       />
+
+      {/* UPDATED: Pass the save handler to ReceiptModal */}
       <ReceiptModal
         isOpen={!!receiptData}
         onClose={() => setReceiptData(null)}
         data={receiptData}
+        onSave={handleLocalUpdate}
       />
 
-      {/* Other Modals */}
       <EditPaymentModal
         isOpen={!!editPayment}
         onClose={() => setEditPayment(null)}
