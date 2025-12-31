@@ -21,8 +21,8 @@ import {
   ChevronRight,
   LogOut,
   X,
-  ClipboardCheck, // Bookings
-  Settings, // Settings
+  ClipboardCheck,
+  Settings,
 } from "lucide-react";
 
 const Sidebar = ({ isOpen, isMobile, onClose }) => {
@@ -34,40 +34,51 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
     payments: false,
   });
 
-  // Auto-open menus based on current URL
+  // auto expand menu if route is inside it
   useEffect(() => {
     if (location.pathname.startsWith("/workers")) {
-      setOpenMenus((prev) => ({ ...prev, workers: true }));
+      setOpenMenus((p) => ({ ...p, workers: true }));
     }
     if (location.pathname.startsWith("/washes")) {
-      setOpenMenus((prev) => ({ ...prev, washes: true }));
+      setOpenMenus((p) => ({ ...p, washes: true }));
+    }
+    if (location.pathname.startsWith("/payments")) {
+      setOpenMenus((p) => ({ ...p, payments: true }));
     }
   }, [location.pathname]);
 
-  const toggleMenu = (menu) => {
-    setOpenMenus((prev) => ({ ...prev, [menu]: !prev[menu] }));
-  };
+  const toggleMenu = (k) => setOpenMenus((p) => ({ ...p, [k]: !p[k] }));
 
   const isActiveParent = (paths) =>
-    paths.some((path) => location.pathname.startsWith(path));
+    paths.some((p) => location.pathname.startsWith(p));
 
   const handleLinkClick = () => {
     if (isMobile && onClose) onClose();
   };
 
-  const sidebarClasses = `
-    fixed top-0 left-0 h-full
-    bg-card text-text-main
-    border-r border-border
-    transition-transform duration-300 ease-in-out z-50
-    w-[280px] max-w-[85vw] flex flex-col
-    ${isOpen ? "translate-x-0" : "-translate-x-full"}
-    ${isMobile ? "shadow-2xl" : ""}
-  `;
+  // ⭐ DESKTOP MODE
+  // collapsed by default → expands on hover
+  // ⭐ MOBILE MODE (UNCHANGED)
+  const sidebarClasses = !isMobile
+    ? `
+      group
+      fixed top-0 left-0 h-full z-50
+      bg-card border-r border-border
+      transition-all duration-300
+      flex flex-col
+      w-[72px] hover:w-[280px]
+    `
+    : `
+      fixed top-0 left-0 h-full z-50
+      bg-card border-r border-border
+      transition-transform duration-300
+      w-[280px] max-w-[85vw] flex flex-col
+      ${isOpen ? "translate-x-0" : "-translate-x-full"}
+    `;
 
   return (
     <>
-      {/* Mobile Overlay */}
+      {/* Mobile Overlay (unchanged) */}
       <AnimatePresence>
         {isMobile && isOpen && (
           <motion.div
@@ -81,19 +92,25 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
       </AnimatePresence>
 
       <aside className={sidebarClasses}>
-        {/* Header */}
-        <div className="h-header-h flex items-center px-5 border-b border-border/50 shrink-0 gap-3 relative bg-card">
+        {/* HEADER */}
+        <div className="h-header-h flex items-center px-5 border-b border-border/50 shrink-0 gap-3 bg-card relative">
+          {/* icon logo always visible */}
           <img
             src="/carwash.jpeg"
             alt="Logo"
             className="w-10 h-10 object-contain shrink-0"
           />
+
+          {/* text logo → visible on mobile OR on desktop hover */}
           <img
             src="/logo-text.png"
             alt="Baba Car Wash"
-            className="h-8 max-w-[140px] object-contain"
+            className={`h-8 max-w-[140px] object-contain ${
+              isMobile ? "block" : "hidden group-hover:block"
+            }`}
           />
 
+          {/* mobile close button (unchanged) */}
           {isMobile && (
             <button
               onClick={onClose}
@@ -104,14 +121,17 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
           )}
         </div>
 
-        {/* Navigation */}
-        <nav
-          className="flex-1 px-4 py-6 overflow-y-auto no-scrollbar"
-          aria-label="Main Navigation"
-        >
+        {/* NAVIGATION */}
+        <nav className="flex-1 px-2 py-6 overflow-y-auto no-scrollbar">
           <ul className="space-y-1">
-            {/* Overview */}
-            <li className="px-4 text-[11px] font-extrabold text-text-muted uppercase tracking-widest mb-2 mt-1">
+            {/* section label — only visible when expanded or mobile */}
+            <li
+              className={`
+              px-4 text-[11px] font-extrabold text-text-muted uppercase tracking-widest
+              mb-2 mt-1
+              ${isMobile ? "block" : "hidden group-hover:block"}
+            `}
+            >
               Overview
             </li>
 
@@ -120,10 +140,17 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
               icon={LayoutDashboard}
               label="Dashboard"
               onClick={handleLinkClick}
+              isMobile={isMobile}
             />
 
-            {/* Management */}
-            <li className="px-4 text-[11px] font-extrabold text-text-muted uppercase tracking-widest mb-2 mt-6">
+            {/* MANAGEMENT */}
+            <li
+              className={`
+              px-4 text-[11px] font-extrabold text-text-muted uppercase tracking-widest
+              mb-2 mt-6
+              ${isMobile ? "block" : "hidden group-hover:block"}
+            `}
+            >
               Management
             </li>
 
@@ -132,27 +159,31 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
               icon={MapPin}
               label="Locations"
               onClick={handleLinkClick}
+              isMobile={isMobile}
             />
             <NavItem
               to="/buildings"
               icon={Building2}
               label="Buildings"
               onClick={handleLinkClick}
+              isMobile={isMobile}
             />
             <NavItem
               to="/malls"
               icon={ShoppingBag}
               label="Malls"
               onClick={handleLinkClick}
+              isMobile={isMobile}
             />
             <NavItem
               to="/sites"
               icon={LocateFixed}
               label="Sites"
               onClick={handleLinkClick}
+              isMobile={isMobile}
             />
 
-            {/* Workers */}
+            {/* WORKERS */}
             <li>
               <MenuButton
                 label="Workers Management"
@@ -160,9 +191,10 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
                 isOpen={openMenus.workers}
                 isActive={isActiveParent(["/workers"])}
                 onClick={() => toggleMenu("workers")}
+                isMobile={isMobile}
               />
 
-              <SubMenu isOpen={openMenus.workers}>
+              <SubMenu isOpen={openMenus.workers} isMobile={isMobile}>
                 <SubNavItem
                   to="/workers/list"
                   label="Workers"
@@ -186,15 +218,17 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
               icon={UserCheck}
               label="Supervisors"
               onClick={handleLinkClick}
+              isMobile={isMobile}
             />
             <NavItem
               to="/customers"
               icon={Users}
               label="Customers"
               onClick={handleLinkClick}
+              isMobile={isMobile}
             />
 
-            {/* Washes */}
+            {/* WASHES */}
             <li>
               <MenuButton
                 label="Washes"
@@ -202,9 +236,10 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
                 isOpen={openMenus.washes}
                 isActive={isActiveParent(["/washes"])}
                 onClick={() => toggleMenu("washes")}
+                isMobile={isMobile}
               />
 
-              <SubMenu isOpen={openMenus.washes}>
+              <SubMenu isOpen={openMenus.washes} isMobile={isMobile}>
                 <SubNavItem
                   to="/washes/onewash"
                   label="One Wash"
@@ -218,10 +253,17 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
               </SubMenu>
             </li>
 
-            {/* Finance */}
-            <li className="px-4 text-[11px] font-extrabold text-text-muted uppercase tracking-widest mb-2 mt-6">
+            {/* FINANCE */}
+            <li
+              className={`
+              px-4 text-[11px] font-extrabold text-text-muted uppercase tracking-widest
+              mb-2 mt-6
+              ${isMobile ? "block" : "hidden group-hover:block"}
+            `}
+            >
               Finance
             </li>
+
             <li>
               <MenuButton
                 label="Payments"
@@ -229,17 +271,15 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
                 isOpen={openMenus.payments}
                 isActive={isActiveParent(["/payments"])}
                 onClick={() => toggleMenu("payments")}
+                isMobile={isMobile}
               />
 
-              <SubMenu isOpen={openMenus.payments}>
-                {/* 🟣 NEW — One Wash Payments */}
+              <SubMenu isOpen={openMenus.payments} isMobile={isMobile}>
                 <SubNavItem
                   to="/payments/onewash"
                   label="One Wash"
                   onClick={handleLinkClick}
                 />
-
-                {/* 🟣 NEW — Residence Payments */}
                 <SubNavItem
                   to="/payments/residence"
                   label="Residence"
@@ -253,28 +293,38 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
               icon={FileText}
               label="Work Records"
               onClick={handleLinkClick}
+              isMobile={isMobile}
             />
             <NavItem
               to="/collection-sheet"
               icon={Receipt}
               label="Collection Sheet"
               onClick={handleLinkClick}
+              isMobile={isMobile}
             />
             <NavItem
               to="/settlements"
               icon={Wallet}
               label="Settlements"
               onClick={handleLinkClick}
+              isMobile={isMobile}
             />
             <NavItem
               to="/pricing"
               icon={Tags}
               label="Pricing"
               onClick={handleLinkClick}
+              isMobile={isMobile}
             />
 
-            {/* Support */}
-            <li className="px-4 text-[11px] font-extrabold text-text-muted uppercase tracking-widest mb-2 mt-6">
+            {/* SUPPORT */}
+            <li
+              className={`
+              px-4 text-[11px] font-extrabold text-text-muted uppercase tracking-widest
+              mb-2 mt-6
+              ${isMobile ? "block" : "hidden group-hover:block"}
+            `}
+            >
               Support
             </li>
 
@@ -283,33 +333,38 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
               icon={HelpCircle}
               label="Enquiry"
               onClick={handleLinkClick}
+              isMobile={isMobile}
             />
-
             <NavItem
               to="/bookings"
               icon={ClipboardCheck}
               label="Bookings"
               onClick={handleLinkClick}
+              isMobile={isMobile}
             />
-
             <NavItem
               to="/import-logs"
               icon={FileText}
               label="Import Logs"
               onClick={handleLinkClick}
+              isMobile={isMobile}
             />
-
             <NavItem
               to="/settings"
               icon={Settings}
               label="Settings"
               onClick={handleLinkClick}
+              isMobile={isMobile}
             />
           </ul>
         </nav>
 
-        {/* Footer */}
-        <div className="p-6 border-t border-border/50 shrink-0 bg-card">
+        {/* FOOTER */}
+        <div
+          className={`p-6 border-t border-border/50 shrink-0 bg-card ${
+            isMobile ? "block" : "hidden group-hover:block"
+          }`}
+        >
           <button className="w-full flex items-center justify-center gap-2 text-danger bg-danger/10 hover:bg-danger/20 py-3 rounded-lg font-bold transition-colors text-sm">
             <LogOut size={18} />
             Logout Account
@@ -320,15 +375,16 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
   );
 };
 
-/* Helper Components */
+/* ---------- COMPONENTS ---------- */
 
-const NavItem = ({ to, icon: Icon, label, onClick }) => (
+const NavItem = ({ to, icon: Icon, label, onClick, isMobile }) => (
   <li>
     <NavLink
       to={to}
       onClick={onClick}
       className={({ isActive }) =>
-        `flex items-center px-4 py-3.5 rounded-lg mb-1 transition-all duration-200 group relative overflow-hidden ${
+        `flex items-center px-4 py-3.5 rounded-lg mb-1 transition-all duration-200 group/item relative overflow-hidden
+        ${
           isActive
             ? "bg-primary-light text-primary-text font-semibold shadow-sm"
             : "text-text-sub hover:bg-page hover:text-text-main"
@@ -340,54 +396,83 @@ const NavItem = ({ to, icon: Icon, label, onClick }) => (
           {isActive && (
             <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />
           )}
+
           <Icon
-            className={`w-5 h-5 mr-3 transition-colors ${
+            className={`w-5 h-5 mr-3 shrink-0 ${
               isActive
                 ? "text-primary"
-                : "text-text-sub group-hover:text-primary"
+                : "text-text-sub group-hover/item:text-primary"
             }`}
           />
-          <span className="truncate">{label}</span>
+
+          {/* Label: Always visible on Mobile OR on Desktop Hover */}
+          <span
+            className={`truncate ${
+              isMobile ? "inline" : "hidden group-hover:inline"
+            }`}
+          >
+            {label}
+          </span>
         </>
       )}
     </NavLink>
   </li>
 );
 
-const MenuButton = ({ label, icon: Icon, isOpen, isActive, onClick }) => (
+const MenuButton = ({
+  label,
+  icon: Icon,
+  isOpen,
+  isActive,
+  onClick,
+  isMobile,
+}) => (
   <button
     onClick={onClick}
-    className={`w-full flex items-center justify-between px-4 py-3.5 rounded-lg mb-1 transition-all duration-200 group ${
-      isActive
-        ? "bg-page text-text-main font-medium shadow-sm"
-        : "text-text-sub hover:bg-page hover:text-text-main"
-    }`}
+    className={`w-full flex items-center justify-between px-4 py-3.5 rounded-lg mb-1 transition-all duration-200 group/item
+      ${
+        isActive
+          ? "bg-page text-text-main font-medium shadow-sm"
+          : "text-text-sub hover:bg-page hover:text-text-main"
+      }`}
   >
     <div className="flex items-center">
       <Icon
-        className={`w-5 h-5 mr-3 transition-colors ${
-          isActive ? "text-primary" : "text-text-sub group-hover:text-primary"
+        className={`w-5 h-5 mr-3 ${
+          isActive
+            ? "text-primary"
+            : "text-text-sub group-hover/item:text-primary"
         }`}
       />
-      <span className="truncate">{label}</span>
+
+      <span
+        className={`truncate ${
+          isMobile ? "inline" : "hidden group-hover:inline"
+        }`}
+      >
+        {label}
+      </span>
     </div>
 
+    {/* Chevron: Always visible on Mobile OR on Desktop Hover */}
     <ChevronRight
       className={`w-4 h-4 text-text-sub transition-transform duration-300 ${
         isOpen ? "rotate-90" : ""
-      }`}
+      } ${isMobile ? "inline" : "hidden group-hover:inline"}`}
     />
   </button>
 );
 
-const SubMenu = ({ isOpen, children }) => (
+const SubMenu = ({ isOpen, children, isMobile }) => (
   <AnimatePresence>
     {isOpen && (
       <motion.ul
         initial={{ height: 0, opacity: 0 }}
         animate={{ height: "auto", opacity: 1 }}
         exit={{ height: 0, opacity: 0 }}
-        className="ml-5 pl-3 border-l-2 border-primary/20 overflow-hidden"
+        className={`ml-5 pl-3 border-l-2 border-primary/20 overflow-hidden ${
+          isMobile ? "block" : "hidden group-hover:block"
+        }`}
       >
         {children}
       </motion.ul>
@@ -401,7 +486,8 @@ const SubNavItem = ({ to, label, onClick }) => (
       to={to}
       onClick={onClick}
       className={({ isActive }) =>
-        `block px-4 py-2.5 text-[13px] rounded-r-lg transition-all duration-200 ${
+        `block px-4 py-2.5 text-[13px] rounded-r-lg transition-all duration-200
+        ${
           isActive
             ? "text-primary font-bold bg-primary-light/50 border-l-2 border-primary -ml-[2px]"
             : "text-text-sub hover:text-text-main hover:bg-page"

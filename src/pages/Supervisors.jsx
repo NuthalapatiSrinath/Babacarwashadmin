@@ -25,7 +25,7 @@ const Supervisors = () => {
   const [currentSearch, setCurrentSearch] = useState("");
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: 50,
     total: 0,
     totalPages: 1,
   });
@@ -205,13 +205,13 @@ const Supervisors = () => {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-8 flex justify-between items-end">
+    <div className="p-3 max-w-7xl mx-auto">
+      {/* <div className="mb-8 flex justify-between items-end">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Supervisors</h1>
           <p className="text-slate-500 mt-1">Manage team assignments</p>
         </div>
-      </div>
+      </div> */}
 
       {/* REUSABLE COMPONENT WITH EXPANDED ROW PROP */}
       <DataTable

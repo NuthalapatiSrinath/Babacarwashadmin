@@ -32,7 +32,7 @@ const Malls = () => {
   // -- Pagination --
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: 50,
     total: 0,
     totalPages: 1,
   });
@@ -219,13 +219,13 @@ const Malls = () => {
   ];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-8">
+    <div className="p-3 max-w-7xl mx-auto">
+      {/* <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-800">Malls</h1>
         <p className="text-slate-500 mt-1">
           Manage shopping malls and service charges
         </p>
-      </div>
+      </div> */}
 
       <DataTable
         title="All Malls"

@@ -9,11 +9,9 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 
-// Components
 import DataTable from "../components/DataTable";
 import RichDateRangePicker from "../components/inputs/RichDateRangePicker";
 
-// API
 import { customerService } from "../api/customerService";
 
 const CustomerHistory = () => {
@@ -23,22 +21,20 @@ const CustomerHistory = () => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
 
-  // Date Filters
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: 50, // <--- CHANGED: Default to 50
     total: 0,
     totalPages: 1,
   });
 
-  // --- Fetch Data ---
-  const fetchData = async (page = 1, limit = 10) => {
+  // <--- CHANGED: Default limit to 50
+  const fetchData = async (page = 1, limit = 50) => {
     setLoading(true);
     try {
-      // Send parameters exactly as your backend expects: startDate, endDate, search, status
       const res = await customerService.getHistory(
         id,
         page,
@@ -61,14 +57,10 @@ const CustomerHistory = () => {
     }
   };
 
-  // Initial Load
   useEffect(() => {
-    fetchData(1, 10);
-  }, [id]); // Reload if ID changes
+    fetchData(1, 50); // <--- CHANGED: Default to 50
+  }, [id]);
 
-  // --- Handlers ---
-
-  // Updates state when User picks from RichDateRangePicker
   const handleDateChange = (field, value) => {
     if (field === "clear") {
       setStartDate("");
@@ -80,7 +72,6 @@ const CustomerHistory = () => {
     }
   };
 
-  // Trigger API Call
   const handleSearch = () => {
     fetchData(1, pagination.limit);
   };
@@ -88,20 +79,21 @@ const CustomerHistory = () => {
   const handleExport = async () => {
     try {
       const blob = await customerService.exportHistory(id, startDate, endDate);
+
       const url = window.URL.createObjectURL(new Blob([blob]));
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute("download", `washes_report_${id}.csv`);
       document.body.appendChild(link);
       link.click();
-      link.parentNode.removeChild(link);
+      link.remove();
+
       toast.success("Download started");
     } catch (e) {
       toast.error("Export failed");
     }
   };
 
-  // --- Columns ---
   const columns = [
     {
       header: "Id",
@@ -190,8 +182,10 @@ const CustomerHistory = () => {
   ];
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 font-sans">
-      {/* 1. HEADER */}
+    // 1. CHANGED: min-h-screen (instead of h-screen) and removed overflow-hidden.
+    // This allows the page to grow vertically and scroll normally.
+    <div className="flex flex-col min-h-screen bg-slate-50 font-sans">
+      {/* HEADER */}
       <div className="bg-[#009ef7] px-6 py-4 flex items-center justify-between text-white shadow-md flex-shrink-0 z-20">
         <div className="flex items-center gap-4">
           <button
@@ -200,6 +194,7 @@ const CustomerHistory = () => {
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
+
           <div>
             <h1 className="text-lg font-bold tracking-wide leading-tight">
               Washes Report
@@ -217,13 +212,13 @@ const CustomerHistory = () => {
             <Download className="w-5 h-5" />
           </button>
 
-          {/* Mini Pagination */}
           <div className="bg-white/20 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-3 border border-white/10">
             <span>
-              {(pagination.page - 1) * pagination.limit + 1} -{" "}
+              {(pagination.page - 1) * pagination.limit + 1} –{" "}
               {Math.min(pagination.page * pagination.limit, pagination.total)}{" "}
               of {pagination.total}
             </span>
+
             <div className="flex gap-1 pl-3 border-l border-white/30">
               <button
                 disabled={pagination.page === 1}
@@ -232,6 +227,7 @@ const CustomerHistory = () => {
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
+
               <button
                 disabled={pagination.page === pagination.totalPages}
                 onClick={() => fetchData(pagination.page + 1, pagination.limit)}
@@ -244,19 +240,20 @@ const CustomerHistory = () => {
         </div>
       </div>
 
-      {/* 2. MAIN CONTENT */}
-      <div className="flex-1 overflow-auto p-6">
-        {/* Filters Section */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-6">
+      {/* 2. CHANGED: Content Wrapper 
+          - Removed flex-1, min-h-0, overflow-hidden
+          - This lets the container expand based on content height
+      */}
+      <div className="w-full max-w-7xl mx-auto p-6 md:p-8">
+        {/* Search Section */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-4">
           <div className="flex flex-col md:flex-row items-end gap-4">
-            {/* Custom Rich Calendar Component */}
             <RichDateRangePicker
               startDate={startDate}
               endDate={endDate}
               onChange={handleDateChange}
             />
 
-            {/* Search Button */}
             <button
               onClick={handleSearch}
               className="w-full md:w-auto px-8 py-2.5 bg-[#009ef7] hover:bg-[#0095e8] text-white font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-2 h-[50px]"
@@ -267,8 +264,11 @@ const CustomerHistory = () => {
           </div>
         </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px] flex flex-col">
+        {/* 3. CHANGED: Table Wrapper
+            - Removed flex/height constraints
+            - Kept styling for visuals
+        */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <DataTable
             columns={columns}
             data={data}

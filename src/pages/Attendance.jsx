@@ -56,7 +56,7 @@ const Attendance = () => {
   // Pagination State (Client-Side)
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: 50,
     total: 0,
     totalPages: 1,
   });
@@ -341,15 +341,15 @@ const Attendance = () => {
   ];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto min-h-screen font-sans bg-slate-50/30">
+    <div className="p-2 max-w-7xl mx-auto min-h-screen font-sans bg-slate-50/30">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
-        <div>
+        {/* <div>
           <h1 className="text-2xl font-bold text-slate-800">Attendance</h1>
           <p className="text-sm text-slate-500 mt-1">
             Manage daily logs for Workers and Staff
           </p>
-        </div>
+        </div> */}
         <button
           onClick={handleExport}
           className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm transition-all active:scale-95"

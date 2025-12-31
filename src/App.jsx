@@ -9,6 +9,8 @@ import { routes } from "./routes"; // Your route config file
 
 // Components
 import ProtectedRoute from "./components/ProtectedRoute";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 
 // --- Custom Loading Screen ---
 const LoadingScreen = () => (
@@ -92,6 +94,8 @@ function App() {
         {/* 2. PROTECTED ROUTES (Dashboard, Customers, etc.) */}
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<MainLayout />}>
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
             {/* Index Route (Default Dashboard) */}
             <Route
               index

@@ -34,13 +34,14 @@ const Buildings = () => {
   // -- Pagination --
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: 50, // <--- CHANGED: Default limit set to 50
     total: 0,
     totalPages: 1,
   });
 
   // --- Fetch Data ---
-  const fetchData = async (page = 1, limit = 10, search = "") => {
+  // <--- CHANGED: Default limit parameter set to 50
+  const fetchData = async (page = 1, limit = 50, search = "") => {
     setLoading(true);
     try {
       const response = await buildingService.list(page, limit, search);
@@ -203,13 +204,13 @@ const Buildings = () => {
   ];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-8">
+    <div className="p-2 max-w-7xl mx-auto">
+      {/* <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-800">Buildings</h1>
         <p className="text-slate-500 mt-1">
           Manage buildings, charges, and daily schedules
         </p>
-      </div>
+      </div> */}
 
       <DataTable
         title="All Buildings"

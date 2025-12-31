@@ -25,13 +25,14 @@ const Locations = () => {
   // -- Pagination State --
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: 50, // <--- CHANGED: Default limit set to 50
     total: 0,
     totalPages: 1,
   });
 
   // --- Fetch Data ---
-  const fetchData = async (page = 1, limit = 10, search = "") => {
+  // CHANGED: Default limit parameter set to 50
+  const fetchData = async (page = 1, limit = 50, search = "") => {
     setLoading(true);
     try {
       const response = await locationService.list(page, limit, search);
@@ -168,22 +169,12 @@ const Locations = () => {
   ];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Locations</h1>
-          <p className="text-slate-500 mt-1">
-            Manage service areas and addresses
-          </p>
-        </div>
-      </div>
-
+    <div className="p-3 max-w-7xl mx-auto">
       {/* Table */}
       <DataTable
         title="Location List"
         columns={columns}
-        data={getDisplayData()} // <--- CHANGED THIS: Uses the helper function
+        data={getDisplayData()}
         loading={loading}
         pagination={pagination}
         onPageChange={(newPage) => fetchData(newPage, pagination.limit)}

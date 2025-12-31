@@ -16,7 +16,7 @@ const ImportLogs = () => {
   // Pagination State
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: 50,
     total: 0,
     totalPages: 1,
   });
@@ -26,7 +26,7 @@ const ImportLogs = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // --- Fetch Data ---
-  const fetchData = async (page = 1, limit = 10) => {
+  const fetchData = async (page = 1, limit = 50) => {
     setLoading(true);
     try {
       const response = await importLogsService.list(page, limit);

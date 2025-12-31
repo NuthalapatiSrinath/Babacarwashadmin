@@ -88,4 +88,19 @@ export const customerService = {
     });
     return response.data;
   },
+
+  exportData: async () => {
+    const response = await api.get("/customers/export/list", {
+      responseType: "blob", // Critical: Tells axios to handle binary data
+    });
+    return response.data;
+  },
+
+  // 2. IMPORT (Keep as is)
+  importData: async (formData) => {
+    const response = await api.post("/customers/import/list", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  },
 };

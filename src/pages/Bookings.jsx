@@ -16,7 +16,7 @@ const Bookings = () => {
   // Pagination
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: 50,
     total: 0,
     totalPages: 1,
   });
@@ -26,7 +26,7 @@ const Bookings = () => {
   const [selectedBooking, setSelectedBooking] = useState(null);
 
   // --- Fetch Data ---
-  const fetchData = async (page = 1, limit = 10, search = "") => {
+  const fetchData = async (page = 1, limit = 50, search = "") => {
     setLoading(true);
     try {
       const response = await bookingService.list(page, limit, search);
@@ -48,7 +48,7 @@ const Bookings = () => {
   };
 
   useEffect(() => {
-    fetchData(1, 10);
+    fetchData(1, 50);
   }, []);
 
   // --- Handlers ---
@@ -278,9 +278,9 @@ const Bookings = () => {
   ];
 
   return (
-    <div className="p-6 w-full h-[calc(100vh-80px)] flex flex-col overflow-hidden font-sans">
+    <div className="p-2 w-full max-w-7xl mx-auto flex flex-col font-sans">
       <div className="mb-6 flex-shrink-0">
-        <h1 className="text-2xl font-bold text-slate-800">Bookings</h1>
+        {/* <h1 className="text-2xl font-bold text-slate-800">Bookings</h1> */}
         {/* <p className="text-slate-500 text-sm mt-1">
           Manage customer booking requests
         </p> */}

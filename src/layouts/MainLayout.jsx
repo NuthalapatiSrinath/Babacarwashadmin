@@ -8,6 +8,7 @@ const MainLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
+  const [zoomScale, setZoomScale] = useState(1);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -21,30 +22,49 @@ const MainLayout = () => {
 
   useEffect(() => {
     const handleResize = () => {
-      const mobile = window.innerWidth < 1024;
+      const width = window.innerWidth;
+      const mobile = width < 1024;
+
       setIsMobile(mobile);
 
       if (mobile) setIsSidebarOpen(false);
       if (!mobile && !isSidebarOpen) setIsSidebarOpen(true);
+
+      if (width < 1100) {
+        const scale = width / 1100;
+        setZoomScale(scale);
+      } else {
+        setZoomScale(1);
+      }
     };
 
+    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // 👉 Zoom ONLY on mobile
+  const contentStyle = isMobile
+    ? {
+        zoom: zoomScale,
+        MozTransform: `scale(${zoomScale})`,
+        MozTransformOrigin: "top left",
+        width: "1100px",
+      }
+    : {};
+
   return (
-    <div className="min-h-screen bg-page text-text-main font-sans selection:bg-primary selection:text-white transition-colors duration-300 flex">
+    <div className="min-h-screen bg-page text-text-main font-sans transition-colors duration-300 flex overflow-x-hidden">
       <Sidebar
         isOpen={isSidebarOpen}
         isMobile={isMobile}
         onClose={() => setIsSidebarOpen(false)}
       />
 
-      {/* Main Content Area */}
       <div
-        className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ease-in-out ${
-          !isMobile && isSidebarOpen ? "ml-[280px]" : "ml-0"
-        }`}
+        className={`flex-1 flex flex-col min-h-screen transition-all duration-300
+          ${!isMobile ? "ml-[72px]" : "ml-0"}
+        `}
       >
         <Header
           onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -52,10 +72,13 @@ const MainLayout = () => {
           toggleTheme={toggleTheme}
         />
 
-        {/* Content — padding removed */}
-        <main className="flex-1 overflow-y-auto">
-          {/* container spacing removed */}
-          <div className="animate-fade-in">
+        <main className="flex-1 overflow-x-hidden w-full bg-page">
+          <div
+            className={`animate-fade-in origin-top-left ${
+              isMobile ? "" : "max-w-[1400px] mx-auto w-full"
+            }`}
+            style={contentStyle}
+          >
             <Outlet />
           </div>
         </main>

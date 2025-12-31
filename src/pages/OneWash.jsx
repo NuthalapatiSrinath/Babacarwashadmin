@@ -57,7 +57,7 @@ const OneWash = () => {
 
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: 50,
     total: 0,
     totalPages: 1,
   });
@@ -79,13 +79,13 @@ const OneWash = () => {
     };
 
     loadWorkers();
-    fetchData(1, 10);
+    fetchData(1, 50);
   }, []);
 
   // --------------------------------
   // FETCH DATA
   // --------------------------------
-  const fetchData = async (page = 1, limit = 10) => {
+  const fetchData = async (page = 1, limit = 50) => {
     setLoading(true);
 
     try {
@@ -333,7 +333,7 @@ const OneWash = () => {
   ];
 
   return (
-    <div className="p-6 w-full h-[calc(100vh-80px)] flex flex-col font-sans overflow-hidden">
+    <div className="p-6 w-full max-w-7xl mx-auto flex flex-col font-sans">
       {/* HEADER */}
       <div className="mb-6 flex flex-col xl:flex-row xl:items-center justify-between gap-4 flex-shrink-0">
         <div>

@@ -65,7 +65,6 @@ const Login = () => {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#0f172a] relative overflow-hidden font-sans">
       {/* --- CSS FIX FOR AUTOFILL BACKGROUND --- */}
-      {/* This forces the browser to keep the background transparent even when autofilled */}
       <style>{`
         input:-webkit-autofill,
         input:-webkit-autofill:hover, 
@@ -76,11 +75,27 @@ const Login = () => {
             transition: background-color 5000s ease-in-out 0s;
             box-shadow: inset 0 0 20px 20px #23232329;
         }
+        @keyframes blob {
+          0% { transform: translate(0px, 0px) scale(1); }
+          33% { transform: translate(30px, -50px) scale(1.1); }
+          66% { transform: translate(-20px, 20px) scale(0.9); }
+          100% { transform: translate(0px, 0px) scale(1); }
+        }
+        .animate-blob {
+          animation: blob 10s infinite;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
       `}</style>
 
-      {/* Background Effects */}
-      <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-purple-600/20 rounded-full blur-[120px] pointer-events-none" />
+      {/* Background Effects with Animation */}
+      <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-indigo-600/30 rounded-full blur-[120px] pointer-events-none animate-blob" />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-purple-600/30 rounded-full blur-[120px] pointer-events-none animate-blob animation-delay-2000" />
+      <div className="absolute bottom-[20%] left-[20%] w-[400px] h-[400px] bg-pink-600/20 rounded-full blur-[120px] pointer-events-none animate-blob animation-delay-4000" />
 
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -90,20 +105,23 @@ const Login = () => {
       >
         <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl p-8 md:p-10">
           <div className="text-center mb-10">
+            {/* Circular Logo with Animation & Gradient Border */}
             <motion.div
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ type: "spring", stiffness: 200, damping: 20 }}
-              className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-indigo-500/25 overflow-hidden bg-white"
+              className="relative w-24 h-24 mx-auto mb-6"
             >
-              {/* Image from public folder */}
-              <img
-                src="/carwash.jpeg"
-                alt="Car Wash Logo"
-                className="w-full h-full object-cover"
-              />
+              <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-full animate-[spin_4s_linear_infinite] blur-sm opacity-70"></div>
+              <div className="relative w-full h-full rounded-full flex items-center justify-center overflow-hidden bg-slate-900 border-2 border-white/20 shadow-lg shadow-indigo-500/25 p-1">
+                <img
+                  src="/carwash.jpeg"
+                  alt="Car Wash Logo"
+                  className="w-full h-full object-cover rounded-full animate-[spin_10s_linear_infinite]"
+                />
+              </div>
             </motion.div>
-            <h1 className="text-3xl font-bold text-white tracking-tight mb-2">
+            <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 to-purple-200 tracking-tight mb-2">
               Admin Portal
             </h1>
             <p className="text-slate-400 text-sm">

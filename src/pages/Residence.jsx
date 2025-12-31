@@ -46,7 +46,7 @@ const Residence = () => {
 
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: 50,
     total: 0,
     totalPages: 1,
   });
@@ -66,11 +66,11 @@ const Residence = () => {
     };
 
     loadWorkers();
-    fetchData(1, 10);
+    fetchData(1, 50);
   }, []);
 
   // --- Fetch Data ---
-  const fetchData = async (page = 1, limit = 10) => {
+  const fetchData = async (page = 1, limit = 50) => {
     setLoading(true);
     try {
       const res = await jobService.list(page, limit, searchTerm, filters);
@@ -294,14 +294,11 @@ const Residence = () => {
   ];
 
   return (
-    <div className="p-6 w-full h-[calc(100vh-80px)] flex flex-col font-sans">
+    <div className="p-6 w-full max-w-7xl mx-auto flex flex-col font-sans">
       {/* Header */}
       <div className="mb-6 flex flex-col xl:flex-row xl:items-center justify-between gap-4 flex-shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Residence Jobs</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Daily Work Schedule & Status
-          </p>
         </div>
 
         <div className="flex gap-3">

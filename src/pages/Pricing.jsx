@@ -27,6 +27,7 @@ const Pricing = () => {
     setLoading(true);
     try {
       const res = await pricingService.list(page, limit);
+
       setData(res.data || []);
       setPagination({
         page: Number(page),
@@ -49,22 +50,23 @@ const Pricing = () => {
     setSelectedPricing(null);
     setIsModalOpen(true);
   };
+
   const handleEdit = (row) => {
     setSelectedPricing(row);
     setIsModalOpen(true);
   };
+
   const handleDelete = async (row) => {
     if (!window.confirm("Delete this pricing?")) return;
     try {
       await pricingService.delete(row._id);
       toast.success("Deleted");
       fetchData(pagination.page, pagination.limit);
-    } catch (e) {
+    } catch {
       toast.error("Delete failed");
     }
   };
 
-  // --- Helper to render price item ---
   const PriceItem = ({ label, value }) => {
     if (!value) return null;
     return (
@@ -75,7 +77,6 @@ const Pricing = () => {
     );
   };
 
-  // --- Columns ---
   const columns = [
     {
       header: "Service Type",
@@ -87,6 +88,7 @@ const Pricing = () => {
         </span>
       ),
     },
+
     {
       header: "Premise",
       accessor: "mall",
@@ -97,20 +99,19 @@ const Pricing = () => {
         </span>
       ),
     },
+
     {
       header: "Pricing",
       accessor: "pricing",
       className: "align-top py-3",
       render: (row) => {
-        // Safe access to nested objects
         const sedan = row.sedan || {};
         const suv = row["4x4"] || {};
 
         return (
           <div className="flex flex-col gap-1.5 text-sm">
-            {/* 1. SEDAN ROW */}
             <div className="flex flex-wrap items-center">
-              <span className="font-bold text-slate-900 border-b border-slate-900 leading-none mr-2">
+              <span className="font-bold text-slate-900 border-b mr-2">
                 SEDAN
               </span>
               <PriceItem label="Onetime" value={sedan.onetime} />
@@ -120,10 +121,9 @@ const Pricing = () => {
               <PriceItem label="Daily" value={sedan.daily} />
             </div>
 
-            {/* 2. 4x4 ROW */}
             <div className="flex flex-wrap items-center">
-              <span className="font-bold text-slate-900 border-b border-slate-900 leading-none mr-2">
-                4x4
+              <span className="font-bold text-slate-900 border-b mr-2">
+                4×4
               </span>
               <PriceItem label="Onetime" value={suv.onetime} />
               <PriceItem label="Once" value={suv.once} />
@@ -135,6 +135,7 @@ const Pricing = () => {
         );
       },
     },
+
     {
       header: "Actions",
       className: "text-right w-24 align-top py-4",
@@ -142,13 +143,14 @@ const Pricing = () => {
         <div className="flex justify-end gap-3">
           <button
             onClick={() => handleEdit(row)}
-            className="text-slate-700 hover:text-black transition-colors"
+            className="text-slate-700 hover:text-black transition"
           >
             <Edit2 className="w-5 h-5" />
           </button>
+
           <button
             onClick={() => handleDelete(row)}
-            className="text-red-500 hover:text-red-700 transition-colors"
+            className="text-red-500 hover:text-red-700 transition"
           >
             <Trash2 className="w-5 h-5" />
           </button>
@@ -158,29 +160,29 @@ const Pricing = () => {
   ];
 
   return (
-    <div className="p-6 w-full h-[calc(100vh-80px)] flex flex-col font-sans">
+    <div className="p-6 w-full max-w-7xl mx-auto">
+      {/* HEADER */}
       <div className="mb-6 flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Pricing</h1>
-        </div>
+        <h1 className="text-2xl font-bold text-slate-800">Pricing</h1>
+
         <button
           onClick={handleCreate}
-          className="px-5 py-2.5 bg-[#009ef7] text-white rounded-lg font-bold text-sm shadow flex items-center gap-2 hover:bg-[#0095e8]"
+          className="px-5 py-2.5 bg-[#009ef7] text-white rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-[#0095e8]"
         >
           <Plus className="w-5 h-5" /> Add Pricing
         </button>
       </div>
 
-      <div className="flex-1 bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-        <DataTable
-          columns={columns}
-          data={data}
-          loading={loading}
-          pagination={pagination}
-          onPageChange={(p) => fetchData(p, pagination.limit)}
-          onLimitChange={(l) => fetchData(1, l)}
-        />
-      </div>
+      {/* TABLE — natural height (NO STRETCH) */}
+      <DataTable
+        title="Data List"
+        columns={columns}
+        data={data}
+        loading={loading}
+        pagination={pagination}
+        onPageChange={(p) => fetchData(p, pagination.limit)}
+        onLimitChange={(l) => fetchData(1, l)}
+      />
 
       <PricingModal
         isOpen={isModalOpen}

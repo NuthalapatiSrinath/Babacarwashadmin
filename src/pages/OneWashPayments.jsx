@@ -88,10 +88,10 @@ const OneWashPayments = () => {
       }
     };
     loadWorkers();
-    fetchData(1, 10);
+    fetchData(1, 50);
   }, []);
 
-  const fetchData = async (page = 1, limit = 10) => {
+  const fetchData = async (page = 1, limit = 50) => {
     setLoading(true);
     try {
       const apiFilters = { ...filters };
@@ -349,7 +349,7 @@ const OneWashPayments = () => {
   ];
 
   return (
-    <div className="p-6 w-full h-[calc(100vh-80px)] flex flex-col font-sans">
+    <div className="p-6 w-full max-w-7xl mx-auto flex flex-col font-sans">
       {/* Stats Bar */}
       <div className="bg-indigo-600 text-white p-4 rounded-xl shadow-lg mb-6 flex flex-col md:flex-row justify-between items-center gap-4 flex-shrink-0">
         <div className="flex items-center gap-3">

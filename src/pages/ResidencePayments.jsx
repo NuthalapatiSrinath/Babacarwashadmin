@@ -72,7 +72,7 @@ const ResidencePayments = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: 50,
     total: 0,
     totalPages: 1,
   });
@@ -100,10 +100,10 @@ const ResidencePayments = () => {
       }
     };
     loadFilters();
-    fetchData(1, 10);
+    fetchData(1, 50);
   }, []);
 
-  const fetchData = async (page = 1, limit = 10) => {
+  const fetchData = async (page = 1, limit = 50) => {
     setLoading(true);
     try {
       const apiFilters = { ...filters };
@@ -381,7 +381,7 @@ const ResidencePayments = () => {
   ];
 
   return (
-    <div className="p-6 w-full h-[calc(100vh-80px)] flex flex-col font-sans">
+    <div className="p-6 w-full max-w-7xl mx-auto flex flex-col font-sans">
       <div className="bg-indigo-600 text-white p-4 rounded-xl shadow-lg mb-4 flex justify-between items-center shrink-0">
         <div>
           <h2 className="text-xl font-bold">Total {stats.totalAmount}</h2>
