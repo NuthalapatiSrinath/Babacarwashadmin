@@ -14,36 +14,30 @@ const ReceiptModal = ({ isOpen, onClose, data }) => {
     if (!receiptRef.current) return;
     setDownloading(true);
     try {
-      // Wait for image to load
       await new Promise((resolve) => setTimeout(resolve, 500));
-
       const canvas = await html2canvas(receiptRef.current, {
-        scale: 2, // High resolution
-        useCORS: true, // Allow loading local/external images
+        scale: 2,
+        useCORS: true,
         backgroundColor: "#ffffff",
       });
-
       const image = canvas.toDataURL("image/png");
       const link = document.createElement("a");
       link.href = image;
-      // Download as Receipt
-      link.download = `Receipt_${data.id || data._id}.png`;
+      link.download = `Receipt_${data.id || "000"}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-
       toast.success("Receipt downloaded successfully");
     } catch (error) {
-      console.error("Download failed", error);
-      toast.error("Failed to download receipt");
+      console.error(error);
+      toast.error("Download failed");
     } finally {
       setDownloading(false);
     }
   };
 
-  // Format Date: DD/MM/YY
   const formatDate = (dateString) => {
-    if (!dateString) return "-";
+    if (!dateString) return "";
     return new Date(dateString).toLocaleDateString("en-GB", {
       day: "2-digit",
       month: "2-digit",
@@ -51,181 +45,163 @@ const ReceiptModal = ({ isOpen, onClose, data }) => {
     });
   };
 
-  // Derived Values
-  const receiptNo = data.id || "REC-000";
-  const carNo = data.vehicle?.registration_no || "-";
-  const parkingNo = data.vehicle?.parking_no || "-";
-  const locationName =
-    data.mall?.name || data.building?.name || "Baba Car Wash Site";
-  const customerName = data.customer
-    ? `${data.customer.firstName || ""} ${data.customer.lastName || ""}`
-    : "Guest";
-  const amount = data.amount_paid || data.total_amount || 0;
+  const amount = data.amount_paid || 0;
+  const dateStr = formatDate(data.createdAt);
+
+  const monthName = data.createdAt
+    ? new Date(data.createdAt).toLocaleString("default", { month: "long" })
+    : "Current Month";
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col"
+          className="bg-transparent w-full max-w-xl flex flex-col items-center"
         >
-          {/* Header Actions */}
-          <div className="flex justify-between items-center p-4 border-b bg-gray-50">
-            <h3 className="font-bold text-gray-700">View Receipt</h3>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-200 rounded-full transition-colors"
-            >
-              <X className="w-5 h-5 text-gray-500" />
-            </button>
-          </div>
-
-          {/* --- RECEIPT PREVIEW AREA --- */}
-          <div className="p-6 bg-gray-100 flex justify-center overflow-auto">
-            {/* ACTUAL RECEIPT DOM NODE */}
-            <div
-              ref={receiptRef}
-              className="bg-white w-[450px] p-8 shadow-md text-black font-sans relative"
-              style={{ minHeight: "600px" }}
-            >
-              {/* Logo Section */}
-              <div className="flex flex-col items-center mb-6">
-                <div className="w-16 h-16 mb-2">
-                  <img
-                    src="/carwash.jpeg"
-                    alt="Logo"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-                <h1 className="text-xl font-bold uppercase tracking-wide text-center">
-                  BABA CAR WASHING & CLEANING LLC
-                </h1>
+          {/* --- RECEIPT PAPER START --- */}
+          <div
+            ref={receiptRef}
+            className="bg-white p-10 w-full shadow-2xl text-slate-900 font-sans text-sm relative"
+            style={{ minHeight: "600px" }}
+          >
+            {/* Header */}
+            <div className="flex flex-col items-center mb-4 text-center">
+              <div className="w-16 h-16 mb-2 rounded-full overflow-hidden">
+                <img
+                  src="/carwash.jpeg"
+                  alt="Logo"
+                  className="w-full h-full object-contain"
+                />
               </div>
 
-              {/* Info Grid */}
-              <div className="flex justify-between mb-6 text-sm">
-                {/* Left Side */}
-                <div className="space-y-1">
-                  <div>
-                    <span className="font-bold">Issued To:</span> {customerName}
-                  </div>
-                  <div>
-                    <span className="font-bold">Car No:</span> {carNo}
-                  </div>
-                  <div>
-                    <span className="font-bold">Parking No:</span> {parkingNo}
-                  </div>
-                  <div>
-                    <span className="font-bold">Building Name:</span>{" "}
-                    {locationName}
-                  </div>
-                </div>
+              {/* UPDATED: Company Name */}
+              <h1 className="text-lg font-bold uppercase tracking-wide">
+                BABA CAR WASHING AND CLEANING L.L.C.
+              </h1>
 
-                {/* Right Side */}
-                <div className="text-right space-y-1">
-                  <div>
-                    <span className="font-bold">Receipt No:</span> {receiptNo}
-                  </div>
-                  <div>
-                    <span className="font-bold">Date:</span>{" "}
-                    {formatDate(data.createdAt)}
-                  </div>
-                  <div>
-                    <span className="font-bold">Mode:</span>{" "}
-                    <span className="uppercase">{data.payment_mode}</span>
-                  </div>
-                </div>
+              <p className="text-xs text-slate-500 mt-1">Dubai - UAE</p>
+
+              {/* UPDATED: Mobile Number */}
+              <p className="text-xs text-slate-500">Mob: 055 241 1075</p>
+
+              {/* UPDATED: TRN Number */}
+              <p className="text-xs text-slate-500 font-bold mt-1">
+                TRN: 105021812000003
+              </p>
+            </div>
+
+            {/* Title */}
+            <div className="text-center font-bold uppercase text-base mb-4 tracking-wider text-slate-700">
+              CASH RECEIPT
+            </div>
+
+            {/* Separator - Dotted Line */}
+            <div className="border-t-2 border-dashed border-gray-300 mb-4"></div>
+
+            {/* Metadata Row: Red No & Date */}
+            <div className="flex justify-between items-center mb-6 font-bold text-sm">
+              <div className="flex items-center">
+                <span className="text-slate-800 mr-2">No:</span>
+                <span className="text-[#ef4444] text-lg">
+                  {data.id || "000000"}
+                </span>
               </div>
+              <div>
+                <span className="text-slate-800 mr-2">Date:</span>
+                <span>{dateStr}</span>
+              </div>
+            </div>
 
-              {/* Table */}
-              <div className="mb-6">
-                <div className="grid grid-cols-12 bg-gray-200 p-2 font-bold text-sm border-b border-gray-300">
-                  <div className="col-span-6">Description</div>
-                  <div className="col-span-2 text-center">Unit Price</div>
-                  <div className="col-span-2 text-center">Qty</div>
-                  <div className="col-span-2 text-right">Total</div>
-                </div>
-                <div className="grid grid-cols-12 p-2 text-sm border-b border-gray-100">
-                  <div className="col-span-6">CAR WASH PAYMENT</div>
-                  <div className="col-span-2 text-center">1</div>
-                  <div className="col-span-2 text-center">{amount}</div>
-                  <div className="col-span-2 text-right">{amount}</div>
-                </div>
-                {/* Total Row */}
-                <div className="grid grid-cols-12 bg-gray-100 p-2 font-bold text-sm">
-                  <div className="col-span-10 text-right pr-4">Total</div>
-                  <div className="col-span-2 text-right">{amount}</div>
+            {/* Fields with Dotted Lines */}
+            <div className="space-y-4 text-sm font-medium">
+              {/* Car No */}
+              <div className="flex items-end">
+                <span className="font-bold w-24 whitespace-nowrap">
+                  Car No:
+                </span>
+                <div className="flex-1 border-b-2 border-dotted border-gray-400 text-center pb-1 relative top-1.5">
+                  {data.vehicle?.registration_no || "-"}
                 </div>
               </div>
 
-              <div className="text-center font-bold text-sm mb-6 uppercase">
-                THIS IS SYSTEM GENERATED RECEIPT
-              </div>
-
-              {/* Bank Details */}
-              <div className="mb-6">
-                <h3 className="text-red-500 font-bold mb-2">Bank Details</h3>
-                <div className="text-xs space-y-1 text-gray-800">
-                  <div className="grid grid-cols-3">
-                    <span className="font-bold">Bank Address:</span>
-                    <span className="col-span-2">Ummhurrair Dubai UAE</span>
-                  </div>
-                  <div className="grid grid-cols-3">
-                    <span className="font-bold">Swift Code:</span>
-                    <span className="col-span-2">NRAKAEAK</span>
-                  </div>
-                  <div className="grid grid-cols-3">
-                    <span className="font-bold">Bank Name:</span>
-                    <span className="col-span-2">
-                      Rak Bank(National Bank of Ras Alkhaimah)
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-3">
-                    <span className="font-bold">Bank Account:</span>
-                    <span className="col-span-2">0033422488061</span>
-                  </div>
-                  <div className="grid grid-cols-3">
-                    <span className="font-bold">Account Name:</span>
-                    <span className="col-span-2">
-                      Baba car washing and cleaning
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-3">
-                    <span className="font-bold">IBAN No:</span>
-                    <span className="col-span-2">
-                      AE46 0400 0000 3342 2488 061
-                    </span>
-                  </div>
+              {/* Parking No */}
+              <div className="flex items-end">
+                <span className="font-bold w-24 whitespace-nowrap">
+                  Parking No:
+                </span>
+                <div className="flex-1 border-b-2 border-dotted border-gray-400 text-center pb-1 relative top-1.5">
+                  {data.vehicle?.parking_no || "-"}
                 </div>
               </div>
 
-              {/* Footer Note */}
-              <div className="text-[10px] text-gray-600 mb-6 leading-tight">
-                Please mention your vehicle number and building name in the
-                payment receipt and send an email to +971552411075 or
-                customerregistration@babagroup.ae
+              {/* Building */}
+              <div className="flex items-end">
+                <span className="font-bold whitespace-nowrap mr-2">
+                  Office / Residence Building:
+                </span>
+                <div className="flex-1 border-b-2 border-dotted border-gray-400 text-center pb-1 relative top-1.5 uppercase truncate">
+                  {data.building?.name || "-"}
+                </div>
               </div>
 
-              <div className="text-center font-bold text-sm uppercase border-t pt-4">
-                THANK YOU FOR CHOOSING BABA CAR WASH
+              {/* Bill Amount */}
+              <div className="flex items-end">
+                <span className="font-bold w-24 whitespace-nowrap">
+                  Bill Amount:
+                </span>
+                <div className="flex-1 border-b-2 border-dotted border-gray-400 text-center pb-1 relative top-1.5">
+                  For the month of {monthName}
+                </div>
+              </div>
+
+              {/* VAT */}
+              <div className="flex items-end">
+                <span className="font-bold w-24 whitespace-nowrap">
+                  VAT 5%:
+                </span>
+                <div className="flex-1 border-b-2 border-dotted border-gray-400 text-center pb-1 relative top-1.5">
+                  -
+                </div>
+              </div>
+
+              {/* Total AED */}
+              <div className="flex items-end">
+                <span className="font-bold w-24 whitespace-nowrap">
+                  Total AED:
+                </span>
+                <div className="flex-1 border-b-2 border-dotted border-gray-400 text-center pb-1 relative top-1.5 font-bold">
+                  {amount} د.إ
+                </div>
+              </div>
+
+              {/* Receiver */}
+              <div className="flex items-end pt-4">
+                <span className="font-bold w-24 whitespace-nowrap">
+                  Receiver:
+                </span>
+                <div className="flex-1 border-b-2 border-dotted border-gray-400 text-center pb-1 relative top-1.5">
+                  {/* Intentionally Empty */}
+                </div>
               </div>
             </div>
           </div>
+          {/* --- RECEIPT PAPER END --- */}
 
-          {/* Footer Actions */}
-          <div className="p-4 bg-white border-t flex justify-end gap-3">
+          {/* Buttons */}
+          <div className="flex gap-3 mt-6">
             <button
               onClick={onClose}
-              className="px-6 py-2 border rounded-lg hover:bg-gray-50 font-bold text-gray-600"
+              className="px-6 py-2 bg-white text-slate-700 font-bold rounded-lg shadow hover:bg-slate-50 transition-colors"
             >
               Close
             </button>
             <button
               onClick={handleDownload}
               disabled={downloading}
-              className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold flex items-center gap-2 shadow-lg"
+              className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-lg shadow hover:bg-indigo-700 transition-colors flex items-center gap-2"
             >
               {downloading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

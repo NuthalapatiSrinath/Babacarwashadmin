@@ -21,15 +21,15 @@ import DataTable from "../components/DataTable";
 import RichDateRangePicker from "../components/inputs/RichDateRangePicker";
 
 // Modals
-import ResidenceReceiptModal from "../components/modals/ResidenceReceiptModal";
-import ReceiptModal from "../components/modals/ReceiptModal";
+import InvoiceModal from "../components/modals/InvoiceModal"; // Use the new InvoiceModal
+import ReceiptModal from "../components/modals/ReceiptModal"; // Use the new ReceiptModal
 import EditPaymentModal from "../components/modals/EditPaymentModal";
 import ViewPaymentModal from "../components/modals/ViewPaymentModal";
 
 // API
 import { paymentService } from "../api/paymentService";
 import { workerService } from "../api/workerService";
-import { buildingService } from "../api/buildingService"; // Import Building Service
+import { buildingService } from "../api/buildingService";
 
 const ResidencePayments = () => {
   const [loading, setLoading] = useState(false);
@@ -66,7 +66,7 @@ const ResidencePayments = () => {
     worker: "",
     status: "",
     onewash: "false",
-    building: "", // Building Filter State
+    building: "",
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -87,7 +87,6 @@ const ResidencePayments = () => {
   useEffect(() => {
     const loadFilters = async () => {
       try {
-        // Fetch Workers and Buildings in parallel
         const [resWorkers, resBuildings] = await Promise.all([
           workerService.list(1, 1000),
           buildingService.list(1, 1000),
@@ -327,6 +326,7 @@ const ResidencePayments = () => {
         <button
           onClick={() => setInvoiceData(r)}
           className="text-slate-400 hover:text-indigo-600"
+          title="View Invoice"
         >
           <FileText className="w-4 h-4 mx-auto" />
         </button>
@@ -339,6 +339,7 @@ const ResidencePayments = () => {
         <button
           onClick={() => setReceiptData(r)}
           className="text-slate-400 hover:text-indigo-600"
+          title="View Receipt"
         >
           <FileText className="w-4 h-4 mx-auto" />
         </button>
@@ -493,17 +494,19 @@ const ResidencePayments = () => {
         />
       </div>
 
-      <ResidenceReceiptModal
+      {/* --- INTEGRATED MODALS --- */}
+      <InvoiceModal
         isOpen={!!invoiceData}
         onClose={() => setInvoiceData(null)}
         data={invoiceData}
-        type="Invoice"
       />
       <ReceiptModal
         isOpen={!!receiptData}
         onClose={() => setReceiptData(null)}
         data={receiptData}
       />
+
+      {/* Other Modals */}
       <EditPaymentModal
         isOpen={!!editPayment}
         onClose={() => setEditPayment(null)}
