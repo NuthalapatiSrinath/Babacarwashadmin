@@ -523,7 +523,7 @@ const Customers = () => {
   ];
 
   return (
-    <div className="p-6 w-full max-w-7xl mx-auto flex flex-col font-sans">
+    <div className="p-3 w-full">
       <input
         type="file"
         accept=".csv, .xlsx"

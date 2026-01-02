@@ -180,7 +180,7 @@ const Sites = () => {
   ];
 
   return (
-    <div className="p-3 max-w-7xl mx-auto">
+    <div className="p-3 w-full">
       {/* <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-800">Sites</h1>
         <p className="text-slate-500 mt-1">

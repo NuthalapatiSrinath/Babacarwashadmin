@@ -160,7 +160,7 @@ const Pricing = () => {
   ];
 
   return (
-    <div className="p-6 w-full max-w-7xl mx-auto">
+    <div className="w-full min-h-screen p-3 font-sans bg-slate-50/30">
       {/* HEADER */}
       <div className="mb-6 flex justify-between items-center">
         <h1 className="text-2xl font-bold text-slate-800">Pricing</h1>

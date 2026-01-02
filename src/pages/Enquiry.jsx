@@ -220,7 +220,7 @@ const Enquiry = () => {
 
   return (
     // FIX: Using h-screen minus header/padding offset to force full height
-    <div className="p-6 w-full max-w-7xl mx-auto flex flex-col font-sans">
+    <div className="p-3 w-full">
       {/* 1. Header (Fixed Height) */}
       <div className="mb-6 flex-shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

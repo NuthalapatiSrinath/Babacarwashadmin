@@ -205,7 +205,7 @@ const Supervisors = () => {
   };
 
   return (
-    <div className="p-3 max-w-7xl mx-auto">
+    <div className="p-3 w-full">
       {/* <div className="mb-8 flex justify-between items-end">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Supervisors</h1>

@@ -416,7 +416,7 @@ const Staff = () => {
 
   return (
     // UPDATED: Added px-6 md:px-12 py-8 for nicer spacing
-    <div className="px-6 md:px-12 py-8 w-full max-w-[1920px] mx-auto flex flex-col font-sans">
+    <div className="px-6 md:px-9 py-8 w-full flex flex-col font-sans">
       <input
         type="file"
         accept=".xlsx"

@@ -341,7 +341,7 @@ const Attendance = () => {
   ];
 
   return (
-    <div className="p-2 max-w-7xl mx-auto min-h-screen font-sans bg-slate-50/30">
+    <div className="w-full min-h-screen font-sans bg-slate-50/30">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
         {/* <div>

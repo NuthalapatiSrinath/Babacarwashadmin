@@ -87,7 +87,7 @@ const WorkRecords = () => {
   const years = [2024, 2025, 2026, 2027];
 
   return (
-    <div className="p-6 w-full h-[calc(100vh-80px)] flex flex-col font-sans bg-slate-50/50">
+    <div className="p-3 w-full">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
           <FileSpreadsheet className="w-8 h-8 text-indigo-600" />

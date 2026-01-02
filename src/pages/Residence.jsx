@@ -294,7 +294,7 @@ const Residence = () => {
   ];
 
   return (
-    <div className="p-6 w-full max-w-7xl mx-auto flex flex-col font-sans">
+    <div className="p-3 w-full">
       {/* Header */}
       <div className="mb-6 flex flex-col xl:flex-row xl:items-center justify-between gap-4 flex-shrink-0">
         <div>

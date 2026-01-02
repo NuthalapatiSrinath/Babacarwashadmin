@@ -278,7 +278,7 @@ const Bookings = () => {
   ];
 
   return (
-    <div className="p-2 w-full max-w-7xl mx-auto flex flex-col font-sans">
+    <div className="p-3 w-full">
       <div className="mb-6 flex-shrink-0">
         {/* <h1 className="text-2xl font-bold text-slate-800">Bookings</h1> */}
         {/* <p className="text-slate-500 text-sm mt-1">

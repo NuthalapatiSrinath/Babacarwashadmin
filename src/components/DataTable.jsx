@@ -141,8 +141,8 @@ const DataTable = ({
 
         {/* 👇 SCROLL ONLY INSIDE TABLE (Desktop + Mobile) */}
         <div className="flex-1 w-full overflow-x-auto overflow-y-auto">
-          <div className="min-w-full max-w-full">
-            <table className="w-full md:min-w-[1600px] whitespace-nowrap text-left border-collapse">
+          <div className="inline-block min-w-full">
+            <table className="min-w-full whitespace-nowrap text-left border-collapse">
               <thead className="sticky top-0 bg-slate-50 border-b z-10 shadow-sm">
                 <tr>
                   {columns.map((c, i) => (

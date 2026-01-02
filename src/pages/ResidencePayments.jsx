@@ -4,41 +4,37 @@ import {
   Search,
   Filter,
   User,
-  Banknote,
+  DollarSign,
   CreditCard,
+  Banknote,
   Landmark,
   CheckCircle,
+  AlertCircle,
+  FileText,
   Edit2,
   Trash2,
   Eye,
-  FileText,
+  ShoppingBag,
   Building,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
 // Components
 import DataTable from "../components/DataTable";
-import RichDateRangePicker from "../components/inputs/RichDateRangePicker";
-
-// Modals
-import InvoiceModal from "../components/modals/InvoiceModal";
 import ReceiptModal from "../components/modals/ReceiptModal";
-import EditPaymentModal from "../components/modals/EditPaymentModal";
 import ViewPaymentModal from "../components/modals/ViewPaymentModal";
+import RichDateRangePicker from "../components/inputs/RichDateRangePicker";
 
 // API
 import { paymentService } from "../api/paymentService";
 import { workerService } from "../api/workerService";
-import { buildingService } from "../api/buildingService";
 
 const ResidencePayments = () => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
-
-  // Lists for Dropdowns
   const [workers, setWorkers] = useState([]);
-  const [buildings, setBuildings] = useState([]);
 
+  // Stats
   const [stats, setStats] = useState({
     totalAmount: 0,
     totalJobs: 0,
@@ -47,74 +43,62 @@ const ResidencePayments = () => {
     bank: 0,
   });
 
-  // Date Helpers
-  const getLocalYMD = (date) => {
-    const offset = date.getTimezoneOffset();
-    const local = new Date(date.getTime() - offset * 60 * 1000);
+  // Dates Helper
+  const getDateString = (dateObj) => {
+    const local = new Date(dateObj);
+    local.setMinutes(local.getMinutes() - local.getTimezoneOffset());
     return local.toISOString().split("T")[0];
   };
-  const getStartOfMonth = () =>
-    getLocalYMD(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
-  const getEndOfMonth = () =>
-    getLocalYMD(
-      new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
-    );
 
+  const getToday = () => getDateString(new Date());
+  const getYesterday = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return getDateString(d);
+  };
+
+  // Filters (Default: Yesterday -> Today, onewash=false)
   const [filters, setFilters] = useState({
-    startDate: getStartOfMonth(),
-    endDate: getEndOfMonth(),
+    startDate: getYesterday(),
+    endDate: getToday(),
     worker: "",
     status: "",
-    onewash: "false",
+    onewash: "false", // Residence Payments
     building: "",
   });
 
   const [searchTerm, setSearchTerm] = useState("");
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 50,
+    limit: 10,
     total: 0,
     totalPages: 1,
   });
 
   // Modal States
-  const [invoiceData, setInvoiceData] = useState(null);
-  const [receiptData, setReceiptData] = useState(null);
-  const [editPayment, setEditPayment] = useState(null);
+  const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [viewPayment, setViewPayment] = useState(null);
 
-  // --- INITIAL LOAD ---
   useEffect(() => {
-    const loadFilters = async () => {
+    const loadWorkers = async () => {
       try {
-        const [resWorkers, resBuildings] = await Promise.all([
-          workerService.list(1, 1000),
-          buildingService.list(1, 1000),
-        ]);
-
-        setWorkers(resWorkers.data || []);
-        setBuildings(resBuildings.data || []);
+        const res = await workerService.list(1, 1000);
+        setWorkers(res.data || []);
       } catch (e) {
-        console.error("Filter Load Error:", e);
+        console.error(e);
       }
     };
-    loadFilters();
-    fetchData(1, 50);
+    loadWorkers();
+    fetchData(1, 10);
   }, []);
 
-  const fetchData = async (page = 1, limit = 50) => {
+  const fetchData = async (page = 1, limit = 10) => {
     setLoading(true);
     try {
       const apiFilters = { ...filters };
-      if (filters.startDate) {
-        const start = new Date(filters.startDate);
-        start.setHours(0, 0, 0, 0);
-        apiFilters.startDate = start.toISOString();
-      }
-      if (filters.endDate) {
-        const end = new Date(filters.endDate);
-        end.setHours(23, 59, 59, 999);
-        apiFilters.endDate = end.toISOString();
+      // Force End of Day
+      if (apiFilters.endDate && apiFilters.endDate.length === 10) {
+        apiFilters.endDate = `${apiFilters.endDate}T23:59:59`;
       }
 
       const res = await paymentService.list(
@@ -123,13 +107,16 @@ const ResidencePayments = () => {
         searchTerm,
         apiFilters
       );
+
       setData(res.data || []);
       if (res.counts) setStats(res.counts);
+
+      const totalCount = res.total || 0;
       setPagination({
         page,
         limit,
-        total: res.total || 0,
-        totalPages: Math.ceil((res.total || 0) / limit) || 1,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit) || 1,
       });
     } catch (e) {
       toast.error("Failed to load payments");
@@ -138,65 +125,40 @@ const ResidencePayments = () => {
     }
   };
 
-  // --- NEW: Handle Local Updates from Receipt Modal ---
-  // This saves the "Temporary Edits" to the main list so they persist when re-opening
-  const handleLocalUpdate = (updatedItem) => {
-    setData((prevData) =>
-      prevData.map((row) => (row.id === updatedItem.id ? updatedItem : row))
-    );
-    // If the currently open modal is this one, update it too
-    if (receiptData && receiptData.id === updatedItem.id) {
-      setReceiptData(updatedItem);
-    }
-  };
-
-  const handleUpdatePayment = async (id, formData) => {
-    try {
-      const payload = {
-        amount_charged: Number(formData.amount),
-        payment_mode: formData.payment_mode,
-        notes: formData.notes,
-      };
-      await paymentService.updatePayment(id, payload);
-      toast.success("Payment updated successfully");
-      setEditPayment(null);
-      fetchData(pagination.page, pagination.limit);
-    } catch (error) {
-      toast.error("Failed to update payment");
-    }
-  };
-
+  // Handlers
   const handleDateChange = (field, value) => {
-    if (field === "clear")
+    if (field === "clear") {
       setFilters((prev) => ({
         ...prev,
-        startDate: getStartOfMonth(),
-        endDate: getEndOfMonth(),
+        startDate: getYesterday(),
+        endDate: getToday(),
       }));
-    else setFilters((prev) => ({ ...prev, [field]: value }));
+    } else {
+      setFilters((prev) => ({ ...prev, [field]: value }));
+    }
   };
-  const handleFilterChange = (e) =>
+
+  const handleFilterChange = (e) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
+  };
+
+  const handleSearch = () => fetchData(1, pagination.limit);
+
+  const handleViewReceipt = (row) => setSelectedReceipt(row);
+  const handleViewDetails = (row) => setViewPayment(row);
 
   const handleExport = async () => {
     const toastId = toast.loading("Preparing download...");
     try {
       const exportParams = { search: searchTerm, ...filters };
-      if (filters.startDate) {
-        const start = new Date(filters.startDate);
-        start.setHours(0, 0, 0, 0);
-        exportParams.startDate = start.toISOString();
-      }
-      if (filters.endDate) {
-        const end = new Date(filters.endDate);
-        end.setHours(23, 59, 59, 999);
-        exportParams.endDate = end.toISOString();
+      if (exportParams.endDate && exportParams.endDate.length === 10) {
+        exportParams.endDate = `${exportParams.endDate}T23:59:59`;
       }
       const blob = await paymentService.exportData(exportParams);
       const url = window.URL.createObjectURL(new Blob([blob]));
       const link = document.createElement("a");
       link.href = url;
-      link.download = `residence_payments.xlsx`;
+      link.download = `residence_payments_${getToday()}.xlsx`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -206,24 +168,30 @@ const ResidencePayments = () => {
     }
   };
 
+  // --- COLUMNS ---
   const columns = [
     {
       header: "Id",
       accessor: "id",
-      className: "w-12 text-center text-slate-500 text-xs",
-      render: (r) => r.id,
+      className: "w-12 text-center text-slate-500 font-mono text-xs",
+      render: (row, idx) => (
+        <span>{(pagination.page - 1) * pagination.limit + idx + 1}</span>
+      ),
     },
     {
       header: "Date",
       accessor: "createdAt",
       className: "w-28",
-      render: (r) => (
-        <div className="flex flex-col text-xs">
-          <span className="font-bold text-slate-700">
-            {new Date(r.createdAt).toLocaleDateString("en-GB")}
+      render: (row) => (
+        <div className="flex flex-col">
+          <span className="text-slate-700 font-medium text-sm">
+            {new Date(row.createdAt).toLocaleDateString("en-GB", {
+              day: "numeric",
+              month: "short",
+            })}
           </span>
-          <span className="text-slate-400">
-            {new Date(r.createdAt).toLocaleTimeString([], {
+          <span className="text-[10px] text-slate-400">
+            {new Date(row.createdAt).toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",
             })}
@@ -233,111 +201,137 @@ const ResidencePayments = () => {
     },
     {
       header: "Vehicle",
-      render: (r) => (
-        <span className="font-bold text-sm">{r.vehicle?.registration_no}</span>
+      accessor: "vehicle.registration_no",
+      render: (row) => (
+        <span className="font-bold text-slate-700 text-sm">
+          {row.vehicle?.registration_no || "N/A"}
+        </span>
       ),
     },
     {
       header: "Parking",
-      render: (r) => (
-        <span className="text-sm font-mono">{r.vehicle?.parking_no}</span>
+      accessor: "vehicle.parking_no",
+      render: (row) => (
+        <span className="text-slate-600 text-sm font-mono">
+          {row.vehicle?.parking_no || "-"}
+        </span>
       ),
     },
     {
       header: "Actual Amount",
       accessor: "amount_charged",
       className: "text-right",
-      render: (r) => (
-        <span className="font-bold text-slate-800">{r.amount_charged}</span>
+      render: (row) => (
+        <span className="font-bold text-slate-800 text-sm">
+          {row.amount_charged}
+        </span>
       ),
     },
     {
       header: "Last Month",
       accessor: "old_balance",
       className: "text-right",
-      render: (r) => <span className="text-slate-500">{r.old_balance}</span>,
+      render: (row) => (
+        <span className="text-slate-500 text-sm">{row.old_balance || 0}</span>
+      ),
     },
     {
       header: "Total",
       accessor: "total_amount",
       className: "text-right",
-      render: (r) => (
-        <span className="font-bold text-indigo-600">{r.total_amount}</span>
+      render: (row) => (
+        <span className="font-bold text-indigo-600 text-sm">
+          {row.total_amount || 0}
+        </span>
       ),
     },
     {
       header: "Paid",
       accessor: "amount_paid",
       className: "text-right",
-      render: (r) => (
-        <span className="font-bold text-emerald-600">{r.amount_paid}</span>
+      render: (row) => (
+        <span className="font-bold text-emerald-600 text-sm">
+          {row.amount_paid || 0}
+        </span>
       ),
     },
     {
       header: "Balance",
       accessor: "balance",
       className: "text-right",
-      render: (r) => (
+      render: (row) => (
         <span
-          className={`font-bold ${
-            r.balance > 0 ? "text-red-500" : "text-slate-400"
+          className={`text-sm font-bold ${
+            row.balance > 0 ? "text-red-500" : "text-slate-400"
           }`}
         >
-          {r.balance}
+          {row.balance || 0}
         </span>
       ),
     },
     {
       header: "Mode",
       accessor: "payment_mode",
-      className: "text-center uppercase text-xs font-bold text-slate-500",
-      render: (r) => (r.status === "completed" ? r.payment_mode : "-"),
+      className: "text-center",
+      render: (row) => (
+        <span className="text-xs font-bold uppercase text-slate-500">
+          {row.payment_mode || "-"}
+        </span>
+      ),
     },
     {
       header: "Status",
       accessor: "status",
-      className: "text-center",
-      render: (r) => (
-        <span
-          className={`text-[10px] font-bold uppercase ${
-            r.status === "completed" ? "text-emerald-500" : "text-amber-500"
-          }`}
-        >
-          {r.status}
-        </span>
-      ),
+      className: "text-center w-24",
+      render: (row) => {
+        const s = (row.status || "").toUpperCase();
+        return (
+          <span
+            className={`text-[10px] font-bold ${
+              s === "COMPLETED" ? "text-emerald-500" : "text-amber-500"
+            }`}
+          >
+            {s}
+          </span>
+        );
+      },
     },
     {
       header: "Settle Status",
       accessor: "settled",
-      className: "text-center",
-      render: (r) => (
-        <span
-          className={`text-[10px] font-bold uppercase ${
-            r.settled === "completed" ? "text-emerald-500" : "text-amber-500"
-          }`}
-        >
-          {r.settled}
-        </span>
-      ),
+      className: "text-center w-24",
+      render: (row) => {
+        const s = (row.settled || "pending").toUpperCase();
+        return (
+          <span
+            className={`text-[10px] font-bold ${
+              s === "COMPLETED" ? "text-emerald-500" : "text-amber-500"
+            }`}
+          >
+            {s}
+          </span>
+        );
+      },
     },
     {
       header: "Worker",
-      accessor: "worker",
-      render: (r) => (
-        <span className="text-xs font-bold uppercase truncate max-w-[100px] block">
-          {r.worker?.name}
+      accessor: "worker.name",
+      render: (row) => (
+        <span
+          className="text-xs font-bold text-slate-700 uppercase truncate max-w-[100px] block"
+          title={row.worker?.name}
+        >
+          {row.worker?.name || "-"}
         </span>
       ),
     },
     {
       header: "Invoice",
       className: "text-center w-16",
-      render: (r) => (
+      render: (row) => (
         <button
-          onClick={() => setInvoiceData(r)}
-          className="text-slate-400 hover:text-indigo-600"
-          title="View Invoice"
+          onClick={() => handleViewReceipt(row)}
+          className="text-slate-400 hover:text-indigo-600 transition-colors"
         >
           <FileText className="w-4 h-4 mx-auto" />
         </button>
@@ -346,11 +340,10 @@ const ResidencePayments = () => {
     {
       header: "Receipt",
       className: "text-center w-16",
-      render: (r) => (
+      render: (row) => (
         <button
-          onClick={() => setReceiptData(r)}
-          className="text-slate-400 hover:text-indigo-600"
-          title="View Receipt"
+          className="text-slate-300 hover:text-slate-500 transition-colors"
+          title="View Receipt (Future)"
         >
           <FileText className="w-4 h-4 mx-auto" />
         </button>
@@ -358,15 +351,19 @@ const ResidencePayments = () => {
     },
     {
       header: "Actions",
-      className: "text-right",
-      render: (r) => (
-        <div className="flex justify-end gap-1">
-          <button className="p-1 hover:bg-slate-100 rounded text-emerald-500">
+      className: "text-right w-20",
+      render: (row) => (
+        <div className="flex items-center justify-end gap-1">
+          <button
+            className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-emerald-500"
+            title="Approve"
+          >
             <CheckCircle className="w-4 h-4" />
           </button>
           <button
-            onClick={() => setViewPayment(r)}
-            className="p-1 hover:bg-slate-100 rounded text-blue-500"
+            onClick={() => handleViewDetails(row)}
+            className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-blue-500"
+            title="View"
           >
             <Eye className="w-4 h-4" />
           </button>
@@ -375,16 +372,19 @@ const ResidencePayments = () => {
     },
     {
       header: "Modify",
-      className: "text-right",
-      render: (r) => (
-        <div className="flex justify-end gap-1">
+      className: "text-right w-16",
+      render: (row) => (
+        <div className="flex items-center justify-end gap-1">
           <button
-            onClick={() => setEditPayment(r)}
-            className="p-1 hover:bg-slate-100 rounded text-indigo-600"
+            className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600"
+            title="Edit"
           >
             <Edit2 className="w-4 h-4" />
           </button>
-          <button className="p-1 hover:bg-slate-100 rounded text-red-500">
+          <button
+            className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-red-500"
+            title="Delete"
+          >
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
@@ -393,19 +393,39 @@ const ResidencePayments = () => {
   ];
 
   return (
-    <div className="p-6 w-full max-w-7xl mx-auto flex flex-col font-sans">
-      <div className="bg-indigo-600 text-white p-4 rounded-xl shadow-lg mb-4 flex justify-between items-center shrink-0">
-        <div>
-          <h2 className="text-xl font-bold">Total {stats.totalAmount}</h2>
+    <div className="p-6 w-full h-[calc(100vh-80px)] flex flex-col font-sans">
+      {/* Stats Bar */}
+      <div className="bg-indigo-600 text-white p-4 rounded-xl shadow-lg mb-6 flex flex-col md:flex-row justify-between items-center gap-4 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="bg-white/20 p-2 rounded-lg">
+            <Building className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <p className="text-xs font-medium opacity-80 uppercase">
+              Total Payments
+            </p>
+            <h2 className="text-2xl font-bold">
+              {stats.totalAmount}{" "}
+              <span className="text-sm font-normal opacity-70">AED</span>
+            </h2>
+          </div>
         </div>
-        <div className="flex gap-4 text-sm font-medium">
-          <span>Cash: {stats.cash}</span>
-          <span>Card: {stats.card}</span>
+        <div className="flex gap-6 text-sm font-medium bg-indigo-700/50 px-4 py-2 rounded-lg border border-indigo-500/30">
+          <div className="flex items-center gap-2">
+            <Banknote className="w-4 h-4 opacity-80" /> {stats.cash}
+          </div>
+          <div className="flex items-center gap-2">
+            <CreditCard className="w-4 h-4 opacity-80" /> {stats.card}
+          </div>
+          <div className="flex items-center gap-2">
+            <Landmark className="w-4 h-4 opacity-80" /> {stats.bank}
+          </div>
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-xl border mb-4 flex gap-4 items-end shrink-0">
-        <div className="w-auto">
+      {/* Filter Bar */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-4 flex flex-col xl:flex-row gap-4 items-end flex-shrink-0">
+        <div className="w-full xl:w-auto">
           <RichDateRangePicker
             startDate={filters.startDate}
             endDate={filters.endDate}
@@ -413,8 +433,7 @@ const ResidencePayments = () => {
           />
         </div>
 
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
-          {/* Status */}
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
           <div className="relative">
             <select
               name="status"
@@ -429,25 +448,6 @@ const ResidencePayments = () => {
             <Filter className="absolute right-4 top-4 w-4 h-4 text-slate-400 pointer-events-none" />
           </div>
 
-          {/* Buildings Filter */}
-          <div className="relative">
-            <select
-              name="building"
-              value={filters.building}
-              onChange={handleFilterChange}
-              className="w-full h-[50px] bg-slate-50 border border-slate-200 rounded-xl px-4 text-sm outline-none cursor-pointer"
-            >
-              <option value="">All Buildings</option>
-              {buildings.map((b) => (
-                <option key={b._id} value={b._id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-            <Building className="absolute right-4 top-4 w-4 h-4 text-slate-400 pointer-events-none" />
-          </div>
-
-          {/* Workers Filter */}
           <div className="relative">
             <select
               name="worker"
@@ -465,14 +465,13 @@ const ResidencePayments = () => {
             <User className="absolute right-4 top-4 w-4 h-4 text-slate-400 pointer-events-none" />
           </div>
 
-          {/* Search Input */}
           <div className="relative">
             <input
               type="text"
               placeholder="Search..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && fetchData(1, 10)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               className="w-full h-[50px] bg-slate-50 border border-slate-200 rounded-xl pl-4 pr-10 text-sm outline-none focus:border-indigo-500"
             />
             <Search className="absolute right-4 top-3.5 w-5 h-5 text-slate-400" />
@@ -480,8 +479,8 @@ const ResidencePayments = () => {
         </div>
 
         <button
-          onClick={() => fetchData(1, 10)}
-          className="h-[50px] px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition-colors"
+          onClick={handleSearch}
+          className="h-[50px] px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition-colors"
         >
           Search
         </button>
@@ -493,7 +492,8 @@ const ResidencePayments = () => {
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 bg-white rounded-2xl shadow-sm border overflow-hidden flex flex-col">
+      {/* Data Table */}
+      <div className="flex-1 min-h-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
         <DataTable
           columns={columns}
           data={data}
@@ -504,26 +504,13 @@ const ResidencePayments = () => {
         />
       </div>
 
-      <InvoiceModal
-        isOpen={!!invoiceData}
-        onClose={() => setInvoiceData(null)}
-        data={invoiceData}
-      />
-
-      {/* UPDATED: Pass the save handler to ReceiptModal */}
+      {/* Modals */}
       <ReceiptModal
-        isOpen={!!receiptData}
-        onClose={() => setReceiptData(null)}
-        data={receiptData}
-        onSave={handleLocalUpdate}
+        isOpen={!!selectedReceipt}
+        onClose={() => setSelectedReceipt(null)}
+        data={selectedReceipt}
       />
 
-      <EditPaymentModal
-        isOpen={!!editPayment}
-        onClose={() => setEditPayment(null)}
-        payment={editPayment}
-        onSubmit={handleUpdatePayment}
-      />
       <ViewPaymentModal
         isOpen={!!viewPayment}
         onClose={() => setViewPayment(null)}

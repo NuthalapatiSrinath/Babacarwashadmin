@@ -204,7 +204,7 @@ const Buildings = () => {
   ];
 
   return (
-    <div className="p-2 max-w-7xl mx-auto">
+    <div className="p-2 w-full">
       {/* <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-800">Buildings</h1>
         <p className="text-slate-500 mt-1">
