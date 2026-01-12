@@ -34,7 +34,7 @@ const Residence = () => {
   const [workers, setWorkers] = useState([]);
   const [buildings, setBuildings] = useState([]);
 
-  // --- DATE HELPERS (Local Time Safe) ---
+  // --- DATE HELPERS ---
   const formatDateLocal = (date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -109,10 +109,8 @@ const Residence = () => {
   const fetchData = async (page = 1, limit = 50) => {
     setLoading(true);
     try {
+      // FIX: Send raw YYYY-MM-DD. Backend now handles end-of-day logic.
       const apiFilters = { ...filters };
-      if (apiFilters.endDate) {
-        apiFilters.endDate = `${apiFilters.endDate}T23:59:59`;
-      }
 
       const res = await jobService.list(page, limit, searchTerm, apiFilters);
       let fetchedData = res.data || [];
@@ -141,17 +139,15 @@ const Residence = () => {
   };
 
   // --- CLIENT SIDE FILTERING ---
-  // This ensures the table visual strictly matches the search term
   const filteredData = data.filter((row) => {
     if (!searchTerm) return true;
     const lowerTerm = searchTerm.toLowerCase();
 
-    // Safely check all fields including Worker Name
     const vehicleReg = row.vehicle?.registration_no?.toLowerCase() || "";
     const parkingNo = row.vehicle?.parking_no?.toString().toLowerCase() || "";
     const mobile = row.customer?.mobile?.toLowerCase() || "";
     const buildingName = row.building?.name?.toLowerCase() || "";
-    const workerName = row.worker?.name?.toLowerCase() || ""; // Added Worker Search
+    const workerName = row.worker?.name?.toLowerCase() || "";
 
     return (
       vehicleReg.includes(lowerTerm) ||
@@ -204,30 +200,47 @@ const Residence = () => {
     const toastId = toast.loading("Preparing download...");
     try {
       const exportFilters = { ...filters };
-      if (exportFilters.endDate) {
-        exportFilters.endDate = `${exportFilters.endDate}T23:59:59`;
-      }
-      const exportParams = {
+      // Backend now handles dates robustly (no need to manually append time)
+
+      const blobData = await jobService.exportData({
+        ...exportFilters,
         search: searchTerm,
-        startDate: exportFilters.startDate,
-        endDate: exportFilters.endDate,
-        worker: filters.worker,
-        status: filters.status,
-        building: filters.building,
-      };
-      const blob = await jobService.exportData(exportParams);
-      const url = window.URL.createObjectURL(new Blob([blob]));
+      });
+
+      const blob = new Blob([blobData], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
+
       const dateStr = new Date().toISOString().split("T")[0];
       link.href = url;
       link.setAttribute("download", `residence_jobs_${dateStr}.xlsx`);
+
       document.body.appendChild(link);
       link.click();
+
       link.parentNode.removeChild(link);
-      toast.success("Download started", { id: toastId });
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Download complete", { id: toastId });
     } catch (e) {
       console.error("Export Error:", e);
-      toast.error("Export failed", { id: toastId });
+      if (e.response && e.response.data instanceof Blob) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const errorObj = JSON.parse(reader.result);
+            toast.error(errorObj.message || "Export failed", { id: toastId });
+          } catch {
+            toast.error("Export failed", { id: toastId });
+          }
+        };
+        reader.readAsText(e.response.data);
+      } else {
+        toast.error("Export failed", { id: toastId });
+      }
     }
   };
 
@@ -525,8 +538,6 @@ const Residence = () => {
           </div>
         </div>
 
-        {/* Passing filteredData ensures the table only shows matches */}
-        {/* Added hideSearch={true} to remove the second search bar */}
         <DataTable
           columns={columns}
           data={filteredData}

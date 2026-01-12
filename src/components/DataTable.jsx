@@ -15,15 +15,11 @@ const DataTable = ({
   columns = [],
   data = [],
   loading = false,
-
   pagination,
   onPageChange,
   onLimitChange,
   onSearch,
-
-  // New prop to control search visibility
   hideSearch = false,
-
   actionButton,
   renderExpandedRow,
 }) => {
@@ -96,7 +92,8 @@ const DataTable = ({
   })();
 
   return (
-    <div className="flex flex-col h-full w-full bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden relative">
+    // FIX: Removed 'min-w-full'. Added 'w-full' and 'overflow-hidden' to contain children.
+    <div className="flex flex-col w-full h-full bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden relative">
       {/* HEADER */}
       <div className="p-5 border-b flex flex-col sm:flex-row justify-between gap-4 flex-shrink-0 bg-white z-20">
         <div>
@@ -109,7 +106,6 @@ const DataTable = ({
         </div>
 
         <div className="flex gap-2 items-center w-full sm:w-auto">
-          {/* Only render search input if hideSearch is false */}
           {!hideSearch && (
             <div className="relative flex-1 sm:flex-none">
               <Search className="w-5 h-5 absolute left-3 top-3 text-slate-400" />
@@ -125,7 +121,7 @@ const DataTable = ({
         </div>
       </div>
 
-      {/* TABLE AREA */}
+      {/* TABLE AREA CONTAINER */}
       <div className="flex-1 relative w-full overflow-hidden flex flex-col">
         <AnimatePresence>
           {loading && (
@@ -145,9 +141,9 @@ const DataTable = ({
           )}
         </AnimatePresence>
 
-        {/* 👇 SCROLL ONLY INSIDE TABLE (Desktop + Mobile) */}
-        <div className="flex-1 w-full overflow-x-auto overflow-y-auto">
-          <div className="inline-block min-w-full">
+        {/* SCROLLABLE TABLE WRAPPER */}
+        <div className="flex-1 w-full overflow-auto">
+          <div className="inline-block min-w-full align-middle">
             <table className="min-w-full whitespace-nowrap text-left border-collapse">
               <thead className="sticky top-0 bg-slate-50 border-b z-10 shadow-sm">
                 <tr>

@@ -4,25 +4,20 @@ import {
   Trash2,
   Archive,
   Edit2,
-  MapPin,
   Download,
   UploadCloud,
   Loader2,
   FileSpreadsheet,
-  Server,
   Search,
   Users,
-  Car,
-  Calendar,
   Hash,
-  CreditCard,
+  Calendar,
   Building,
   Home,
-  Briefcase,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx"; // Ensure you have 'xlsx' installed
 
 // Components
 import DataTable from "../../components/DataTable";
@@ -160,10 +155,127 @@ const Customers = () => {
     }
   };
 
-  // --- Import / Export Handlers ---
+  // --- EXPORT & IMPORT HANDLERS ---
 
+  // 1. Export All Data (Frontend Generate)
+  const handleExport = async () => {
+    const toastId = toast.loading("Fetching all records for export...");
+    try {
+      // Fetch data for export from service (raw array)
+      // Pass 'limit=0' or large number to get all records if API supports it
+      // Assuming 'customerService.exportData' returns the flattened array
+      const res = await customerService.exportData(activeTab);
+      const allData = res.data || res; // Adjust based on API response structure
+
+      if (!allData || allData.length === 0) {
+        toast.error("No data found to export", { id: toastId });
+        return;
+      }
+
+      // Map to exact Excel columns matching Import Template
+      const excelData = allData.map((row) => ({
+        "Customer Name": `${row.firstName || ""} ${row.lastName || ""}`.trim(),
+        Mobile: row.mobile || "",
+        Email: row.email || "",
+        "Vehicle No": row.registration_no || "",
+        "Parking No": row.parking_no || "",
+        Building: row.building || "", // Service already flattens this
+        "Flat No": row.flat_no || "",
+        Amount: row.amount || 0,
+        Advance: row.advance_amount || 0,
+        "Cleaner Name": row.worker || "", // Service already flattens
+        "Schedule Type": row.schedule_type || "daily",
+        "Schedule Days": row.schedule_days || "",
+        "Start Date": row.start_date
+          ? new Date(row.start_date).toISOString().split("T")[0]
+          : "",
+      }));
+
+      // Generate Sheet
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Customers");
+
+      // Auto-width columns
+      const wscols = [
+        { wch: 20 },
+        { wch: 15 },
+        { wch: 25 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 20 },
+        { wch: 10 },
+        { wch: 10 },
+        { wch: 10 },
+        { wch: 20 },
+        { wch: 15 },
+        { wch: 25 },
+        { wch: 15 },
+      ];
+      worksheet["!cols"] = wscols;
+
+      const fileName = `Customers_Export_${
+        activeTab === 1 ? "Active" : "Inactive"
+      }_${new Date().toISOString().split("T")[0]}.xlsx`;
+
+      XLSX.writeFile(workbook, fileName);
+
+      toast.success(`Exported ${excelData.length} records!`, { id: toastId });
+    } catch (e) {
+      console.error(e);
+      toast.error("Export failed", { id: toastId });
+    }
+  };
+
+  // 2. Download Template (Matches Export Format)
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        "Customer Name": "John Doe",
+        Mobile: "971500000000",
+        Email: "john@example.com",
+        "Vehicle No": "DXB 12345",
+        "Parking No": "P-101",
+        Building: "Marina Tower",
+        "Flat No": "1204",
+        Amount: 350,
+        Advance: 0,
+        "Cleaner Name": "Ravi Kumar",
+        "Schedule Type": "daily", // or weekly
+        "Schedule Days": "Mon,Wed,Fri", // Only if weekly
+        "Start Date": "2026-01-01", // YYYY-MM-DD
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+
+    // Widths
+    worksheet["!cols"] = [
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 25 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 10 },
+      { wch: 10 },
+      { wch: 10 },
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 25 },
+      { wch: 15 },
+    ];
+
+    XLSX.writeFile(workbook, "Customer_Import_Template.xlsx");
+    toast.success("Template downloaded");
+  };
+
+  // 3. Import Logic
   const handleImportClick = () => {
     if (fileInputRef.current) {
+      fileInputRef.current.value = null; // Clear prev file
       fileInputRef.current.click();
     }
   };
@@ -171,190 +283,43 @@ const Customers = () => {
   const handleFileChange = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    event.target.value = null; // Reset input
 
     const formData = new FormData();
     formData.append("file", file);
 
     setImportLoading(true);
-    const toastId = toast.loading("Importing data...");
+    const toastId = toast.loading("Uploading and processing...");
 
     try {
-      console.log("📤 [FRONTEND] Uploading file:", file.name);
       const res = await customerService.importData(formData);
-      console.log("📥 [FRONTEND] Import response:", res);
 
       if (res.success || res.statusCode === 200) {
         const summary = res.data || res;
-        toast.success(
-          `Import completed: ${summary.success || 0} success, ${
-            summary.errors?.length || 0
-          } errors`,
-          { id: toastId, duration: 5000 }
-        );
+        toast.success(`Import Success: ${summary.success} rows added.`, {
+          id: toastId,
+          duration: 5000,
+        });
 
-        // Show detailed errors if any
         if (summary.errors && summary.errors.length > 0) {
-          console.error("❌ [FRONTEND] Import errors:", summary.errors);
-          summary.errors.slice(0, 3).forEach((err, idx) => {
-            toast.error(`${err.row || `Row ${idx + 1}`}: ${err.error}`, {
-              duration: 8000,
-            });
+          console.error("Import Errors:", summary.errors);
+          toast.error(`Failed rows: ${summary.errors.length}. Check console.`, {
+            duration: 6000,
           });
         }
 
+        // Refresh table
         fetchData(1, pagination.limit, searchTerm, activeTab);
       } else {
         toast.error(res.message || "Import failed", { id: toastId });
       }
     } catch (error) {
-      console.error("💥 [FRONTEND] Import error:", error);
-      const errorMsg =
-        error.response?.data?.message ||
-        error.message ||
-        "Import failed. Check file format.";
-      toast.error(errorMsg, { id: toastId, duration: 8000 });
+      console.error("Import Error:", error);
+      toast.error("Import failed. Check file format.", { id: toastId });
     } finally {
       setImportLoading(false);
     }
   };
 
-  const handleExportFrontendXLSX = async () => {
-    const toastId = toast.loading("Fetching all records for Excel export...");
-    try {
-      const res = await customerService.list(1, 10000, searchTerm, activeTab);
-      const allData = res.data || [];
-
-      if (allData.length === 0) {
-        toast.error("No data found to export", { id: toastId });
-        return;
-      }
-
-      const rows = [];
-      allData.forEach((customer) => {
-        if (customer.vehicles && customer.vehicles.length > 0) {
-          customer.vehicles.forEach((vehicle) => {
-            rows.push({ ...vehicle, customer, uniqueId: vehicle._id });
-          });
-        } else {
-          rows.push({
-            customer,
-            uniqueId: customer._id,
-            registration_no: "NO VEHICLE",
-            status: customer.status,
-          });
-        }
-      });
-
-      const excelData = rows.map((row) => ({
-        "Customer Name": `${row.customer.firstName || ""} ${
-          row.customer.lastName || ""
-        }`.trim(),
-        Mobile: row.customer.mobile || "",
-        Email: row.customer.email || "",
-        "Vehicle No": row.registration_no || "",
-        "Parking No": row.parking_no || "",
-        Building: row.customer.building?.name || "",
-        Flat: row.customer.flat_no || "",
-        Amount: row.amount || 0,
-        Advance: row.advance || 0,
-        Status: row.status === 1 ? "Active" : "Inactive",
-        Cleaner: row.worker?.name || "Unassigned",
-        Schedule: row.schedule_days?.map((d) => d.day).join(", ") || "",
-        "Onboard Date": row.onboard_date
-          ? new Date(row.onboard_date).toLocaleDateString()
-          : "",
-        "Start Date": row.start_date
-          ? new Date(row.start_date).toLocaleDateString()
-          : "",
-      }));
-
-      const worksheet = XLSX.utils.json_to_sheet(excelData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Customers");
-      const fileName = `All_Customers_${
-        activeTab === 1 ? "Active" : "Inactive"
-      }.xlsx`;
-      XLSX.writeFile(workbook, fileName);
-
-      toast.success(`Exported ${rows.length} records to Excel!`, {
-        id: toastId,
-      });
-    } catch (e) {
-      console.error(e);
-      toast.error("Excel export failed", { id: toastId });
-    }
-  };
-
-  const handleDownloadTemplate = () => {
-    // Create sample data with the exact format expected by backend - SINGLE ROW ONLY
-    const templateData = [
-      {
-        "Customer Name": "John Doe",
-        Mobile: "9876543210",
-        Email: "john@example.com",
-        "Vehicle No": "KA01AB1234",
-        "Parking No": "A101",
-        Building: "Tower A",
-        "Flat No": "101",
-        Amount: 1500,
-        Advance: 500,
-        "Cleaner Name": "Ravi Kumar",
-        "Schedule Type": "daily",
-        "Schedule Days": "Mon,Wed,Fri",
-        "Start Date": "2026-01-10",
-      },
-    ];
-
-    // Create worksheet
-    const worksheet = XLSX.utils.json_to_sheet(templateData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Customers");
-
-    // Set column widths for better readability
-    worksheet["!cols"] = [
-      { wch: 20 }, // Customer Name
-      { wch: 15 }, // Mobile
-      { wch: 25 }, // Email
-      { wch: 15 }, // Vehicle No
-      { wch: 12 }, // Parking No
-      { wch: 15 }, // Building
-      { wch: 10 }, // Flat No
-      { wch: 10 }, // Amount
-      { wch: 10 }, // Advance
-      { wch: 20 }, // Cleaner Name
-      { wch: 15 }, // Schedule Type
-      { wch: 25 }, // Schedule Days
-      { wch: 15 }, // Start Date
-    ];
-
-    // Download file
-    XLSX.writeFile(workbook, "Customer_Import_Template.xlsx");
-    toast.success("Template downloaded! Fill it and import.");
-  };
-
-  const handleExportServerSide = async () => {
-    const toastId = toast.loading("Requesting server export...");
-    try {
-      const blob = await customerService.exportData();
-      const url = window.URL.createObjectURL(new Blob([blob]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `customers_server_export.csv`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success("Server export downloaded", { id: toastId });
-    } catch (error) {
-      console.error(error);
-      toast.error("Server export failed. Try Frontend Export.", {
-        id: toastId,
-      });
-    }
-  };
-
-  // --- Helper for Date Formatting ---
   const formatDateForTable = (dateString) => {
     if (!dateString) return "-";
     const date = new Date(dateString);
@@ -364,12 +329,13 @@ const Customers = () => {
     return `${year}/${month}/${day}`;
   };
 
-  // --- Render Table Row ---
   const renderExpandedRow = (row) => {
     const c = row.customer;
     const workerName = row.worker?.name || "Unassigned";
     const schedule =
-      row.schedule_days?.map((d) => d.day).join(",") || "No Schedule";
+      row.schedule_days?.map((d) => d.day).join(",") ||
+      row.schedule_type ||
+      "-";
 
     return (
       <div className="bg-slate-50 p-5 rounded-lg border border-slate-200 ml-12 shadow-inner">
@@ -425,7 +391,7 @@ const Customers = () => {
                     {row.amount}
                   </td>
                   <td className="px-6 py-4 text-slate-700">
-                    {row.advance || 0}
+                    {row.advance_amount || 0}
                   </td>
                   <td className="px-6 py-4 text-slate-700">
                     {formatDateForTable(row.onboard_date)}
@@ -445,9 +411,6 @@ const Customers = () => {
                 {workerName}
               </span>
             </div>
-            {/* <button className="px-4 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded shadow-sm text-sm font-medium transition-all">
-              Show Work
-            </button> */}
           </div>
         </div>
       </div>
@@ -536,34 +499,6 @@ const Customers = () => {
         </div>
       ),
     },
-    ...(activeTab === 2
-      ? [
-          {
-            header: "Reason",
-            accessor: "deactivateReason",
-            render: (row) => (
-              <span className="inline-flex items-center gap-1 text-red-600 text-[10px] font-bold bg-red-50 border border-red-100 px-2 py-1 rounded-full uppercase">
-                <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-                {row.deactivateReason || "Stopped"}
-              </span>
-            ),
-          },
-          {
-            header: "Deactivate Date",
-            accessor: "deactivateDate",
-            render: (row) => (
-              <div className="flex items-center gap-1 text-slate-500 text-xs">
-                <Calendar className="w-3 h-3" />
-                <span className="font-mono">
-                  {row.deactivateDate
-                    ? new Date(row.deactivateDate).toLocaleDateString()
-                    : "-"}
-                </span>
-              </div>
-            ),
-          },
-        ]
-      : []),
     {
       header: "Actions",
       className:
@@ -682,6 +617,7 @@ const Customers = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 justify-end">
+            {/* Download Template Button */}
             <button
               onClick={handleDownloadTemplate}
               className="h-10 px-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
@@ -690,22 +626,16 @@ const Customers = () => {
               <span className="hidden xl:inline">Template</span>
             </button>
 
+            {/* Export All Button */}
             <button
-              onClick={handleExportServerSide}
-              className="h-10 px-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
-            >
-              <Server className="w-4 h-4" />
-              <span className="hidden xl:inline">Server Export</span>
-            </button>
-
-            <button
-              onClick={handleExportFrontendXLSX}
+              onClick={handleExport}
               className="h-10 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
             >
               <Download className="w-4 h-4" />
               <span className="hidden sm:inline">Export</span>
             </button>
 
+            {/* Import Button */}
             <button
               onClick={handleImportClick}
               disabled={importLoading}
@@ -719,6 +649,7 @@ const Customers = () => {
               <span className="hidden sm:inline">Import</span>
             </button>
 
+            {/* Add Customer Button */}
             <button
               onClick={handleCreate}
               className="h-10 px-5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg hover:shadow-xl transition-all active:scale-95"

@@ -62,6 +62,34 @@ export const deletePayment = createAsyncThunk(
   }
 );
 
+// ✅ NEW: Async thunk for bulk settling payments (Admin Collection)
+export const settlePaymentsBulk = createAsyncThunk(
+  "payment/settlePaymentsBulk",
+  async (paymentIds, { rejectWithValue }) => {
+    try {
+      // Backend expects payload: { paymentIds: [...] }
+      const response = await paymentService.settlePayment({ paymentIds });
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+// ✅ NEW: Async thunk for bulk updating status (Mark as Paid)
+export const bulkUpdatePaymentStatus = createAsyncThunk(
+  "payment/bulkUpdateStatus",
+  async ({ ids, status }, { rejectWithValue }) => {
+    try {
+      // Ensure your service has this method defined
+      const response = await paymentService.bulkStatus(ids, status);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
 const paymentSlice = createSlice({
   name: "payment",
   initialState: {
@@ -136,6 +164,28 @@ const paymentSlice = createSlice({
       })
       .addCase(deletePayment.rejected, (state, action) => {
         state.error = action.payload || "Failed to delete payment";
+      })
+      // Bulk Settle Payments
+      .addCase(settlePaymentsBulk.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(settlePaymentsBulk.fulfilled, (state) => {
+        state.loading = false;
+      })
+      .addCase(settlePaymentsBulk.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "Failed to settle payments";
+      })
+      // Bulk Update Status
+      .addCase(bulkUpdatePaymentStatus.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(bulkUpdatePaymentStatus.fulfilled, (state) => {
+        state.loading = false;
+      })
+      .addCase(bulkUpdatePaymentStatus.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "Failed to update status";
       });
   },
 });

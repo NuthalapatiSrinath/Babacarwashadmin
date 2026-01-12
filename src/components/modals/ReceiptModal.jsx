@@ -1,8 +1,14 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Download, Loader2, Edit2, Check, RotateCcw, X } from "lucide-react";
+import { Download, Loader2, Edit2, Check, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import html2canvas from "html2canvas";
 import toast from "react-hot-toast";
+
+// Helper for Date Input
+const formatDateForInput = (dateObj) => {
+  if (!dateObj) return "";
+  return dateObj.toISOString().split("T")[0];
+};
 
 const ReceiptModal = ({ isOpen, onClose, data, onSave }) => {
   const receiptRef = useRef(null);
@@ -10,40 +16,36 @@ const ReceiptModal = ({ isOpen, onClose, data, onSave }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editableData, setEditableData] = useState(null);
 
-  // Initialize editable data
   useEffect(() => {
     if (data) {
-      if (data._saved_receipt_state) {
-        setEditableData({
-          ...data._saved_receipt_state,
-          date: new Date(data._saved_receipt_state.date),
-        });
-      } else {
-        setEditableData({
-          id: data.id || data._id || "000000",
-          date: data.createdAt ? new Date(data.createdAt) : new Date(),
-          carNo: data.vehicle?.registration_no || "-",
-          parkingNo: data.vehicle?.parking_no || "-",
-          building: data.building?.name || data.customer?.building?.name || "-",
-          // Use formatted description or fallback to "For the month of..."
-          billAmount:
-            data.billAmountDesc ||
-            `For the month of ${
-              data.createdAt
-                ? new Date(data.createdAt).toLocaleString("default", {
-                    month: "long",
-                  })
-                : "Current Month"
-            }`,
-          vat: "-",
-          total: `${data.amount_paid || 0} د.إ`,
-          tip: `${data.tip || data.tip_amount || 0} د.إ`,
-          balance: `${data.balance || 0} د.إ`,
-          paymentMode: (data.payment_mode || "cash").toUpperCase(),
-          status: (data.status || "pending").toUpperCase(),
-          receiver: data.worker?.name || "jkhgfb", // Default placeholder from image if empty
-        });
+      const initData = data._saved_receipt_state || {
+        id: data.id || data._id || "000000",
+        date: data.createdAt ? new Date(data.createdAt) : new Date(),
+        carNo: data.vehicle?.registration_no || "-",
+        parkingNo: data.vehicle?.parking_no || "-",
+        building: data.building?.name || data.customer?.building?.name || "-",
+        billAmount:
+          data.billAmountDesc ||
+          `For the month of ${
+            data.createdAt
+              ? new Date(data.createdAt).toLocaleString("default", {
+                  month: "long",
+                })
+              : "Current Month"
+          }`,
+        vat: "-",
+        total: `${data.amount_paid || 0} د.إ`,
+        tip: `${data.tip || data.tip_amount || 0} د.إ`,
+        balance: `${data.balance || 0} د.إ`,
+        paymentMode: (data.payment_mode || "cash").toUpperCase(),
+        status: (data.status || "pending").toUpperCase(),
+        receiver: data.worker?.name || "SATYANARAYANA G.",
+      };
+
+      if (typeof initData.date === "string") {
+        initData.date = new Date(initData.date);
       }
+      setEditableData(initData);
     }
   }, [data, isOpen]);
 
@@ -51,39 +53,30 @@ const ReceiptModal = ({ isOpen, onClose, data, onSave }) => {
 
   const saveChanges = () => {
     if (onSave && data) {
-      onSave({
-        ...data,
-        _saved_receipt_state: editableData,
-      });
+      onSave({ ...data, _saved_receipt_state: editableData });
     }
   };
 
+  // ✅ Download with canvas-safe dotted lines
   const handleDownload = async () => {
     if (!receiptRef.current) return;
 
-    if (isEditing) {
-      setIsEditing(false);
-      saveChanges();
-    }
-
-    // Wait for UI to update
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
     setDownloading(true);
+
     try {
       const canvas = await html2canvas(receiptRef.current, {
-        scale: 2, // High resolution
+        scale: 3,
         useCORS: true,
         backgroundColor: "#ffffff",
-        windowWidth: 1200, // Simulate desktop browser width
-        width: 800, // Force the capture width to be standard
-        onclone: (clonedDoc) => {
-          const clonedElement = clonedDoc.getElementById("receipt-content");
-          if (clonedElement) {
-            clonedElement.style.width = "800px";
-            clonedElement.style.display = "block";
-            clonedElement.style.padding = "48px"; // Ensure consistent padding in image
-          }
+        windowWidth: 1200,
+        letterRendering: true,
+        onclone: (doc) => {
+          doc.querySelectorAll(".dotted-line").forEach((el) => {
+            el.classList.remove("border-dotted");
+            el.classList.remove("border-b-2");
+            el.classList.remove("border-t-2");
+            el.classList.add("canvas-dotted");
+          });
         },
       });
 
@@ -94,26 +87,10 @@ const ReceiptModal = ({ isOpen, onClose, data, onSave }) => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success("Receipt downloaded successfully");
-    } catch (error) {
-      console.error(error);
-      toast.error("Download failed");
+    } catch (e) {
+      console.error(e);
     } finally {
       setDownloading(false);
-    }
-  };
-
-  const handleDoneEditing = () => {
-    setIsEditing(false);
-    saveChanges();
-    toast.success("Changes saved locally");
-  };
-
-  const handleReset = () => {
-    // Reset logic (simplified for brevity, restores from props)
-    if (data) {
-      // ... (Logic to restore original data similar to useEffect)
-      toast.success("Reset to original values");
     }
   };
 
@@ -131,69 +108,78 @@ const ReceiptModal = ({ isOpen, onClose, data, onSave }) => {
             exit={{ opacity: 0, scale: 0.95 }}
             className="w-full max-w-xl flex flex-col items-center"
           >
-            {/* --- RECEIPT PAPER START --- */}
+            {/* === RECEIPT CONTAINER === */}
             <div
-              id="receipt-content"
               ref={receiptRef}
-              className="bg-white p-8 w-full max-w-[800px] shadow-2xl text-gray-900 font-sans text-base relative"
+              className="bg-white p-10 w-full max-w-[800px] shadow-2xl text-black font-sans relative"
             >
-              {/* Header Section */}
+              {/* Header */}
               <div className="flex flex-col items-center mb-6 text-center">
-                {/* Logo */}
-                <div className="w-20 h-20 mb-3 rounded-full flex items-center justify-center">
+                <div className="w-24 h-24 mb-2 flex items-center justify-center">
                   <img
                     src="/carwash.jpeg"
                     alt="BCW"
-                    className="w-full h-full object-contain rounded-full"
+                    className="w-full h-full object-contain"
                   />
                 </div>
-
-                <h1 className="text-xl md:text-2xl font-bold uppercase tracking-wide text-gray-900 mb-1">
+                <h1 className="text-2xl font-black uppercase tracking-wide mb-1">
                   BABA CAR WASHING AND CLEANING L.L.C.
                 </h1>
-
-                <div className="text-sm text-gray-500 space-y-1">
+                <div className="text-sm font-medium text-gray-600 space-y-0.5">
                   <p>PO Box 126297, Dubai - UAE</p>
                   <p>Mob: 055 241 1075</p>
-                  <p className="font-bold text-gray-600">
-                    TRN: 105021812000003
-                  </p>
+                  <p className="font-bold text-black">TRN: 105021812000003</p>
                 </div>
               </div>
 
               {/* Title */}
-              <div className="text-center font-bold uppercase text-xl mb-4 tracking-widest text-gray-800">
+              <div className="text-center font-black uppercase text-2xl mb-5 tracking-widest">
                 {editableData.paymentMode.includes("CARD")
                   ? "CARD RECEIPT"
                   : "CASH RECEIPT"}
               </div>
 
-              {/* Dashed Separator */}
-              <div className="border-t-2 border-dashed border-gray-300 mb-6"></div>
+              {/* Divider */}
+              <div className="border-t-2 border-dotted border-gray-400 mb-6 dotted-border"></div>
 
-              {/* Metadata Row: No & Date */}
-              <div className="flex justify-between items-end mb-8 font-bold text-base">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-900 font-bold">No:</span>
-                  <span className="text-red-500 text-xl font-bold">
-                    {editableData.id}
-                  </span>
-                </div>
+              {/* Metadata */}
+              <div className="mb-6 px-1">
+                <div className="flex justify-between items-end">
+                  <div className="flex items-end">
+                    <span className="font-bold text-gray-700 text-lg mr-2 mb-1">
+                      No:
+                    </span>
+                    <span className="text-red-600 text-2xl font-black">
+                      {editableData.id}
+                    </span>
+                  </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-900 font-bold">Date:</span>
-                  <span className="text-gray-900 font-bold">
-                    {editableData.date?.toLocaleDateString("en-GB", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "2-digit",
-                    })}
-                  </span>
+                  <div className="flex items-end w-[280px]">
+                    <span className="font-bold text-gray-700 text-lg mr-2 mb-1 shrink-0">
+                      Date:
+                    </span>
+                    <div className="flex-1 border-b-2 border-dotted border-gray-400 text-center px-2 dotted-border">
+                      {isEditing ? (
+                        <input
+                          type="date"
+                          value={formatDateForInput(editableData.date)}
+                          onChange={(e) =>
+                            handleChange("date", new Date(e.target.value))
+                          }
+                          className="w-full bg-transparent text-center font-bold text-lg outline-none pb-1"
+                        />
+                      ) : (
+                        <span className="font-bold text-black text-lg block pb-1">
+                          {editableData.date?.toLocaleDateString("en-GB")}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Details List (Using Helper Component) */}
-              <div className="space-y-4 text-base font-bold text-gray-800">
+              {/* Details */}
+              <div className="space-y-4 px-1">
                 <ReceiptRow
                   label="Car No"
                   value={editableData.carNo}
@@ -206,15 +192,12 @@ const ReceiptModal = ({ isOpen, onClose, data, onSave }) => {
                   isEditing={isEditing}
                   onChange={(v) => handleChange("parkingNo", v)}
                 />
-
                 <ReceiptRow
                   label="Office / Residence Building"
                   value={editableData.building}
                   isEditing={isEditing}
                   onChange={(v) => handleChange("building", v)}
-                  isUppercase
                 />
-
                 <ReceiptRow
                   label="Bill Amount"
                   value={editableData.billAmount}
@@ -227,12 +210,12 @@ const ReceiptModal = ({ isOpen, onClose, data, onSave }) => {
                   isEditing={isEditing}
                   onChange={(v) => handleChange("vat", v)}
                 />
-
                 <ReceiptRow
                   label="Total AED"
                   value={editableData.total}
                   isEditing={isEditing}
                   onChange={(v) => handleChange("total", v)}
+                  isBold
                 />
                 <ReceiptRow
                   label="Tip"
@@ -246,7 +229,6 @@ const ReceiptModal = ({ isOpen, onClose, data, onSave }) => {
                   isEditing={isEditing}
                   onChange={(v) => handleChange("balance", v)}
                 />
-
                 <ReceiptRow
                   label="Payment Mode"
                   value={editableData.paymentMode}
@@ -254,7 +236,6 @@ const ReceiptModal = ({ isOpen, onClose, data, onSave }) => {
                   onChange={(v) => handleChange("paymentMode", v)}
                 />
 
-                {/* Receiver Row - Added padding top for spacing */}
                 <div className="pt-6">
                   <ReceiptRow
                     label="Receiver"
@@ -265,25 +246,25 @@ const ReceiptModal = ({ isOpen, onClose, data, onSave }) => {
                 </div>
               </div>
             </div>
-            {/* --- RECEIPT PAPER END --- */}
 
-            {/* Action Buttons */}
+            {/* Buttons */}
             <div className="flex flex-wrap justify-center gap-3 mt-6 pb-4">
               <button
                 onClick={onClose}
-                className="px-6 py-2 bg-white text-slate-700 font-bold rounded-lg shadow hover:bg-slate-50 transition-colors flex items-center gap-2"
+                className="px-6 py-2 bg-white text-slate-700 font-bold rounded-lg shadow hover:bg-slate-50 flex items-center gap-2"
               >
                 <X className="w-4 h-4" /> Close
               </button>
 
               <button
-                onClick={
-                  isEditing ? handleDoneEditing : () => setIsEditing(true)
-                }
-                className={`px-6 py-2 font-bold rounded-lg shadow transition-colors flex items-center gap-2 ${
+                onClick={() => {
+                  if (isEditing) saveChanges();
+                  setIsEditing(!isEditing);
+                }}
+                className={`px-6 py-2 font-bold rounded-lg shadow flex items-center gap-2 ${
                   isEditing
-                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
+                    ? "bg-emerald-600 text-white"
+                    : "bg-blue-600 text-white"
                 }`}
               >
                 {isEditing ? (
@@ -300,7 +281,7 @@ const ReceiptModal = ({ isOpen, onClose, data, onSave }) => {
               <button
                 onClick={handleDownload}
                 disabled={downloading}
-                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-lg transition-colors flex items-center gap-2"
+                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-lg flex items-center gap-2"
               >
                 {downloading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -317,46 +298,33 @@ const ReceiptModal = ({ isOpen, onClose, data, onSave }) => {
   );
 };
 
-// --- HELPER COMPONENT FOR ROWS (Dotted Leader Style) ---
-
-const ReceiptRow = ({ label, value, isEditing, onChange, isUppercase }) => (
-  <div className="flex items-center w-full mb-1">
-    {/* Label */}
-    <span className="font-bold text-gray-900 shrink-0 w-40 md:w-56 whitespace-nowrap">
+// Row Component
+const ReceiptRow = ({
+  label,
+  value,
+  isEditing,
+  onChange,
+  isUppercase,
+  isBold,
+}) => (
+  <div className="flex items-end w-full mb-1">
+    <div className="w-[220px] font-bold text-gray-700 text-lg shrink-0 mb-1">
       {label}:
-    </span>
-    {/* Dotted line with value overlay */}
-    <div className="relative flex-1 mx-2">
-      <span
-        className="block w-full border-b-2 border-dotted border-gray-400 absolute top-1/2 left-0 z-0"
-        style={{ transform: "translateY(-50%)" }}
-      ></span>
+    </div>
+
+    <div className="flex-1 border-b-2 border-dotted border-gray-400 text-center px-2 dotted-border">
       {isEditing ? (
         <input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={`absolute right-0 top-1/2 z-10 bg-white text-right outline-none border-none p-0 focus:ring-0 text-indigo-700 font-bold ${
-            isUppercase ? "uppercase" : ""
-          }`}
-          style={{
-            transform: "translateY(-50%)",
-            minWidth: "60px",
-            maxWidth: "70%",
-            background: "white",
-          }}
+          className="w-full bg-transparent text-center outline-none font-bold text-lg pb-1"
         />
       ) : (
         <span
-          className={`absolute right-0 top-1/2 z-10 bg-white px-1 font-bold text-gray-800 leading-relaxed ${
-            isUppercase ? "uppercase" : ""
+          className={`block w-full text-black text-lg pb-1 ${
+            isBold ? "font-black text-xl" : "font-bold"
           }`}
-          style={{
-            transform: "translateY(-50%)",
-            minWidth: "60px",
-            maxWidth: "70%",
-            textAlign: "right",
-          }}
         >
           {value || "-"}
         </span>

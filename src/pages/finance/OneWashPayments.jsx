@@ -5,11 +5,9 @@ import {
   Search,
   Filter,
   User,
-  DollarSign,
-  CreditCard,
   Banknote,
+  CreditCard,
   Landmark,
-  AlertCircle,
   FileText,
   Edit2,
   Trash2,
@@ -18,7 +16,6 @@ import {
   Plus,
   Calendar,
   Car,
-  MapPin,
   CheckCircle2,
   Clock,
 } from "lucide-react";
@@ -46,26 +43,62 @@ const OneWashPayments = () => {
   );
   const { workers } = useSelector((state) => state.worker);
 
-  // Dates Helper (Local Time)
-  const getDateString = (dateObj) => {
-    const local = new Date(dateObj);
-    local.setMinutes(local.getMinutes() - local.getTimezoneOffset());
-    return local.toISOString().split("T")[0];
+  // --- DATES & TABS LOGIC ---
+
+  // Get dynamic month names (e.g., "December", "January")
+  const getMonthNames = () => {
+    const today = new Date();
+    const thisMonth = today.toLocaleString("default", { month: "long" });
+
+    const prevDate = new Date();
+    prevDate.setMonth(prevDate.getMonth() - 1);
+    const lastMonth = prevDate.toLocaleString("default", { month: "long" });
+
+    return { thisMonth, lastMonth };
   };
 
-  const getToday = () => getDateString(new Date());
+  const { thisMonth, lastMonth } = getMonthNames();
 
-  // --- CHANGED: Get Last 10 Days ---
-  const getLast10Days = () => {
-    const d = new Date();
-    d.setDate(d.getDate() - 10);
-    return getDateString(d);
+  // Helper to generate ISO strings with your backend's 18:30 offset
+  const getRangeForTab = (tab) => {
+    const today = new Date();
+    let start, end;
+
+    if (tab === "this_month") {
+      // Start: 1st of This Month
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      start.setDate(start.getDate() - 1); // Go back 1 day
+      start.setUTCHours(18, 30, 0, 0); // 18:30 UTC
+
+      // End: Today
+      end = new Date();
+      end.setUTCHours(18, 29, 59, 999);
+    } else {
+      // Last Month
+      // Start: 1st of Prev Month
+      start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      start.setDate(start.getDate() - 1);
+      start.setUTCHours(18, 30, 0, 0);
+
+      // End: Last Day of Prev Month
+      end = new Date(today.getFullYear(), today.getMonth(), 0);
+      end.setUTCHours(18, 29, 59, 999);
+    }
+
+    return {
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
+    };
   };
 
-  // Filters (Defaults to Last 10 Days -> Today)
+  // State
+  const [activeTab, setActiveTab] = useState("this_month"); // 'this_month' or 'last_month'
+  const initialDates = getRangeForTab("this_month");
+
+  // Filters
   const [filters, setFilters] = useState({
-    startDate: getLast10Days(), // Starts 10 days ago by default
-    endDate: getToday(),
+    startDate: initialDates.startDate,
+    endDate: initialDates.endDate,
     worker: "",
     status: "",
     service_type: "",
@@ -74,9 +107,11 @@ const OneWashPayments = () => {
   });
 
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Default Limit 50
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: 50,
     total: 0,
     totalPages: 1,
   });
@@ -96,64 +131,110 @@ const OneWashPayments = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
 
-  // Update pagination when total changes from Redux
+  // --- AUTOMATIC FETCH EFFECTS ---
+  // Trigger when filters (dates/tabs) change
   useEffect(() => {
-    if (total !== pagination.total) {
-      setPagination((prev) => ({
-        ...prev,
-        total: total,
-        totalPages: Math.ceil(total / prev.limit) || 1,
-      }));
-    }
-  }, [total, pagination.total, pagination.limit]);
+    fetchData(1, pagination.limit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
+
+  // Trigger when Search Term changes (Debounced)
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      // If searching, fetch more data (up to 3000) to filter client-side
+      const limit = searchTerm ? 3000 : 50;
+      fetchData(1, limit);
+    }, 500);
+    return () => clearTimeout(delayDebounceFn);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
 
   const fetchData = async (page = 1, limit = 50) => {
     try {
       const apiFilters = { ...filters };
-      // Force End of Day
-      if (apiFilters.endDate && apiFilters.endDate.length === 10) {
-        apiFilters.endDate = `${apiFilters.endDate}T23:59:59`;
-      }
+      // Dates are already in correct ISO format from logic
+
+      const isSearching = searchTerm.trim().length > 0;
+      const fetchLimit = isSearching ? 3000 : limit;
 
       const result = await dispatch(
         fetchOneWash({
           page,
-          limit,
-          search: searchTerm,
+          limit: fetchLimit,
+          search: "", // Don't use backend search, fetch all & filter here
           filters: apiFilters,
         })
       ).unwrap();
 
       setPagination({
         page,
-        limit,
+        limit: fetchLimit,
         total: result.total || 0,
-        totalPages: Math.ceil((result.total || 0) / limit) || 1,
+        totalPages: Math.ceil((result.total || 0) / fetchLimit) || 1,
       });
     } catch (e) {
       toast.error("Failed to load payments");
     }
   };
 
-  // Handlers
+  // --- CLIENT SIDE FILTERING ---
+  const filteredPayments = oneWashJobs.filter((row) => {
+    if (!searchTerm) return true;
+    const lowerTerm = searchTerm.toLowerCase().trim();
+
+    // Fields to search against
+    const id = String(row.id || row._id || "").toLowerCase();
+    const vehicleReg = row.registration_no?.toLowerCase() || "";
+    const parkingNo = row.parking_no?.toString().toLowerCase() || "";
+    const workerName = row.worker?.name ? row.worker.name.toLowerCase() : "";
+    const amount = String(row.amount || "").toLowerCase();
+    const paymentMode = row.payment_mode?.toLowerCase() || "";
+    const status = row.status?.toLowerCase() || "";
+    const dateObj = new Date(row.createdAt);
+    const dateStr = dateObj.toLocaleDateString().toLowerCase();
+    const monthStr = dateObj
+      .toLocaleString("default", { month: "long" })
+      .toLowerCase();
+
+    return (
+      id.includes(lowerTerm) ||
+      vehicleReg.includes(lowerTerm) ||
+      parkingNo.includes(lowerTerm) ||
+      workerName.includes(lowerTerm) ||
+      amount.includes(lowerTerm) ||
+      paymentMode.includes(lowerTerm) ||
+      status.includes(lowerTerm) ||
+      dateStr.includes(lowerTerm) ||
+      monthStr.includes(lowerTerm)
+    );
+  });
+
+  // --- HANDLERS ---
+
+  // Tab Switch Handler
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    const newDates = getRangeForTab(tab);
+    setFilters((prev) => ({
+      ...prev,
+      startDate: newDates.startDate,
+      endDate: newDates.endDate,
+    }));
+  };
+
   const handleDateChange = (field, value) => {
     if (field === "clear") {
-      // --- CHANGED: Reset to Last 10 Days ---
-      setFilters((prev) => ({
-        ...prev,
-        startDate: getLast10Days(),
-        endDate: getToday(),
-      }));
+      // If clearing manually, revert to This Month
+      handleTabChange("this_month");
     } else {
       setFilters((prev) => ({ ...prev, [field]: value }));
+      setActiveTab("custom"); // If manual date pick, deselect tabs
     }
   };
 
   const handleFilterChange = (e) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
   };
-
-  const handleSearch = () => fetchData(1, pagination.limit);
 
   const handleViewReceipt = (row) => {
     const receiptData = {
@@ -217,23 +298,34 @@ const OneWashPayments = () => {
   };
 
   const handleExport = async () => {
-    const toastId = toast.loading("Preparing download...");
+    const toastId = toast.loading("Downloading report...");
     try {
-      const exportParams = { search: searchTerm, ...filters };
-      if (exportParams.endDate && exportParams.endDate.length === 10) {
-        exportParams.endDate = `${exportParams.endDate}T23:59:59`;
-      }
+      const exportParams = {
+        ...filters,
+        search: searchTerm,
+        onewash: "true",
+      };
+
       const result = await dispatch(exportPayments(exportParams)).unwrap();
-      const blob = result.blob;
-      const url = window.URL.createObjectURL(new Blob([blob]));
+      const blobData = result.blob || result;
+      const blob = new Blob([blobData], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
+      const dateStr = new Date().toISOString().split("T")[0];
       link.href = url;
-      link.download = `onewash_payments_${getToday()}.xlsx`;
+      link.setAttribute("download", `onewash_payments_${dateStr}.xlsx`);
+
       document.body.appendChild(link);
       link.click();
-      link.remove();
-      toast.success("Download started", { id: toastId });
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Download complete", { id: toastId });
     } catch (e) {
+      console.error("Export Error:", e);
       toast.error("Export failed", { id: toastId });
     }
   };
@@ -363,29 +455,38 @@ const OneWashPayments = () => {
     {
       header: "Worker",
       accessor: "worker.name",
-      render: (row) => (
-        <div className="flex items-center gap-1.5" title={row.worker?.name}>
-          <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold">
-            {row.worker?.name?.[0] || "?"}
+      render: (row) => {
+        if (!row.worker?.name) return null;
+        return (
+          <div className="flex items-start gap-1.5 min-w-[100px]">
+            <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
+              {row.worker.name[0]}
+            </div>
+            <span className="text-xs font-semibold text-slate-700 whitespace-normal break-words leading-tight">
+              {row.worker.name}
+            </span>
           </div>
-          <span className="text-xs font-semibold text-slate-700 truncate max-w-[90px]">
-            {row.worker?.name || "-"}
-          </span>
-        </div>
-      ),
+        );
+      },
     },
     {
       header: "Receipt",
       className: "text-center w-16",
-      render: (row) => (
-        <button
-          onClick={() => handleViewReceipt(row)}
-          className="w-8 h-8 flex items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
-          title="Download Receipt"
-        >
-          <FileText className="w-4 h-4" />
-        </button>
-      ),
+      // Only show receipt button if Completed
+      render: (row) => {
+        const isPaid = (row.status || "").toLowerCase() === "completed";
+        if (!isPaid) return <span className="text-slate-300">-</span>;
+
+        return (
+          <button
+            onClick={() => handleViewReceipt(row)}
+            className="w-8 h-8 flex items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+            title="Download Receipt"
+          >
+            <FileText className="w-4 h-4" />
+          </button>
+        );
+      },
     },
     {
       header: "Actions",
@@ -426,7 +527,6 @@ const OneWashPayments = () => {
       {/* --- HEADER & STATS --- */}
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          {/* Title */}
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200">
               <ShoppingBag className="w-7 h-7 text-white" />
@@ -441,52 +541,86 @@ const OneWashPayments = () => {
             </div>
           </div>
 
-          {/* Stats Cards */}
-          <div className="flex flex-wrap gap-4">
-            <div className="px-5 py-3 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 text-white shadow-md flex flex-col justify-center min-w-[140px]">
-              <span className="text-[10px] font-bold opacity-60 uppercase tracking-wider mb-1">
-                Total Revenue
+          <div className="flex flex-wrap items-center gap-3">
+            {/* ✅ TAB SWITCHER */}
+            <div className="bg-slate-100 p-1 rounded-xl flex">
+              <button
+                onClick={() => handleTabChange("last_month")}
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+                  activeTab === "last_month"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                {lastMonth}
+              </button>
+              <button
+                onClick={() => handleTabChange("this_month")}
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+                  activeTab === "this_month"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                {thisMonth}
+              </button>
+            </div>
+
+            {/* Export Only - Bulk buttons removed as requested */}
+            <button
+              onClick={handleExport}
+              className="h-10 px-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
+            >
+              <Download className="w-4 h-4" /> Export
+            </button>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="flex flex-wrap gap-4 mt-6">
+          <div className="px-5 py-3 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 text-white shadow-md flex flex-col justify-center min-w-[140px]">
+            <span className="text-[10px] font-bold opacity-60 uppercase tracking-wider mb-1">
+              Total Revenue
+            </span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-bold">{stats.totalAmount}</span>
+              <span className="text-xs opacity-70">AED</span>
+            </div>
+          </div>
+
+          <div className="px-4 py-2 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+              <Banknote className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="block text-xs text-slate-400 font-bold uppercase">
+                Cash
               </span>
-              <div className="flex items-baseline gap-1">
-                <span className="text-xl font-bold">{stats.totalAmount}</span>
-                <span className="text-xs opacity-70">AED</span>
-              </div>
+              <span className="font-bold text-slate-700">{stats.cash}</span>
             </div>
+          </div>
 
-            <div className="px-4 py-2 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
-                <Banknote className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="block text-xs text-slate-400 font-bold uppercase">
-                  Cash
-                </span>
-                <span className="font-bold text-slate-700">{stats.cash}</span>
-              </div>
+          <div className="px-4 py-2 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+              <CreditCard className="w-5 h-5" />
             </div>
-
-            <div className="px-4 py-2 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                <CreditCard className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="block text-xs text-slate-400 font-bold uppercase">
-                  Card
-                </span>
-                <span className="font-bold text-slate-700">{stats.card}</span>
-              </div>
+            <div>
+              <span className="block text-xs text-slate-400 font-bold uppercase">
+                Card
+              </span>
+              <span className="font-bold text-slate-700">{stats.card}</span>
             </div>
+          </div>
 
-            <div className="px-4 py-2 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
-                <Landmark className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="block text-xs text-slate-400 font-bold uppercase">
-                  Bank
-                </span>
-                <span className="font-bold text-slate-700">{stats.bank}</span>
-              </div>
+          <div className="px-4 py-2 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
+              <Landmark className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="block text-xs text-slate-400 font-bold uppercase">
+                Bank
+              </span>
+              <span className="font-bold text-slate-700">{stats.bank}</span>
             </div>
           </div>
         </div>
@@ -557,10 +691,9 @@ const OneWashPayments = () => {
             <div className="relative">
               <input
                 type="text"
-                placeholder="Vehicle / ID..."
+                placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 className="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all"
               />
               <Search className="absolute left-3 top-3.5 w-4 h-4 text-slate-400" />
@@ -570,25 +703,11 @@ const OneWashPayments = () => {
           {/* Buttons */}
           <div className="lg:col-span-2 flex gap-2">
             <button
-              onClick={handleSearch}
-              className="flex-1 h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center"
-              title="Search"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-            <button
               onClick={handleAddNew}
               className="flex-1 h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-1"
               title="Add New Payment"
             >
               <Plus className="w-5 h-5" />
-            </button>
-            <button
-              onClick={handleExport}
-              className="h-11 px-3 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-bold rounded-xl shadow-sm transition-all"
-              title="Export Excel"
-            >
-              <Download className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -598,11 +717,12 @@ const OneWashPayments = () => {
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden flex flex-col flex-1">
         <DataTable
           columns={columns}
-          data={oneWashJobs}
+          data={filteredPayments} // Use filtered data here
           loading={loading}
           pagination={pagination}
           onPageChange={(p) => fetchData(p, pagination.limit)}
           onLimitChange={(l) => fetchData(1, l)}
+          hideSearch={true} // Hide inner search
         />
       </div>
 

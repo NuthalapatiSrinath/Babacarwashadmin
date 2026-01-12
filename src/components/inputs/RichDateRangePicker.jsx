@@ -1,11 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import {
-  Calendar,
-  ChevronLeft,
-  ChevronRight,
-  X,
-  ChevronDown,
-} from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const daysOfWeek = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -24,9 +18,56 @@ const months = [
   "December",
 ];
 
+// --- HELPER 1: Convert ISO (from Backend) to YYYY-MM-DD (for Calendar Display) ---
+// Handles: "2025-12-31T18:30:00Z" -> "2026-01-01" (Visual correction for IST)
+const toDisplayDate = (isoString, isEndDate) => {
+  if (!isoString) return "";
+  // If it's already simple YYYY-MM-DD, return it
+  if (isoString.length === 10) return isoString;
+
+  const date = new Date(isoString);
+  // Add 5 hours 30 mins to shift 18:30 UTC -> 00:00 IST next day
+  // Or simply: rely on the fact that 18:30 previous day represents the *start* of the target day.
+
+  if (!isEndDate) {
+    // Start Date: If 18:30 prev day, we want to show Next Day.
+    // Quick hack: Add 6 hours to push it into the correct visual day
+    date.setHours(date.getHours() + 6);
+  }
+
+  // Format to YYYY-MM-DD
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(date.getDate()).padStart(2, "0")}`;
+};
+
+// --- HELPER 2: Convert YYYY-MM-DD (from Click) to ISO 18:30 offset (for API) ---
+const toApiDate = (dateStr, isEndDate) => {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+
+  if (isEndDate) {
+    // End Date: Current Day 23:59:59 IST -> Current Day 18:29:59 UTC
+    // We set UTC hours directly to match your backend requirement
+    date.setUTCHours(18, 29, 59, 999);
+    return date.toISOString();
+  } else {
+    // Start Date: Current Day 00:00:00 IST -> Previous Day 18:30:00 UTC
+    date.setDate(date.getDate() - 1); // Go back 1 day
+    date.setUTCHours(18, 30, 0, 0); // Set to 18:30 UTC
+    return date.toISOString();
+  }
+};
+
 const RichDateRangePicker = ({ startDate, endDate, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
+
+  // Use display dates for internal calendar logic
+  const displayStart = toDisplayDate(startDate, false);
+  const displayEnd = toDisplayDate(endDate, true);
+
   const [currentDate, setCurrentDate] = useState(new Date());
 
   useEffect(() => {
@@ -42,13 +83,13 @@ const RichDateRangePicker = ({ startDate, endDate, onChange }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Sync calendar view when opening if a start date is already selected
+  // Sync calendar view when opening
   useEffect(() => {
-    if (isOpen && startDate) {
-      const d = new Date(startDate);
+    if (isOpen && displayStart) {
+      const d = new Date(displayStart);
       if (!isNaN(d.getTime())) setCurrentDate(d);
     }
-  }, [isOpen]);
+  }, [isOpen, displayStart]);
 
   const getDaysInMonth = (year, month) =>
     new Date(year, month + 1, 0).getDate();
@@ -58,21 +99,59 @@ const RichDateRangePicker = ({ startDate, endDate, onChange }) => {
     const year = currentDate.getFullYear();
     const month = String(currentDate.getMonth() + 1).padStart(2, "0");
     const d = String(day).padStart(2, "0");
-    const dateStr = `${year}-${month}-${d}`;
+    const clickedDateStr = `${year}-${month}-${d}`; // YYYY-MM-DD
 
-    if (!startDate || (startDate && endDate)) {
-      onChange("startDate", dateStr);
+    // Logic for range selection
+    if (!displayStart || (displayStart && displayEnd)) {
+      // New Selection Start
+      // Convert to API Format immediately
+      onChange("startDate", toApiDate(clickedDateStr, false));
       onChange("endDate", "");
     } else {
-      // Fix: Simple String comparison works reliably for YYYY-MM-DD
-      if (dateStr < startDate) {
-        onChange("endDate", startDate);
-        onChange("startDate", dateStr);
+      // Range Completion
+      if (clickedDateStr < displayStart) {
+        onChange("endDate", toApiDate(displayStart, true));
+        onChange("startDate", toApiDate(clickedDateStr, false));
       } else {
-        onChange("endDate", dateStr);
+        onChange("endDate", toApiDate(clickedDateStr, true));
       }
-      setIsOpen(false); // Optional: Close automatically on selection
+      setIsOpen(false);
     }
+  };
+
+  // --- SHORTCUTS ---
+  const selectThisMonth = () => {
+    const d = new Date();
+    // 1st of Month
+    const start = new Date(d.getFullYear(), d.getMonth(), 1);
+    const startStr = `${start.getFullYear()}-${String(
+      start.getMonth() + 1
+    ).padStart(2, "0")}-01`;
+    // Today
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(d.getDate()).padStart(2, "0")}`;
+
+    onChange("startDate", toApiDate(startStr, false));
+    onChange("endDate", toApiDate(todayStr, true));
+
+    setCurrentDate(new Date());
+    setIsOpen(false);
+  };
+
+  const selectToday = () => {
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(d.getDate()).padStart(2, "0")}`;
+
+    onChange("startDate", toApiDate(todayStr, false));
+    onChange("endDate", toApiDate(todayStr, true));
+
+    setCurrentDate(new Date());
+    setIsOpen(false);
   };
 
   const changeMonth = (offset) => {
@@ -103,12 +182,14 @@ const RichDateRangePicker = ({ startDate, endDate, onChange }) => {
         2,
         "0"
       )}-${String(day).padStart(2, "0")}`;
-      const start = startDate;
-      const end = endDate;
 
-      const isSelected = currentStr === start || currentStr === end;
-      // Robust Range Check using strings
-      const isInRange = start && end && currentStr > start && currentStr < end;
+      const isSelected =
+        currentStr === displayStart || currentStr === displayEnd;
+      const isInRange =
+        displayStart &&
+        displayEnd &&
+        currentStr > displayStart &&
+        currentStr < displayEnd;
 
       let classes = "text-slate-700 hover:bg-slate-100 rounded-lg bg-white";
       if (isSelected) {
@@ -137,9 +218,9 @@ const RichDateRangePicker = ({ startDate, endDate, onChange }) => {
   const years = Array.from({ length: 20 }, (_, i) => 2020 + i);
 
   const getDisplayText = () => {
-    if (!startDate && !endDate) return "Select Date Range";
-    if (startDate && !endDate) return `${startDate} - ...`;
-    return `${startDate} - ${endDate}`;
+    if (!displayStart && !displayEnd) return "Select Date Range";
+    if (displayStart && !displayEnd) return `${displayStart} - ...`;
+    return `${displayStart} - ${displayEnd}`;
   };
 
   return (
@@ -251,24 +332,26 @@ const RichDateRangePicker = ({ startDate, endDate, onChange }) => {
             <div className="grid grid-cols-7 gap-1 mb-2 min-h-[220px]">
               {renderCalendarDays()}
             </div>
+
+            {/* Quick Select Buttons */}
             <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-100">
-              <button
-                onClick={() => {
-                  const d = new Date();
-                  const today = `${d.getFullYear()}-${String(
-                    d.getMonth() + 1
-                  ).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-                  onChange("startDate", today);
-                  onChange("endDate", today);
-                  setCurrentDate(new Date());
-                }}
-                className="text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors px-2 py-1"
-              >
-                Today
-              </button>
+              <div className="flex gap-1">
+                <button
+                  onClick={selectToday}
+                  className="text-xs font-bold text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 px-2 py-1.5 rounded transition-colors"
+                >
+                  Today
+                </button>
+                <button
+                  onClick={selectThisMonth}
+                  className="text-xs font-bold text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 px-2 py-1.5 rounded transition-colors"
+                >
+                  This Month
+                </button>
+              </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="px-5 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-all shadow-md shadow-indigo-200"
+                className="px-4 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-all shadow-md shadow-indigo-200"
               >
                 Done
               </button>

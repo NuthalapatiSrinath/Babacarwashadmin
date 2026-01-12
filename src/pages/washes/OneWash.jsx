@@ -5,16 +5,16 @@ import {
   Edit2,
   Download,
   Search,
-  MapPin,
-  User,
   Filter,
+  User,
   CreditCard,
   Banknote,
-  Car,
-  Calendar,
   Briefcase,
   DollarSign,
   Layers,
+  Calendar,
+  Car,
+  MapPin,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -42,7 +42,6 @@ const OneWash = () => {
   // -----------------------------
   // DATE HELPERS (Local Time Safe)
   // -----------------------------
-  // Helper to format date as YYYY-MM-DD in LOCAL time
   const formatDateLocal = (date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -52,16 +51,16 @@ const OneWash = () => {
 
   const getToday = () => formatDateLocal(new Date());
 
-  const getLast3Days = () => {
+  // 🔹 CHANGED: Get 1st of current month
+  const getFirstOfMonth = () => {
     const d = new Date();
-    d.setDate(d.getDate() - 3);
+    d.setDate(1); // Set to 1st day of month
     return formatDateLocal(d);
   };
 
-  // DEFAULT DATES: Last 3 days ➜ Today
   const [filters, setFilters] = useState({
-    startDate: getLast3Days(),
-    endDate: getToday(),
+    startDate: getFirstOfMonth(), // Default: 1st of Month
+    endDate: getToday(), // Default: Today
     service_type: "",
     worker: "",
   });
@@ -79,7 +78,7 @@ const OneWash = () => {
   const [selectedJob, setSelectedJob] = useState(null);
 
   // --------------------------------
-  // LOAD WORKERS + INITIAL DATA
+  // LOAD WORKERS ON MOUNT
   // --------------------------------
   useEffect(() => {
     const loadWorkers = async () => {
@@ -90,10 +89,28 @@ const OneWash = () => {
         console.error(e);
       }
     };
-
     loadWorkers();
-    fetchData(1, 50);
   }, []);
+
+  // --------------------------------
+  // AUTOMATIC FETCH EFFECTS
+  // --------------------------------
+
+  // 1. Trigger when filters change
+  useEffect(() => {
+    fetchData(1, pagination.limit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
+
+  // 2. Trigger when Search Term changes (Debounced)
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchData(1, pagination.limit);
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
 
   // --------------------------------
   // FETCH DATA
@@ -102,10 +119,8 @@ const OneWash = () => {
     setLoading(true);
 
     try {
-      // --- FIX: ADJUST END DATE TO INCLUDE FULL DAY ---
       const apiFilters = { ...filters };
       if (apiFilters.endDate) {
-        // Appending time ensures we get records up to the very end of that day
         apiFilters.endDate = `${apiFilters.endDate}T23:59:59`;
       }
 
@@ -113,7 +128,7 @@ const OneWash = () => {
         page,
         limit,
         searchTerm,
-        apiFilters // Pass the adjusted filters
+        apiFilters
       );
 
       setData(res.data || []);
@@ -138,13 +153,52 @@ const OneWash = () => {
   };
 
   // --------------------------------
+  // CLIENT-SIDE FILTERING (Strict Visual Match)
+  // --------------------------------
+  const filteredData = data.filter((row) => {
+    if (!searchTerm) return true;
+    const lowerTerm = searchTerm.toLowerCase();
+
+    // Fields to search against
+    const id = String(row.id || "").toLowerCase();
+    const vehicle = row.registration_no?.toLowerCase() || "";
+    const parking = row.parking_no?.toLowerCase() || "";
+    const amount = String(row.amount || "").toLowerCase();
+    const tip = String(row.tip_amount || "").toLowerCase();
+    const payMode = row.payment_mode?.toLowerCase() || "";
+    const status = row.status?.toLowerCase() || "";
+    const workerName = row.worker?.name?.toLowerCase() || "";
+
+    const locationName =
+      (row.service_type === "mall"
+        ? row.mall?.name
+        : row.building?.name
+      )?.toLowerCase() || "";
+
+    const dateStr = new Date(row.createdAt).toLocaleString().toLowerCase();
+
+    return (
+      id.includes(lowerTerm) ||
+      vehicle.includes(lowerTerm) ||
+      parking.includes(lowerTerm) ||
+      amount.includes(lowerTerm) ||
+      tip.includes(lowerTerm) ||
+      payMode.includes(lowerTerm) ||
+      status.includes(lowerTerm) ||
+      locationName.includes(lowerTerm) ||
+      workerName.includes(lowerTerm) ||
+      dateStr.includes(lowerTerm)
+    );
+  });
+
+  // --------------------------------
   // FILTER HANDLERS
   // --------------------------------
   const handleDateChange = (field, value) => {
     if (field === "clear") {
       setFilters((prev) => ({
         ...prev,
-        startDate: getLast3Days(),
+        startDate: getFirstOfMonth(), // Reset to 1st of month
         endDate: getToday(),
       }));
     } else {
@@ -154,10 +208,6 @@ const OneWash = () => {
 
   const handleFilterChange = (e) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
-  };
-
-  const applyFilters = () => {
-    fetchData(1, pagination.limit);
   };
 
   // --------------------------------
@@ -186,30 +236,51 @@ const OneWash = () => {
   };
 
   const handleExport = async () => {
+    const toastId = toast.loading("Downloading report...");
     try {
-      // Apply the same date fix for export
       const exportFilters = { ...filters };
-      if (exportFilters.endDate) {
-        exportFilters.endDate = `${exportFilters.endDate}T23:59:59`;
-      }
+      // Backend handles partial date strings, no need to add time manually for filtering
+      // just pass the dates as strings
 
-      const blob = await oneWashService.exportData({
+      const blobData = await oneWashService.exportData({
         ...exportFilters,
         search: searchTerm,
       });
 
-      const url = window.URL.createObjectURL(new Blob([blob]));
+      const blob = new Blob([blobData], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
 
+      const dateStr = new Date().toISOString().split("T")[0];
       link.href = url;
-      link.setAttribute("download", "onewash_report.xlsx");
+      link.setAttribute("download", `onewash_report_${dateStr}.xlsx`);
+
       document.body.appendChild(link);
       link.click();
-      link.parentNode.removeChild(link);
 
-      toast.success("Download started");
-    } catch {
-      toast.error("Export failed");
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Download complete", { id: toastId });
+    } catch (e) {
+      console.error("Export Error:", e);
+      if (e.response && e.response.data instanceof Blob) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const errorObj = JSON.parse(reader.result);
+            toast.error(errorObj.message || "Export failed", { id: toastId });
+          } catch {
+            toast.error("Export failed", { id: toastId });
+          }
+        };
+        reader.readAsText(e.response.data);
+      } else {
+        toast.error("Export failed", { id: toastId });
+      }
     }
   };
 
@@ -218,133 +289,72 @@ const OneWash = () => {
   // --------------------------------
   const columns = [
     {
-      header: "ID",
+      header: "Id",
       accessor: "id",
-      className: "w-16 text-center",
-      render: (row) => (
-        <div className="flex justify-center">
-          <span className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs font-mono border border-slate-200">
-            #{row.id}
-          </span>
-        </div>
-      ),
+      className: "w-16 text-center text-slate-500",
+      render: (row) => <span>{row.id}</span>,
     },
     {
       header: "Date",
       accessor: "createdAt",
-      className: "w-32",
       render: (row) => (
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
-            <Calendar className="w-4 h-4" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-slate-700 font-bold text-xs">
-              {new Date(row.createdAt).toLocaleDateString()}
-            </span>
-            <span className="text-[10px] text-slate-400 font-medium">
-              {new Date(row.createdAt).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-          </div>
-        </div>
+        <span className="text-slate-700 font-medium text-sm">
+          {new Date(row.createdAt).toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          })}
+        </span>
       ),
     },
     {
-      header: "Vehicle Info",
+      header: "Vehicle No",
       accessor: "registration_no",
       render: (row) => (
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <Car className="w-3.5 h-3.5 text-slate-400" />
-            <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-xs font-bold uppercase text-slate-700 tracking-wide w-fit">
-              {row.registration_no}
-            </span>
-          </div>
-          {row.parking_no && (
-            <span className="text-[10px] text-slate-500 pl-6">
-              Parking: <span className="font-bold">{row.parking_no}</span>
-            </span>
-          )}
-        </div>
+        <span className="font-semibold text-slate-700">
+          {row.registration_no}
+        </span>
       ),
     },
     {
-      header: "Location",
-      accessor: "service_type",
+      header: "Parking No",
+      accessor: "parking_no",
       render: (row) => (
-        <div className="flex flex-col">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <MapPin
-              className={`w-3 h-3 ${
-                row.service_type === "mall"
-                  ? "text-purple-500"
-                  : "text-orange-500"
-              }`}
-            />
-            <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">
-              {row.service_type}
-            </span>
-          </div>
-          <span className="text-sm font-bold text-slate-700 truncate max-w-[140px]">
-            {row.service_type === "mall"
-              ? row.mall?.name || "-"
-              : row.building?.name || "-"}
-          </span>
-        </div>
-      ),
-    },
-    {
-      header: "Assigned Worker",
-      accessor: "worker",
-      render: (row) => (
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center text-indigo-700 text-xs font-bold border border-indigo-200">
-            {row.worker?.name?.[0] || "U"}
-          </div>
-          <span className="text-sm text-slate-700 font-medium">
-            {row.worker?.name || (
-              <span className="text-slate-400 italic text-xs">Unassigned</span>
-            )}
-          </span>
-        </div>
+        <span className="text-slate-600">{row.parking_no || "-"}</span>
       ),
     },
     {
       header: "Amount",
       accessor: "amount",
-      className: "text-right",
       render: (row) => (
-        <div className="flex flex-col items-end">
-          <span className="font-bold text-slate-800 text-sm flex items-center gap-1">
-            {row.amount} <span className="text-[10px] text-slate-400">AED</span>
-          </span>
-          <div className="flex items-center gap-1 mt-0.5">
-            {row.payment_mode === "cash" && (
-              <Banknote className="w-3 h-3 text-emerald-500" />
-            )}
-            {row.payment_mode === "card" && (
-              <CreditCard className="w-3 h-3 text-blue-500" />
-            )}
-            <span className="text-[10px] text-slate-500 uppercase font-bold">
-              {row.payment_mode}
-            </span>
-          </div>
-        </div>
+        <span className="font-bold text-slate-800">{row.amount}</span>
+      ),
+    },
+    {
+      header: "Tip",
+      accessor: "tip_amount",
+      render: (row) => (
+        <span className="text-slate-600">{row.tip_amount || 0}</span>
+      ),
+    },
+    {
+      header: "Payment Mode",
+      accessor: "payment_mode",
+      render: (row) => (
+        <span className="text-slate-600 capitalize">
+          {row.payment_mode || "-"}
+        </span>
       ),
     },
     {
       header: "Status",
       accessor: "status",
-      className: "w-24 text-center",
       render: (row) => (
         <span
-          className={`inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide border ${
-            row.status === "completed"
-              ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-              : "bg-amber-50 text-amber-700 border-amber-100"
+          className={`text-xs font-bold uppercase tracking-wide ${
+            row.status === "completed" ? "text-emerald-500" : "text-amber-500"
           }`}
         >
           {row.status}
@@ -352,21 +362,38 @@ const OneWash = () => {
       ),
     },
     {
-      header: "Actions",
-      className:
-        "text-right w-24 sticky right-0 bg-white shadow-[-5px_0_10px_-5px_rgba(0,0,0,0.05)]",
+      header: "Mall/Building",
+      accessor: "location",
+      render: (row) => {
+        const name =
+          row.service_type === "mall" ? row.mall?.name : row.building?.name;
+        return <span className="text-slate-700 uppercase">{name || "-"}</span>;
+      },
+    },
+    {
+      header: "Worker",
+      accessor: "worker.name",
       render: (row) => (
-        <div className="flex justify-end gap-1.5 pr-2">
+        <span className="text-slate-700 uppercase font-medium">
+          {row.worker?.name || "Unassigned"}
+        </span>
+      ),
+    },
+    {
+      header: "Actions",
+      className: "text-right w-24 sticky right-0 bg-white",
+      render: (row) => (
+        <div className="flex justify-end gap-2 pr-2">
           <button
             onClick={() => handleEdit(row)}
-            className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg transition-all"
+            className="hover:text-indigo-600 text-slate-400 transition-colors"
             title="Edit"
           >
             <Edit2 className="w-4 h-4" />
           </button>
           <button
             onClick={() => handleDelete(row._id)}
-            className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-all"
+            className="hover:text-red-600 text-slate-400 transition-colors"
             title="Delete"
           >
             <Trash2 className="w-4 h-4" />
@@ -505,33 +532,24 @@ const OneWash = () => {
               <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search Plate No..."
+                placeholder="Search All Columns..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && fetchData(1, pagination.limit)
-                }
                 className="w-full h-full pl-10 pr-4 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 font-medium"
               />
             </div>
           </div>
-
-          <button
-            onClick={applyFilters}
-            className="h-[42px] px-6 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2"
-          >
-            <Search className="w-4 h-4" /> Apply
-          </button>
         </div>
 
         {/* Data Table */}
         <DataTable
           columns={columns}
-          data={data}
+          data={filteredData}
           loading={loading}
           pagination={pagination}
           onPageChange={(p) => fetchData(p, pagination.limit)}
           onLimitChange={(l) => fetchData(1, l)}
+          hideSearch={true}
         />
       </div>
 

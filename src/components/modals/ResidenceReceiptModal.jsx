@@ -1,8 +1,14 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Download, Edit2, Check, Loader2, X } from "lucide-react";
+import { Download, Edit2, Check, Loader2, X, Calendar } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import html2canvas from "html2canvas";
 import toast from "react-hot-toast";
+
+// Helper for date input
+const formatDateForInput = (dateObj) => {
+  if (!dateObj) return "";
+  return dateObj.toISOString().split("T")[0];
+};
 
 const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
   const contentRef = useRef(null);
@@ -10,11 +16,12 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [localData, setLocalData] = useState(null);
 
-  // Helper to format the Long Backend ID into a short Receipt Number
+  // ✅ FIX: Handle both Numbers (Serial) and Strings (Mongo ID)
   const formatId = (rawId) => {
     if (!rawId) return "000000";
-    if (rawId.length < 10) return rawId;
-    return rawId.slice(-6).toUpperCase();
+    const strId = String(rawId); // Convert to string immediately
+    if (strId.length < 10) return strId; // It's likely our Serial Number
+    return strId.slice(-6).toUpperCase(); // It's a Mongo ID, slice it
   };
 
   useEffect(() => {
@@ -25,6 +32,7 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
         date: data.createdAt ? new Date(data.createdAt) : new Date(),
         carNo: data.vehicle?.registration_no || "-",
         parkingNo: data.vehicle?.parking_no || "-",
+        flatNo: data.customer?.flat_no || "-", // Residence specific
         building: data.building?.name || data.customer?.building?.name || "-",
         billAmountDesc:
           data.billAmountDesc ||
@@ -35,17 +43,19 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
                 })
               : "Current Month"
           }`,
-        amount: data.amount_paid || 0,
+        amount: data.amount_paid || 0, // Number for Invoice calculations
         vat: "-",
-        total: data.amount_paid || 0,
-        tip: data.tip || 0,
-        balance: data.balance || 0,
-        receiver: data.worker?.name || "Admin",
+        total: `${data.amount_paid || 0} د.إ`, // String for Receipt View
+        tip: `${data.tip || 0} د.إ`,
+        balance: `${data.balance || 0} د.إ`,
+        receiver: data.worker?.name || "SATYANARAYANA G.",
         paymentMode: (data.payment_mode || "cash").toUpperCase(),
         status: (data.status || "Completed").toUpperCase(),
         // Extra fields for Invoice
-        customerName: data.customer?.name || "Valued Customer",
-        customerPhone: data.customer?.phone || "-",
+        customerName: data.customer?.firstName
+          ? `${data.customer.firstName} ${data.customer.lastName || ""}`
+          : "Valued Customer",
+        customerPhone: data.customer?.mobile || "-",
       });
     }
   }, [data, isOpen]);
@@ -56,7 +66,7 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
     if (!contentRef.current) return;
 
     if (isEditing) setIsEditing(false);
-    // Wait for inputs to revert to text before capturing
+    // Wait for UI to update
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     setDownloading(true);
@@ -64,19 +74,25 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
       const isInvoice = type === "Invoice";
 
       const canvas = await html2canvas(contentRef.current, {
-        scale: 2, // High resolution
+        scale: 3, // High resolution
         useCORS: true,
         backgroundColor: "#ffffff",
-        windowWidth: 1200, // Simulate desktop view
-        width: isInvoice ? 794 : 800, // A4 Width vs Receipt Width
+        windowWidth: 1200,
+        width: isInvoice ? 794 : 800, // A4 vs Receipt width
         onclone: (clonedDoc) => {
           const el = clonedDoc.getElementById("capture-content");
           if (el) {
             el.style.width = isInvoice ? "794px" : "800px";
             el.style.maxWidth = "none";
             el.style.display = "block";
-            el.style.padding = "40px";
-            el.style.height = "auto";
+            el.style.padding = isInvoice ? "48px" : "40px";
+
+            // Force colors for crisp output
+            el.querySelectorAll("*").forEach((node) => {
+              if (!node.classList.contains("text-red-600")) {
+                node.style.color = "#000000";
+              }
+            });
           }
         },
       });
@@ -101,69 +117,81 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
     setLocalData((prev) => ({ ...prev, [key]: value }));
   };
 
-  // --- LAYOUT 1: RECEIPT (Vertical) ---
+  // --- LAYOUT 1: RECEIPT (The Dotted Line Design) ---
   const renderReceiptLayout = () => (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center w-full">
       {/* Header */}
       <div className="flex flex-col items-center mb-6 text-center">
-        <div className="w-20 h-20 mb-2">
+        <div className="w-24 h-24 mb-2 flex items-center justify-center">
           <img
             src="/carwash.jpeg"
             alt="Logo"
             className="w-full h-full object-contain"
           />
         </div>
-        <h1 className="text-xl font-bold uppercase tracking-wide">
+        <h1 className="text-2xl font-black uppercase tracking-wide text-black mb-1 leading-tight">
           BABA CAR WASHING AND CLEANING L.L.C.
         </h1>
-        <p className="text-sm text-slate-500">PO Box 126297, Dubai - UAE</p>
-        <p className="text-sm text-slate-500">Mob: 055 241 1075</p>
-        <p className="text-sm text-slate-600 font-bold mt-1">
-          TRN: 105021812000003
-        </p>
+        <div className="text-sm font-medium text-gray-600 space-y-0.5">
+          <p>PO Box 126297, Dubai - UAE</p>
+          <p>Mob: 055 241 1075</p>
+          <p className="font-bold text-black">TRN: 105021812000003</p>
+        </div>
       </div>
 
       {/* Title */}
-      <div className="text-center mb-6">
-        <span className="font-bold uppercase text-lg tracking-widest text-slate-800">
-          {localData.paymentMode.includes("CARD")
-            ? "CARD RECEIPT"
-            : "CASH RECEIPT"}
-        </span>
+      <div className="text-center font-black uppercase text-2xl mb-5 tracking-widest text-black">
+        {localData.paymentMode.includes("CARD")
+          ? "CARD RECEIPT"
+          : "CASH RECEIPT"}
       </div>
 
-      <div className="border-t-2 border-dashed border-slate-300 w-full mb-6"></div>
+      <div className="border-t-2 border-dotted border-gray-400 w-full mb-6"></div>
 
       {/* Meta Data */}
-      <div className="flex justify-between items-end mb-6 text-base w-full">
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-slate-900">No:</span>
+      <div className="flex justify-between items-end mb-6 text-base w-full px-1">
+        <div className="flex items-end gap-2">
+          <span className="font-bold text-gray-700 text-lg mb-1">No:</span>
           {isEditing ? (
             <input
               value={localData.displayId}
               onChange={(e) => handleChange("displayId", e.target.value)}
-              className="font-bold text-red-600 text-xl w-32 border-b border-indigo-300 outline-none"
+              className="font-black text-red-600 text-2xl w-32 border-b border-indigo-300 outline-none leading-none"
             />
           ) : (
-            <span className="text-red-600 font-bold text-xl">
+            <span className="text-red-600 font-black text-2xl leading-none">
               {localData.displayId}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-slate-900">Date:</span>
-          <span>
-            {localData.date.toLocaleDateString("en-GB", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "2-digit",
-            })}
+
+        <div className="flex items-end gap-2 w-[280px]">
+          <span className="font-bold text-gray-700 text-lg shrink-0 mb-1">
+            Date:
           </span>
+          <div className="flex-1 border-b-2 border-dotted border-gray-400 text-center relative px-2">
+            {isEditing ? (
+              <input
+                type="date"
+                value={formatDateForInput(localData.date)}
+                onChange={(e) => handleChange("date", new Date(e.target.value))}
+                className="w-full bg-transparent text-center font-bold text-lg outline-none text-indigo-700 pb-1"
+              />
+            ) : (
+              <span className="font-bold text-black text-lg block pb-1">
+                {localData.date.toLocaleDateString("en-GB", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "2-digit",
+                })}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Data Rows */}
-      <div className="space-y-4 text-sm md:text-base font-medium w-full">
+      {/* Data Rows using Helper */}
+      <div className="space-y-4 px-1 w-full">
         <ReceiptRow
           label="Car No"
           value={localData.carNo}
@@ -175,6 +203,13 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
           value={localData.parkingNo}
           isEditing={isEditing}
           onChange={(v) => handleChange("parkingNo", v)}
+        />
+        {/* Added Flat No for Residence Receipt */}
+        <ReceiptRow
+          label="Flat / Villa No"
+          value={localData.flatNo}
+          isEditing={isEditing}
+          onChange={(v) => handleChange("flatNo", v)}
         />
         <ReceiptRow
           label="Office / Residence Building"
@@ -198,20 +233,21 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
         <div className="pt-2">
           <ReceiptRow
             label="Total AED"
-            value={`${localData.total} د.إ`}
+            value={localData.total}
             isEditing={isEditing}
             onChange={(v) => handleChange("total", v)}
+            isBold
           />
         </div>
         <ReceiptRow
           label="Tip"
-          value={`${localData.tip} د.إ`}
+          value={localData.tip}
           isEditing={isEditing}
           onChange={(v) => handleChange("tip", v)}
         />
         <ReceiptRow
           label="Balance"
-          value={`${localData.balance} د.إ`}
+          value={localData.balance}
           isEditing={isEditing}
           onChange={(v) => handleChange("balance", v)}
         />
@@ -220,39 +256,28 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
           value={localData.paymentMode}
           isEditing={isEditing}
           onChange={(v) => handleChange("paymentMode", v)}
+          isUppercase
         />
 
-        {/* Receiver */}
-        <div className="pt-6 w-full">
-          <div className="flex items-end justify-between w-full">
-            <span className="font-bold text-slate-900 shrink-0 w-32 pb-1">
-              Receiver:
-            </span>
-            <div className="flex-1 border-b-2 border-dotted border-slate-400 mb-1 ml-2 relative">
-              {isEditing ? (
-                <input
-                  value={localData.receiver}
-                  onChange={(e) => handleChange("receiver", e.target.value)}
-                  className="w-full text-center bg-transparent outline-none font-medium uppercase text-indigo-700"
-                />
-              ) : (
-                <div className="text-center w-full pb-1 uppercase">
-                  {localData.receiver}
-                </div>
-              )}
-            </div>
-          </div>
+        <div className="pt-6">
+          <ReceiptRow
+            label="Receiver"
+            value={localData.receiver}
+            isEditing={isEditing}
+            onChange={(v) => handleChange("receiver", v)}
+            isUppercase
+          />
         </div>
       </div>
     </div>
   );
 
-  // --- LAYOUT 2: INVOICE (A4 Style) ---
+  // --- LAYOUT 2: INVOICE (A4 Style - Kept Original Structure) ---
   const renderInvoiceLayout = () => (
-    <div className="flex flex-col w-full text-slate-800 font-sans">
+    <div className="flex flex-col w-full text-slate-800 font-sans h-full">
       {/* Invoice Header */}
       <div className="text-center mb-8">
-        <div className="w-24 h-24 mx-auto mb-2">
+        <div className="w-24 h-24 mx-auto mb-2 flex items-center justify-center">
           <img
             src="/carwash.jpeg"
             alt="Logo"
@@ -288,7 +313,7 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
             <span>{localData.parkingNo}</span>
           </div>
           <div className="flex gap-2">
-            <span className="font-bold w-24">Building Name:</span>
+            <span className="font-bold w-24">Building:</span>
             <span>{localData.building}</span>
           </div>
         </div>
@@ -327,10 +352,10 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
               <td className="py-4 px-4 font-medium text-slate-700">
                 CAR WASH PAYMENT
               </td>
-              <td className="py-4 px-4 text-center text-slate-600">1</td>
               <td className="py-4 px-4 text-center text-slate-600">
                 {localData.amount}
               </td>
+              <td className="py-4 px-4 text-center text-slate-600">1</td>
               <td className="py-4 px-4 text-right font-bold text-slate-800">
                 {localData.amount}
               </td>
@@ -365,7 +390,7 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
           <span>Ummhurair Dubai UAE</span>
           <span className="font-bold">Swift Code:</span> <span>NRAKAEAK</span>
           <span className="font-bold">Bank Name:</span>{" "}
-          <span>Rak Bank(The name is National Bank of Ras Alkhaimah)</span>
+          <span>Rak Bank (National Bank of Ras Alkhaimah)</span>
           <span className="font-bold">Bank Account:</span>{" "}
           <span>0033422488061</span>
           <span className="font-bold">Account Name:</span>{" "}
@@ -407,8 +432,8 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
               ref={contentRef}
               className={`bg-white shadow-2xl relative text-slate-900 font-sans ${
                 type === "Invoice"
-                  ? "p-12 min-h-[1123px]"
-                  : "p-8 w-full max-w-[800px]"
+                  ? "p-12 min-h-[1123px] flex flex-col"
+                  : "p-10 w-full max-w-[800px]"
               }`}
             >
               {type === "Invoice"
@@ -467,30 +492,40 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
   );
 };
 
-// --- HELPER COMPONENT FOR RECEIPT ROWS ---
-const ReceiptRow = ({ label, value, isEditing, onChange, isUppercase }) => (
-  <div className="flex items-end justify-between w-full">
-    <span className="font-bold text-slate-900 shrink-0 w-36 md:w-48 pb-1">
+// --- HELPER COMPONENT (Dotted Line Style) ---
+const ReceiptRow = ({
+  label,
+  value,
+  isEditing,
+  onChange,
+  isUppercase,
+  isBold,
+}) => (
+  <div className="flex items-end w-full mb-1">
+    {/* Fixed Label Width ensures alignment */}
+    <div className="w-[220px] font-bold text-gray-700 text-lg shrink-0 mb-1 text-left">
       {label}:
-    </span>
-    <div className="flex-1 border-b-2 border-dotted border-slate-400 mb-1 relative ml-2">
+    </div>
+
+    {/* Dots + Value */}
+    <div className="flex-1 border-b-2 border-dotted border-gray-400 text-center relative px-2">
       {isEditing ? (
         <input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={`w-full text-center bg-transparent outline-none border-none p-0 pb-1 focus:ring-0 text-indigo-700 font-bold ${
+          className={`w-full bg-transparent text-center outline-none text-indigo-700 font-bold text-lg pb-1 ${
             isUppercase ? "uppercase" : ""
           }`}
         />
       ) : (
-        <div
-          className={`text-center w-full pb-1 leading-relaxed ${
+        <span
+          className={`block w-full pb-1 text-black text-lg leading-none ${
             isUppercase ? "uppercase" : ""
-          }`}
+          } ${isBold ? "font-black text-xl" : "font-bold"}`}
         >
           {value || "-"}
-        </div>
+        </span>
       )}
     </div>
   </div>

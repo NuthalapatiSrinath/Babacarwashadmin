@@ -104,6 +104,11 @@ export const paymentService = {
     return response.data;
   },
 
+  bulkStatus: async (ids, status) => {
+    const response = await api.put("/payments/bulk/status", { ids, status });
+    return response.data;
+  },
+
   // 2. Approve/Update Settlement
   updateSettlement: async (id) => {
     const response = await api.put(`/payments/settlements/${id}`, {});
