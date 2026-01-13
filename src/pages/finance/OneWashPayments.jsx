@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   Download,
@@ -18,6 +18,10 @@ import {
   Car,
   CheckCircle2,
   Clock,
+  Briefcase, // Used for Total Jobs icon
+  Building,
+  MapPin,
+  Coins, // Generic currency icon
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -28,6 +32,7 @@ import ViewPaymentModal from "../../components/modals/ViewPaymentModal";
 import OneWashModal from "../../components/modals/OneWashModal";
 import DeleteModal from "../../components/modals/DeleteModal";
 import RichDateRangePicker from "../../components/inputs/RichDateRangePicker";
+import CustomDropdown from "../../components/ui/CustomDropdown"; // Import CustomDropdown
 
 // Redux
 import { exportPayments } from "../../redux/slices/paymentSlice";
@@ -42,6 +47,8 @@ const OneWashPayments = () => {
     (state) => state.oneWash
   );
   const { workers } = useSelector((state) => state.worker);
+
+  const [currency, setCurrency] = useState("AED"); // Default Currency
 
   // --- DATES & TABS LOGIC ---
 
@@ -59,7 +66,8 @@ const OneWashPayments = () => {
 
   const { thisMonth, lastMonth } = getMonthNames();
 
-  // Helper to generate ISO strings with your backend's 18:30 offset
+  // Helper to generate ISO strings with your backend's 18:30 offset logic if needed,
+  // or standard UTC. Keeping existing logic.
   const getRangeForTab = (tab) => {
     const today = new Date();
     let start, end;
@@ -67,20 +75,18 @@ const OneWashPayments = () => {
     if (tab === "this_month") {
       // Start: 1st of This Month
       start = new Date(today.getFullYear(), today.getMonth(), 1);
-      start.setDate(start.getDate() - 1); // Go back 1 day
-      start.setUTCHours(18, 30, 0, 0); // 18:30 UTC
+      start.setDate(start.getDate() - 1); // Go back 1 day based on your specific logic
+      start.setUTCHours(18, 30, 0, 0);
 
       // End: Today
       end = new Date();
       end.setUTCHours(18, 29, 59, 999);
     } else {
       // Last Month
-      // Start: 1st of Prev Month
       start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       start.setDate(start.getDate() - 1);
       start.setUTCHours(18, 30, 0, 0);
 
-      // End: Last Day of Prev Month
       end = new Date(today.getFullYear(), today.getMonth(), 0);
       end.setUTCHours(18, 29, 59, 999);
     }
@@ -92,7 +98,7 @@ const OneWashPayments = () => {
   };
 
   // State
-  const [activeTab, setActiveTab] = useState("this_month"); // 'this_month' or 'last_month'
+  const [activeTab, setActiveTab] = useState("this_month");
   const initialDates = getRangeForTab("this_month");
 
   // Filters
@@ -125,23 +131,24 @@ const OneWashPayments = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Load Currency & Initial Data
   useEffect(() => {
+    const savedCurrency = localStorage.getItem("app_currency");
+    if (savedCurrency) setCurrency(savedCurrency);
+
     dispatch(fetchWorkers({ page: 1, limit: 1000, status: 1 }));
     fetchData(1, 50);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
 
   // --- AUTOMATIC FETCH EFFECTS ---
-  // Trigger when filters (dates/tabs) change
   useEffect(() => {
     fetchData(1, pagination.limit);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
-  // Trigger when Search Term changes (Debounced)
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      // If searching, fetch more data (up to 3000) to filter client-side
       const limit = searchTerm ? 3000 : 50;
       fetchData(1, limit);
     }, 500);
@@ -152,8 +159,6 @@ const OneWashPayments = () => {
   const fetchData = async (page = 1, limit = 50) => {
     try {
       const apiFilters = { ...filters };
-      // Dates are already in correct ISO format from logic
-
       const isSearching = searchTerm.trim().length > 0;
       const fetchLimit = isSearching ? 3000 : limit;
 
@@ -161,7 +166,7 @@ const OneWashPayments = () => {
         fetchOneWash({
           page,
           limit: fetchLimit,
-          search: "", // Don't use backend search, fetch all & filter here
+          search: "",
           filters: apiFilters,
         })
       ).unwrap();
@@ -182,7 +187,6 @@ const OneWashPayments = () => {
     if (!searchTerm) return true;
     const lowerTerm = searchTerm.toLowerCase().trim();
 
-    // Fields to search against
     const id = String(row.id || row._id || "").toLowerCase();
     const vehicleReg = row.registration_no?.toLowerCase() || "";
     const parkingNo = row.parking_no?.toString().toLowerCase() || "";
@@ -210,8 +214,6 @@ const OneWashPayments = () => {
   });
 
   // --- HANDLERS ---
-
-  // Tab Switch Handler
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     const newDates = getRangeForTab(tab);
@@ -224,16 +226,11 @@ const OneWashPayments = () => {
 
   const handleDateChange = (field, value) => {
     if (field === "clear") {
-      // If clearing manually, revert to This Month
       handleTabChange("this_month");
     } else {
       setFilters((prev) => ({ ...prev, [field]: value }));
-      setActiveTab("custom"); // If manual date pick, deselect tabs
+      setActiveTab("custom");
     }
-  };
-
-  const handleFilterChange = (e) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value });
   };
 
   const handleViewReceipt = (row) => {
@@ -330,6 +327,24 @@ const OneWashPayments = () => {
     }
   };
 
+  // --- Prepare Dropdown Options ---
+  const statusOptions = [
+    { value: "", label: "All Status" },
+    { value: "completed", label: "Completed" },
+    { value: "pending", label: "Pending" },
+    { value: "cancelled", label: "Cancelled" },
+  ];
+
+  const workerOptions = useMemo(() => {
+    const options = [{ value: "", label: "All Workers" }];
+    if (workers && workers.length > 0) {
+      workers.forEach((w) => {
+        options.push({ value: w._id, label: w.name });
+      });
+    }
+    return options;
+  }, [workers]);
+
   // --- COLUMNS ---
   const columns = [
     {
@@ -387,7 +402,8 @@ const OneWashPayments = () => {
       className: "text-right",
       render: (row) => (
         <span className="font-bold text-emerald-600 text-sm">
-          {row.amount} <span className="text-[10px] text-emerald-400">AED</span>
+          {row.amount}{" "}
+          <span className="text-[10px] text-emerald-400">{currency}</span>
         </span>
       ),
     },
@@ -472,7 +488,6 @@ const OneWashPayments = () => {
     {
       header: "Receipt",
       className: "text-center w-16",
-      // Only show receipt button if Completed
       render: (row) => {
         const isPaid = (row.status || "").toLowerCase() === "completed";
         if (!isPaid) return <span className="text-slate-300">-</span>;
@@ -542,7 +557,7 @@ const OneWashPayments = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {/* ✅ TAB SWITCHER */}
+            {/* TAB SWITCHER */}
             <div className="bg-slate-100 p-1 rounded-xl flex">
               <button
                 onClick={() => handleTabChange("last_month")}
@@ -566,7 +581,6 @@ const OneWashPayments = () => {
               </button>
             </div>
 
-            {/* Export Only - Bulk buttons removed as requested */}
             <button
               onClick={handleExport}
               className="h-10 px-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
@@ -584,7 +598,7 @@ const OneWashPayments = () => {
             </span>
             <div className="flex items-baseline gap-1">
               <span className="text-xl font-bold">{stats.totalAmount}</span>
-              <span className="text-xs opacity-70">AED</span>
+              <span className="text-xs opacity-70">{currency}</span>
             </div>
           </div>
 
@@ -641,46 +655,28 @@ const OneWashPayments = () => {
             />
           </div>
 
-          {/* Filters */}
+          {/* Filters using CustomDropdown */}
           <div className="lg:col-span-2">
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">
-              Status
-            </label>
-            <div className="relative">
-              <select
-                name="status"
-                value={filters.status}
-                onChange={handleFilterChange}
-                className="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl px-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all appearance-none cursor-pointer text-slate-600 font-medium"
-              >
-                <option value="">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="completed">Completed</option>
-              </select>
-              <Filter className="absolute right-3 top-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
-            </div>
+            <CustomDropdown
+              label="Status"
+              value={filters.status}
+              onChange={(val) => setFilters({ ...filters, status: val })}
+              options={statusOptions}
+              icon={Filter}
+              placeholder="All Status"
+            />
           </div>
 
           <div className="lg:col-span-2">
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">
-              Worker
-            </label>
-            <div className="relative">
-              <select
-                name="worker"
-                value={filters.worker}
-                onChange={handleFilterChange}
-                className="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl px-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all appearance-none cursor-pointer text-slate-600 font-medium"
-              >
-                <option value="">All Workers</option>
-                {workers.map((w) => (
-                  <option key={w._id} value={w._id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-              <User className="absolute right-3 top-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
-            </div>
+            <CustomDropdown
+              label="Worker"
+              value={filters.worker}
+              onChange={(val) => setFilters({ ...filters, worker: val })}
+              options={workerOptions}
+              icon={User}
+              placeholder="All Workers"
+              searchable={true}
+            />
           </div>
 
           {/* Search */}
@@ -717,12 +713,12 @@ const OneWashPayments = () => {
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden flex flex-col flex-1">
         <DataTable
           columns={columns}
-          data={filteredPayments} // Use filtered data here
+          data={filteredPayments}
           loading={loading}
           pagination={pagination}
           onPageChange={(p) => fetchData(p, pagination.limit)}
           onLimitChange={(l) => fetchData(1, l)}
-          hideSearch={true} // Hide inner search
+          hideSearch={true}
         />
       </div>
 

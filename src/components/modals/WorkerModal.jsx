@@ -6,9 +6,9 @@ import {
   Building,
   ShoppingBag,
   Loader2,
-  ChevronDown,
   Check,
   X,
+  Briefcase,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useDispatch } from "react-redux";
@@ -16,6 +16,7 @@ import { createWorker, updateWorker } from "../../redux/slices/workerSlice";
 import { fetchBuildings } from "../../redux/slices/buildingSlice";
 import { fetchMalls } from "../../redux/slices/mallSlice";
 import ModalManager from "./ModalManager";
+import CustomDropdown from "../ui/CustomDropdown";
 
 const WorkerModal = ({ isOpen, onClose, onSuccess, editData }) => {
   const dispatch = useDispatch();
@@ -29,7 +30,7 @@ const WorkerModal = ({ isOpen, onClose, onSuccess, editData }) => {
   // Form State
   const [formData, setFormData] = useState({
     name: "",
-    mobile: "", // Changed from 'number' to 'mobile' to match backend
+    mobile: "",
     password: "",
     confirmPassword: "",
     serviceType: "residence", // 'residence' or 'mall'
@@ -47,6 +48,12 @@ const WorkerModal = ({ isOpen, onClose, onSuccess, editData }) => {
   const [mallSearch, setMallSearch] = useState("");
   const [isMallDropdownOpen, setIsMallDropdownOpen] = useState(false);
   const mallDropdownRef = useRef(null);
+
+  // Service Type Options for CustomDropdown
+  const serviceTypeOptions = [
+    { value: "residence", label: "Residence", icon: Building },
+    { value: "mall", label: "Mall", icon: ShoppingBag },
+  ];
 
   // --- 1. Load Data ---
   useEffect(() => {
@@ -110,6 +117,7 @@ const WorkerModal = ({ isOpen, onClose, onSuccess, editData }) => {
         setFormData({
           name: editData.name || "",
           mobile: editData.mobile || "",
+          // Changed: Pre-fill password for edit
           password: editData.password || "",
           confirmPassword: editData.password || "",
           serviceType: sType,
@@ -186,7 +194,8 @@ const WorkerModal = ({ isOpen, onClose, onSuccess, editData }) => {
       toast.error("Name and Mobile are required");
       return;
     }
-    if (!editData && !formData.password) {
+    // Changed: Password is required for both new and edit
+    if (!formData.password) {
       console.warn("⚠️ [WORKER MODAL] Validation failed: Password required");
       toast.error("Password is required");
       return;
@@ -201,8 +210,9 @@ const WorkerModal = ({ isOpen, onClose, onSuccess, editData }) => {
       const payload = {
         name: formData.name,
         mobile: formData.mobile,
+        // Changed: Always send password
+        password: formData.password,
       };
-      if (formData.password) payload.password = formData.password;
 
       // Handle Service Type Logic
       if (formData.serviceType === "mall") {
@@ -271,135 +281,137 @@ const WorkerModal = ({ isOpen, onClose, onSuccess, editData }) => {
     >
       {/* Form */}
       <form onSubmit={handleSubmit} className="p-6 space-y-5">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Mobile <span className="text-red-500">*</span>
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Phone className="h-4 w-4 text-slate-400" />
+        {/* Name & Mobile Row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Mobile Input */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700">
+              Mobile <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Phone className="h-4 w-4 text-slate-400" />
+              </div>
+              <input
+                type="text"
+                value={formData.mobile}
+                onChange={(e) =>
+                  setFormData({ ...formData, mobile: e.target.value })
+                }
+                className="w-full pl-9 pr-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm transition-all"
+                placeholder="9876543210"
+              />
             </div>
-            <input
-              type="text"
-              value={formData.mobile}
-              onChange={(e) =>
-                setFormData({ ...formData, mobile: e.target.value })
-              }
-              className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-sm"
-              placeholder="9876543210"
-            />
+          </div>
+
+          {/* Name Input */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700">
+              Name <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <User className="h-4 w-4 text-slate-400" />
+              </div>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                className="w-full pl-9 pr-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm transition-all"
+                placeholder="Enter full name"
+              />
+            </div>
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Name <span className="text-red-500">*</span>
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <User className="h-4 w-4 text-slate-400" />
+        {/* Password Row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700">
+              Password <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Lock className="h-4 w-4 text-slate-400" />
+              </div>
+              <input
+                // Changed: Make password visible
+                type="text"
+                value={formData.password}
+                onChange={(e) =>
+                  setFormData({ ...formData, password: e.target.value })
+                }
+                className="w-full pl-9 pr-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm transition-all"
+                placeholder="Enter password"
+              />
             </div>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-sm"
-              placeholder="Enter full name"
-            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700">
+              Confirm Password <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Lock className="h-4 w-4 text-slate-400" />
+              </div>
+              <input
+                // Changed: Make confirm password visible
+                type="text"
+                value={formData.confirmPassword}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    confirmPassword: e.target.value,
+                  })
+                }
+                className={`w-full pl-9 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${
+                  isPasswordMismatch
+                    ? "border-red-500 focus:ring-2 focus:ring-red-100"
+                    : "border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                }`}
+                placeholder="Re-enter password"
+              />
+            </div>
+            {isPasswordMismatch && (
+              <p className="text-xs text-red-500 mt-1">
+                Passwords do not match
+              </p>
+            )}
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Password {!editData && <span className="text-red-500">*</span>}
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Lock className="h-4 w-4 text-slate-400" />
-            </div>
-            <input
-              type="text"
-              value={formData.password}
-              onChange={(e) =>
-                setFormData({ ...formData, password: e.target.value })
-              }
-              className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-sm"
-              placeholder="Enter password"
-            />
-          </div>
-        </div>
+        <div className="border-t border-dashed border-slate-200 my-4"></div>
 
-        <div>
-          <label
-            className={`block text-sm font-medium mb-2 ${
-              isPasswordMismatch ? "text-red-500" : "text-slate-700"
-            }`}
-          >
-            Confirm Password
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Lock className="h-4 w-4 text-slate-400" />
-            </div>
-            <input
-              type="text"
-              value={formData.confirmPassword}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  confirmPassword: e.target.value,
-                })
-              }
-              className={`w-full pl-10 pr-4 py-2.5 border rounded-lg outline-none transition-all text-sm ${
-                isPasswordMismatch
-                  ? "border-red-500 focus:ring-2 focus:ring-red-100"
-                  : "border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              }`}
-              placeholder="Re-enter password"
-            />
-          </div>
-          {isPasswordMismatch && (
-            <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
-          )}
-        </div>
-
-        <hr className="border-dashed border-slate-200" />
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Service Type
-          </label>
-          <div className="relative">
-            <select
-              value={formData.serviceType}
-              onChange={(e) =>
-                setFormData({ ...formData, serviceType: e.target.value })
-              }
-              className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none appearance-none bg-slate-50 text-sm font-medium text-slate-700"
-            >
-              <option value="residence">Residence</option>
-              <option value="mall">Mall</option>
-            </select>
-            <ChevronDown className="absolute right-4 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-          </div>
+        {/* Service Type Dropdown */}
+        <div className="space-y-2">
+          <CustomDropdown
+            label="Service Type"
+            value={formData.serviceType}
+            onChange={(val) => setFormData({ ...formData, serviceType: val })}
+            options={serviceTypeOptions}
+            icon={Briefcase}
+            placeholder="Select Service Type"
+          />
         </div>
 
         {/* --- MALL MULTI-SELECT --- */}
         {formData.serviceType === "mall" && (
-          <div ref={mallDropdownRef}>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Assign Malls
+          // Changed: Added relative positioning to the container
+          <div ref={mallDropdownRef} className="space-y-2 relative">
+            <label className="text-sm font-medium text-slate-700">
+              Assign Malls <span className="text-red-500">*</span>
             </label>
             <div
               onClick={() => setIsMallDropdownOpen(true)}
-              className="w-full min-h-[50px] px-2 py-2 rounded-lg border border-slate-300 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent bg-white flex flex-wrap gap-2 items-center cursor-text"
+              className="w-full min-h-[42px] px-3 py-2 rounded-xl border border-slate-300 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent bg-white flex flex-wrap gap-2 items-center cursor-text transition-all"
             >
               {selectedMalls.map((m) => (
                 <span
                   key={m._id}
-                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-700"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100"
                 >
                   {m.name}
                   <button
@@ -408,7 +420,7 @@ const WorkerModal = ({ isOpen, onClose, onSuccess, editData }) => {
                       e.stopPropagation();
                       removeSelection(m._id, selectedMalls, setSelectedMalls);
                     }}
-                    className="hover:bg-gray-300 rounded-full p-0.5"
+                    className="hover:bg-indigo-200 rounded-full p-0.5 transition-colors"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -416,50 +428,60 @@ const WorkerModal = ({ isOpen, onClose, onSuccess, editData }) => {
               ))}
               <input
                 type="text"
-                className="flex-1 min-w-[120px] outline-none text-sm bg-transparent h-full ml-1"
+                className="flex-1 min-w-[120px] outline-none text-sm bg-transparent h-full"
                 placeholder={
-                  selectedMalls.length === 0 ? "Search malls..." : ""
+                  selectedMalls.length === 0 ? "Search & Select Malls..." : ""
                 }
                 value={mallSearch}
                 onChange={(e) => {
                   setMallSearch(e.target.value);
                   setIsMallDropdownOpen(true);
                 }}
+                onFocus={() => setIsMallDropdownOpen(true)}
               />
             </div>
+
+            {/* Dropdown List */}
             {isMallDropdownOpen && (
-              <div className="absolute w-[calc(100%-3rem)] mt-1 bg-white border border-gray-200 rounded-md shadow-xl max-h-48 overflow-y-auto z-50">
-                {filteredMalls.map((m) => {
-                  const isSelected = selectedMalls.find(
-                    (sm) => sm._id === m._id
-                  );
-                  return (
-                    <div
-                      key={m._id}
-                      onClick={() =>
-                        toggleSelection(
-                          m,
-                          selectedMalls,
-                          setSelectedMalls,
-                          setMallSearch
-                        )
-                      }
-                      className={`px-4 py-2.5 text-sm cursor-pointer flex items-center justify-between hover:bg-blue-50 ${
-                        isSelected
-                          ? "bg-blue-50 text-blue-600"
-                          : "text-gray-700"
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <ShoppingBag className="w-4 h-4 text-gray-400" />{" "}
-                        {m.name}
-                      </span>
-                      {isSelected && (
-                        <Check className="w-4 h-4 text-blue-600" />
-                      )}
-                    </div>
-                  );
-                })}
+              // Changed: Adjusted CSS for cleaner dropdown appearance
+              <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-100 rounded-xl shadow-lg max-h-48 overflow-y-auto z-50 animate-in fade-in zoom-in-95 duration-100">
+                {filteredMalls.length > 0 ? (
+                  filteredMalls.map((m) => {
+                    const isSelected = selectedMalls.find(
+                      (sm) => sm._id === m._id
+                    );
+                    return (
+                      <div
+                        key={m._id}
+                        onClick={() =>
+                          toggleSelection(
+                            m,
+                            selectedMalls,
+                            setSelectedMalls,
+                            setMallSearch
+                          )
+                        }
+                        className={`px-4 py-2.5 text-sm cursor-pointer flex items-center justify-between transition-colors ${
+                          isSelected
+                            ? "bg-indigo-50 text-indigo-700 font-medium"
+                            : "text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <ShoppingBag className="w-4 h-4 text-slate-400" />
+                          {m.name}
+                        </span>
+                        {isSelected && (
+                          <Check className="w-4 h-4 text-indigo-600" />
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="p-4 text-center text-slate-400 text-sm">
+                    No malls found
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -467,18 +489,19 @@ const WorkerModal = ({ isOpen, onClose, onSuccess, editData }) => {
 
         {/* --- BUILDING MULTI-SELECT --- */}
         {formData.serviceType === "residence" && (
-          <div ref={buildingDropdownRef}>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Assign Buildings
+          // Changed: Added relative positioning to the container
+          <div ref={buildingDropdownRef} className="space-y-2 relative">
+            <label className="text-sm font-medium text-slate-700">
+              Assign Buildings <span className="text-red-500">*</span>
             </label>
             <div
               onClick={() => setIsBuildingDropdownOpen(true)}
-              className="w-full min-h-[50px] px-2 py-2 rounded-lg border border-slate-300 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent bg-white flex flex-wrap gap-2 items-center cursor-text"
+              className="w-full min-h-[42px] px-3 py-2 rounded-xl border border-slate-300 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent bg-white flex flex-wrap gap-2 items-center cursor-text transition-all"
             >
               {selectedBuildings.map((b) => (
                 <span
                   key={b._id}
-                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-700"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100"
                 >
                   {b.name}
                   <button
@@ -491,7 +514,7 @@ const WorkerModal = ({ isOpen, onClose, onSuccess, editData }) => {
                         setSelectedBuildings
                       );
                     }}
-                    className="hover:bg-gray-300 rounded-full p-0.5"
+                    className="hover:bg-blue-200 rounded-full p-0.5 transition-colors"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -499,49 +522,62 @@ const WorkerModal = ({ isOpen, onClose, onSuccess, editData }) => {
               ))}
               <input
                 type="text"
-                className="flex-1 min-w-[120px] outline-none text-sm bg-transparent h-full ml-1"
+                className="flex-1 min-w-[120px] outline-none text-sm bg-transparent h-full"
                 placeholder={
-                  selectedBuildings.length === 0 ? "Search buildings..." : ""
+                  selectedBuildings.length === 0
+                    ? "Search & Select Buildings..."
+                    : ""
                 }
                 value={buildingSearch}
                 onChange={(e) => {
                   setBuildingSearch(e.target.value);
                   setIsBuildingDropdownOpen(true);
                 }}
+                onFocus={() => setIsBuildingDropdownOpen(true)}
               />
             </div>
+
+            {/* Dropdown List */}
             {isBuildingDropdownOpen && (
-              <div className="absolute w-[calc(100%-3rem)] mt-1 bg-white border border-gray-200 rounded-md shadow-xl max-h-48 overflow-y-auto z-50">
-                {filteredBuildings.map((b) => {
-                  const isSelected = selectedBuildings.find(
-                    (sb) => sb._id === b._id
-                  );
-                  return (
-                    <div
-                      key={b._id}
-                      onClick={() =>
-                        toggleSelection(
-                          b,
-                          selectedBuildings,
-                          setSelectedBuildings,
-                          setBuildingSearch
-                        )
-                      }
-                      className={`px-4 py-2.5 text-sm cursor-pointer flex items-center justify-between hover:bg-blue-50 ${
-                        isSelected
-                          ? "bg-blue-50 text-blue-600"
-                          : "text-gray-700"
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <Building className="w-4 h-4 text-gray-400" /> {b.name}
-                      </span>
-                      {isSelected && (
-                        <Check className="w-4 h-4 text-blue-600" />
-                      )}
-                    </div>
-                  );
-                })}
+              // Changed: Adjusted CSS for cleaner dropdown appearance
+              <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-100 rounded-xl shadow-lg max-h-48 overflow-y-auto z-50 animate-in fade-in zoom-in-95 duration-100">
+                {filteredBuildings.length > 0 ? (
+                  filteredBuildings.map((b) => {
+                    const isSelected = selectedBuildings.find(
+                      (sb) => sb._id === b._id
+                    );
+                    return (
+                      <div
+                        key={b._id}
+                        onClick={() =>
+                          toggleSelection(
+                            b,
+                            selectedBuildings,
+                            setSelectedBuildings,
+                            setBuildingSearch
+                          )
+                        }
+                        className={`px-4 py-2.5 text-sm cursor-pointer flex items-center justify-between transition-colors ${
+                          isSelected
+                            ? "bg-blue-50 text-blue-700 font-medium"
+                            : "text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <Building className="w-4 h-4 text-slate-400" />
+                          {b.name}
+                        </span>
+                        {isSelected && (
+                          <Check className="w-4 h-4 text-blue-600" />
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="p-4 text-center text-slate-400 text-sm">
+                    No buildings found
+                  </div>
+                )}
               </div>
             )}
           </div>

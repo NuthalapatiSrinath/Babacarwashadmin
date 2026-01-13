@@ -7,7 +7,6 @@ import {
   MapPin,
   Building,
   ShoppingBag,
-  Filter,
   CheckCircle,
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -15,6 +14,7 @@ import toast from "react-hot-toast";
 // Components
 import DataTable from "../../components/DataTable";
 import RichDateRangePicker from "../../components/inputs/RichDateRangePicker";
+import CustomDropdown from "../../components/ui/CustomDropdown"; // ✅ Import CustomDropdown
 
 // APIs
 import { attendanceService } from "../../api/attendanceService";
@@ -98,10 +98,21 @@ const Attendance = () => {
   const fetchRecords = async () => {
     setLoading(true);
     try {
+      const start = new Date(dateRange.startDate);
+      const end = new Date(dateRange.endDate);
+
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        console.warn("Invalid dates selected");
+        setLoading(false);
+        return;
+      }
+
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+
       const params = {
-        startDate: dateRange.startDate,
-        endDate: `${dateRange.endDate}T23:59:59`, // Full day coverage
-        // Note: We do NOT send search here, we filter locally for instant name matching
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
       };
 
       if (selectedEmployee) params.worker = selectedEmployee;
@@ -117,7 +128,7 @@ const Attendance = () => {
       }
 
       const response = await attendanceService.list(params);
-      const fullList = response.data || [];
+      const fullList = Array.isArray(response.data) ? response.data : [];
 
       // Sort Newest First
       fullList.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -125,7 +136,7 @@ const Attendance = () => {
       setAllData(fullList);
     } catch (error) {
       console.error(error);
-      toast.error("Failed to load records");
+      setAllData([]);
     } finally {
       setLoading(false);
     }
@@ -174,7 +185,7 @@ const Attendance = () => {
     return filteredData.slice(startIndex, startIndex + pagination.limit);
   }, [filteredData, pagination.page, pagination.limit]);
 
-  // Update total counts when filtering happens
+  // Update total counts
   useEffect(() => {
     setPagination((prev) => ({
       ...prev,
@@ -244,9 +255,14 @@ const Attendance = () => {
   const handleExport = async () => {
     try {
       toast.loading("Exporting...");
+      const start = new Date(dateRange.startDate);
+      const end = new Date(dateRange.endDate);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+
       const params = {
-        startDate: dateRange.startDate,
-        endDate: `${dateRange.endDate}T23:59:59`,
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
         premise: activePremise !== "all" ? activePremise : undefined,
         worker: selectedEmployee || undefined,
       };
@@ -272,6 +288,42 @@ const Attendance = () => {
       toast.error("Export failed");
     }
   };
+
+  // --- PREPARE DROPDOWN OPTIONS ---
+  const employeeOptions = useMemo(
+    () => [
+      { value: "", label: "All Employees" },
+      ...employees.map((emp) => ({
+        value: emp._id,
+        label: `${emp.name} (${emp.mobile || emp.employeeCode})`,
+      })),
+    ],
+    [employees]
+  );
+
+  const mallOptions = useMemo(
+    () => [
+      { value: "", label: "All Malls" },
+      ...malls.map((m) => ({ value: m._id, label: m.name })),
+    ],
+    [malls]
+  );
+
+  const siteOptions = useMemo(
+    () => [
+      { value: "", label: "All Sites" },
+      ...sites.map((s) => ({ value: s._id, label: s.name })),
+    ],
+    [sites]
+  );
+
+  const buildingOptions = useMemo(
+    () => [
+      { value: "", label: "All Buildings" },
+      ...buildings.map((b) => ({ value: b._id, label: b.name })),
+    ],
+    [buildings]
+  );
 
   // --- COLUMNS ---
   const columns = [
@@ -438,79 +490,52 @@ const Attendance = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 border-t border-slate-200/60">
-            {/* Employee Dropdown */}
+            {/* Employee Dropdown - Using CustomDropdown */}
             <div className="relative">
-              <User className="absolute left-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-              <select
+              <CustomDropdown
                 value={selectedEmployee}
-                onChange={(e) => setSelectedEmployee(e.target.value)}
-                className="w-full pl-10 pr-8 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 appearance-none cursor-pointer text-slate-700"
-              >
-                <option value="">All Employees</option>
-                {employees.map((emp) => (
-                  <option key={emp._id} value={emp._id}>
-                    {emp.name} ({emp.mobile || emp.employeeCode})
-                  </option>
-                ))}
-              </select>
-              <Filter className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                onChange={setSelectedEmployee}
+                options={employeeOptions}
+                icon={User}
+                placeholder="All Employees"
+                searchable={true}
+              />
             </div>
 
-            {/* Dynamic Dropdowns based on activePremise */}
+            {/* Dynamic Dropdowns - Using CustomDropdown */}
             <div className="relative col-span-1 md:col-span-2">
               {activePremise === "mall" && (
-                <div className="relative">
-                  <ShoppingBag className="absolute left-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-                  <select
-                    value={selectedMall}
-                    onChange={(e) => setSelectedMall(e.target.value)}
-                    className="w-full pl-10 pr-8 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 appearance-none cursor-pointer text-slate-700"
-                  >
-                    <option value="">All Malls</option>
-                    {malls.map((m) => (
-                      <option key={m._id} value={m._id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <CustomDropdown
+                  value={selectedMall}
+                  onChange={setSelectedMall}
+                  options={mallOptions}
+                  icon={ShoppingBag}
+                  placeholder="All Malls"
+                  searchable={true}
+                />
               )}
               {activePremise === "site" && (
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-                  <select
-                    value={selectedSite}
-                    onChange={(e) => setSelectedSite(e.target.value)}
-                    className="w-full pl-10 pr-8 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 appearance-none cursor-pointer text-slate-700"
-                  >
-                    <option value="">All Sites</option>
-                    {sites.map((s) => (
-                      <option key={s._id} value={s._id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <CustomDropdown
+                  value={selectedSite}
+                  onChange={setSelectedSite}
+                  options={siteOptions}
+                  icon={MapPin}
+                  placeholder="All Sites"
+                  searchable={true}
+                />
               )}
               {activePremise === "residence" && (
-                <div className="relative">
-                  <Building className="absolute left-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-                  <select
-                    value={selectedBuilding}
-                    onChange={(e) => setSelectedBuilding(e.target.value)}
-                    className="w-full pl-10 pr-8 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 appearance-none cursor-pointer text-slate-700"
-                  >
-                    <option value="">All Buildings</option>
-                    {buildings.map((b) => (
-                      <option key={b._id} value={b._id}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <CustomDropdown
+                  value={selectedBuilding}
+                  onChange={setSelectedBuilding}
+                  options={buildingOptions}
+                  icon={Building}
+                  placeholder="All Buildings"
+                  searchable={true}
+                />
               )}
               {activePremise === "all" && (
-                <div className="w-full py-2.5 px-4 text-sm text-slate-400 italic bg-slate-50 border border-slate-200 rounded-lg select-none">
+                <div className="w-full py-2.5 px-4 text-sm text-slate-400 italic bg-slate-50 border border-slate-200 rounded-xl select-none">
                   (Select a premise type above to filter further)
                 </div>
               )}
@@ -518,7 +543,7 @@ const Attendance = () => {
           </div>
         </div>
 
-        {/* --- DATA TABLE with Built-in Search --- */}
+        {/* --- DATA TABLE --- */}
         <DataTable
           columns={columns}
           data={displayedData}

@@ -5,7 +5,6 @@ import {
   Trash2,
   Building,
   MapPin,
-  DollarSign,
   CheckCircle,
   XCircle,
 } from "lucide-react";
@@ -22,6 +21,7 @@ import { buildingService } from "../../api/buildingService";
 const Buildings = () => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
+  const [currency, setCurrency] = useState("AED"); // Default currency state
 
   // -- Modal States --
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,6 +42,14 @@ const Buildings = () => {
   // --- Search State ---
   const [currentSearch, setCurrentSearch] = useState("");
 
+  // --- Load Currency from Settings ---
+  useEffect(() => {
+    const savedCurrency = localStorage.getItem("app_currency");
+    if (savedCurrency) {
+      setCurrency(savedCurrency);
+    }
+  }, []);
+
   // --- Fetch Data ---
   const fetchData = async (page = 1, limit = 50, search = "") => {
     setLoading(true);
@@ -50,10 +58,6 @@ const Buildings = () => {
     try {
       let resultData = [];
       let totalRecords = 0;
-
-      // STRATEGY (Same as Malls/Locations):
-      // If searching: Fetch ALL items (limit=1000) and filter locally
-      // If not searching: Use standard server-side pagination.
 
       if (search) {
         // 1. Fetch EVERYTHING
@@ -94,7 +98,6 @@ const Buildings = () => {
   const getDisplayData = () => {
     if (!data) return [];
 
-    // If we are searching or if backend sent all data, handle client-side slicing
     if (data.length > pagination.limit) {
       const startIndex = (pagination.page - 1) * pagination.limit;
       return data.slice(startIndex, startIndex + pagination.limit);
@@ -126,7 +129,6 @@ const Buildings = () => {
       await buildingService.delete(buildingToDelete._id);
       toast.success("Building deleted successfully");
       setIsDeleteModalOpen(false);
-      // Refresh with current state
       fetchData(pagination.page, pagination.limit, currentSearch);
     } catch (error) {
       toast.error(error.message || "Failed to delete building");
@@ -183,7 +185,10 @@ const Buildings = () => {
       accessor: "amount",
       render: (row) => (
         <div className="flex items-center gap-1.5 font-bold text-slate-700 bg-slate-50 px-2 py-1 rounded border border-slate-100 w-fit text-xs">
-          <DollarSign className="w-3 h-3 text-emerald-500" />
+          {/* ✅ DYNAMIC CURRENCY SYMBOL */}
+          <span className="text-[10px] font-extrabold text-emerald-600">
+            {currency}
+          </span>
           {row.amount?.toFixed(2) || "0.00"}
         </div>
       ),
@@ -246,14 +251,11 @@ const Buildings = () => {
           data={getDisplayData()}
           loading={loading}
           pagination={pagination}
-          // Pagination Handlers
           onPageChange={(newPage) =>
             fetchData(newPage, pagination.limit, currentSearch)
           }
           onLimitChange={(newLimit) => fetchData(1, newLimit, currentSearch)}
-          // Search Handler (Integrated into Table Header)
           onSearch={(term) => fetchData(1, pagination.limit, term)}
-          // Add Button (Integrated into Table Header)
           actionButton={
             <button
               onClick={handleAdd}

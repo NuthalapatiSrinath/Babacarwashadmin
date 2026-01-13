@@ -20,7 +20,7 @@ import toast from "react-hot-toast";
 import DataTable from "../../components/DataTable";
 import EnquiryModal from "../../components/modals/EnquiryModal";
 import DeleteModal from "../../components/modals/DeleteModal";
-import RichDateRangePicker from "../../components/inputs/RichDateRangePicker"; // Ensure this import exists
+import RichDateRangePicker from "../../components/inputs/RichDateRangePicker";
 
 // Redux
 import {
@@ -30,7 +30,7 @@ import {
   clearSelectedEnquiry,
   clearError,
 } from "../../redux/slices/enquirySlice";
-import { fetchWorkers } from "../../redux/slices/workerSlice"; // Added to populate worker dropdown
+import { fetchWorkers } from "../../redux/slices/workerSlice";
 
 const Enquiry = () => {
   // Redux State
@@ -40,14 +40,11 @@ const Enquiry = () => {
   const { workers } = useSelector((state) => state.worker);
 
   // --- Dates Helper ---
-  // Default to current month range or similar if needed, here mostly empty defaults
+  // Default to empty strings or specific range if needed
   const getInitialDates = () => {
-    const today = new Date();
-    // Default to Last 30 Days if you want initial data filtered, else empty
-    // const start = new Date(); start.setDate(today.getDate() - 30);
     return {
-      startDate: "", // or start.toISOString()
-      endDate: "", // or today.toISOString()
+      startDate: "",
+      endDate: "",
     };
   };
 
@@ -82,11 +79,37 @@ const Enquiry = () => {
   // --- MAIN FETCH EFFECT (Instant) ---
   // Triggers whenever Pagination or Filters change
   useEffect(() => {
+    // Prepare filters with safe dates
+    const apiFilters = { ...filters };
+
+    // ✅ FIX: Ensure dates are full ISO strings with correct time boundaries
+    if (apiFilters.startDate && apiFilters.endDate) {
+      const start = new Date(apiFilters.startDate);
+      const end = new Date(apiFilters.endDate);
+
+      // Validate dates
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+
+        apiFilters.startDate = start.toISOString();
+        apiFilters.endDate = end.toISOString();
+      } else {
+        // If invalid dates, remove them to prevent server error
+        delete apiFilters.startDate;
+        delete apiFilters.endDate;
+      }
+    } else {
+      // If either date is missing, remove both to be safe
+      delete apiFilters.startDate;
+      delete apiFilters.endDate;
+    }
+
     dispatch(
       fetchEnquiries({
         page: pagination.page,
         limit: pagination.limit,
-        filters: filters, // Pass the active filters directly
+        filters: apiFilters,
       })
     );
   }, [dispatch, pagination.page, pagination.limit, filters]);
@@ -160,8 +183,8 @@ const Enquiry = () => {
       await dispatch(deleteEnquiry(enquiryToDelete._id)).unwrap();
       toast.success("Enquiry deleted successfully");
       setIsDeleteModalOpen(false);
-      // Re-fetch handled by useEffect dependency on enquiry slice update usually,
-      // or force re-fetch if needed:
+      // Re-fetch will be triggered automatically if Redux updates state,
+      // but explicitly calling it ensures table refresh
       dispatch(
         fetchEnquiries({
           page: pagination.page,
@@ -441,13 +464,6 @@ const Enquiry = () => {
           }}
           onPageChange={handlePageChange}
           onLimitChange={handleLimitChange}
-          // We removed the inner Search from DataTable by passing hideSearch={true} if needed,
-          // or we just use the one we built above.
-          // Since DataTable usually has its own search props, we can pass null or handle it.
-          // In your provided code, `onSearch={handleClientSearch}` was passed.
-          // Since we built a custom search bar above, we can pass hideSearch to DataTable if supported,
-          // OR just pass the handler to DataTable if you prefer the search inside the table header.
-          // Based on your UI request ("Full page code"), I put a nice search bar in the filter section above.
           hideSearch={true}
           actionButton={
             <button

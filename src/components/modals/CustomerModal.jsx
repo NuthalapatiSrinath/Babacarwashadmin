@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   X,
   User,
@@ -9,13 +9,13 @@ import {
   Car,
   Loader2,
   Save,
-  DollarSign,
   Briefcase,
   Clock,
   Calendar,
   Mail,
   Plus,
   Trash2,
+  Check,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
@@ -26,8 +26,12 @@ import { locationService } from "../../api/locationService";
 import { buildingService } from "../../api/buildingService";
 import { workerService } from "../../api/workerService";
 
+// Custom Components
+import CustomDropdown from "../ui/CustomDropdown";
+
 const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
   const [loading, setLoading] = useState(false);
+  const [currency, setCurrency] = useState("AED"); // Default Currency
 
   // Data States
   const [locations, setLocations] = useState([]);
@@ -45,6 +49,7 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
     amount: "",
     worker: "",
     schedule_type: "daily",
+    schedule_days: "", // Stores comma separated days "Mon,Tue"
     start_date: new Date().toISOString().split("T")[0],
     onboard_date: new Date().toISOString().split("T")[0],
     advance_amount: "",
@@ -59,10 +64,24 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
     location: "",
     building: "",
     flat_no: "",
-    vehicles: [vehicleTemplate], // Start with one vehicle
+    vehicles: [vehicleTemplate],
   });
 
-  // 1. Load Initial Data
+  // Week Days Options
+  const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  // Refs for Day Dropdowns
+  const dayDropdownRefs = useRef([]);
+  // UI State for Open Day Dropdowns (Tracked by vehicle index)
+  const [openDayDropdowns, setOpenDayDropdowns] = useState({});
+
+  // --- Load Currency ---
+  useEffect(() => {
+    const savedCurrency = localStorage.getItem("app_currency");
+    if (savedCurrency) setCurrency(savedCurrency);
+  }, []);
+
+  // --- 1. Load Initial Data ---
   useEffect(() => {
     if (isOpen) {
       const loadDependencies = async () => {
@@ -90,7 +109,7 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, customer]);
 
-  // 2. Filter Buildings when Location Changes
+  // --- 2. Filter Buildings when Location Changes ---
   useEffect(() => {
     if (formData.location && allBuildings.length > 0) {
       const filtered = allBuildings.filter((b) => {
@@ -105,7 +124,7 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
     }
   }, [formData.location, allBuildings]);
 
-  // 3. Filter Workers when Building Changes
+  // --- 3. Filter Workers when Building Changes ---
   useEffect(() => {
     if (formData.building && allWorkers.length > 0) {
       const relevantWorkers = allWorkers.filter((worker) => {
@@ -120,13 +139,12 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
     }
   }, [formData.building, allWorkers]);
 
-  // 4. Populate Form
+  // --- 4. Populate Form ---
   const populateForm = () => {
     if (customer) {
       const locId = customer.location?._id || customer.location || "";
       const buildId = customer.building?._id || customer.building || "";
 
-      // Ensure at least one vehicle exists
       const vehicles =
         customer.vehicles && customer.vehicles.length > 0
           ? customer.vehicles.map((v) => ({
@@ -137,6 +155,7 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
               amount: v.amount || "",
               worker: v.worker?._id || v.worker || "",
               schedule_type: v.schedule_type || "daily",
+              schedule_days: v.schedule_days || "",
               start_date: v.start_date
                 ? new Date(v.start_date).toISOString().split("T")[0]
                 : "",
@@ -173,8 +192,7 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
 
   // --- Handlers ---
 
-  const handleBasicChange = (e) => {
-    const { name, value } = e.target;
+  const handleBasicChange = (name, value) => {
     setFormData((prev) => {
       // If location changes, clear building
       if (name === "location") {
@@ -184,12 +202,26 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
     });
   };
 
-  // Handle changes for a specific vehicle index
-  const handleVehicleChange = (index, e) => {
-    const { name, value } = e.target;
+  const handleVehicleChange = (index, name, value) => {
     const updatedVehicles = [...formData.vehicles];
     updatedVehicles[index] = { ...updatedVehicles[index], [name]: value };
     setFormData({ ...formData, vehicles: updatedVehicles });
+  };
+
+  const toggleDaySelection = (index, day) => {
+    const vehicle = formData.vehicles[index];
+    let currentDays = vehicle.schedule_days
+      ? vehicle.schedule_days.split(",").filter((d) => d)
+      : [];
+
+    if (currentDays.includes(day)) {
+      currentDays = currentDays.filter((d) => d !== day);
+    } else {
+      currentDays.push(day);
+    }
+
+    const sortedDays = weekDays.filter((d) => currentDays.includes(d));
+    handleVehicleChange(index, "schedule_days", sortedDays.join(","));
   };
 
   const handleAddVehicle = () => {
@@ -203,6 +235,23 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
     const updatedVehicles = formData.vehicles.filter((_, i) => i !== index);
     setFormData({ ...formData, vehicles: updatedVehicles });
   };
+
+  // Close day dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      Object.keys(openDayDropdowns).forEach((key) => {
+        if (
+          openDayDropdowns[key] &&
+          dayDropdownRefs.current[key] &&
+          !dayDropdownRefs.current[key].contains(event.target)
+        ) {
+          setOpenDayDropdowns((prev) => ({ ...prev, [key]: false }));
+        }
+      });
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openDayDropdowns]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -224,6 +273,36 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
       setLoading(false);
     }
   };
+
+  // --- Prepare Dropdown Options ---
+  const locationOptions = useMemo(
+    () => locations.map((l) => ({ value: l._id, label: l.name || l.address })),
+    [locations]
+  );
+
+  const buildingOptions = useMemo(
+    () => filteredBuildings.map((b) => ({ value: b._id, label: b.name })),
+    [filteredBuildings]
+  );
+
+  const workerOptions = useMemo(
+    () => filteredWorkers.map((w) => ({ value: w._id, label: w.name })),
+    [filteredWorkers]
+  );
+
+  const vehicleTypeOptions = [
+    { value: "sedan", label: "Sedan" },
+    { value: "suv", label: "SUV / 4x4" },
+    { value: "bike", label: "Bike" },
+    { value: "hatchback", label: "Hatchback" },
+    { value: "xuv", label: "XUV" },
+  ];
+
+  const scheduleTypeOptions = [
+    { value: "daily", label: "Daily" },
+    { value: "weekly", label: "Weekly" },
+    { value: "onetime", label: "One Time" },
+  ];
 
   // Styles
   const labelClass =
@@ -286,7 +365,9 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
                       <input
                         name="firstName"
                         value={formData.firstName}
-                        onChange={handleBasicChange}
+                        onChange={(e) =>
+                          handleBasicChange("firstName", e.target.value)
+                        }
                         className={inputClass}
                         placeholder="John"
                         required
@@ -299,7 +380,9 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
                       <input
                         name="lastName"
                         value={formData.lastName}
-                        onChange={handleBasicChange}
+                        onChange={(e) =>
+                          handleBasicChange("lastName", e.target.value)
+                        }
                         className={inputClass}
                         placeholder="Doe"
                       />
@@ -312,7 +395,9 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
                       <input
                         name="mobile"
                         value={formData.mobile}
-                        onChange={handleBasicChange}
+                        onChange={(e) =>
+                          handleBasicChange("mobile", e.target.value)
+                        }
                         className={inputClass}
                         placeholder="971500000000"
                         required
@@ -326,7 +411,9 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
                       <input
                         name="email"
                         value={formData.email}
-                        onChange={handleBasicChange}
+                        onChange={(e) =>
+                          handleBasicChange("email", e.target.value)
+                        }
                         className={inputClass}
                         placeholder="john@example.com"
                       />
@@ -342,45 +429,31 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   <div>
-                    <label className={labelClass}>Location</label>
-                    <div className={wrapperClass}>
-                      <select
-                        name="location"
-                        value={formData.location}
-                        onChange={handleBasicChange}
-                        className={`${inputClass} cursor-pointer`}
-                      >
-                        <option value="">Select Location</option>
-                        {locations.map((l) => (
-                          <option key={l._id} value={l._id}>
-                            {l.name || l.address}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <CustomDropdown
+                      label="Location"
+                      value={formData.location}
+                      onChange={(val) => handleBasicChange("location", val)}
+                      options={locationOptions}
+                      placeholder="Select Location"
+                      icon={MapPin}
+                      searchable={true}
+                    />
                   </div>
                   <div>
-                    <label className={labelClass}>Building</label>
-                    <div
-                      className={`${wrapperClass} ${
-                        !formData.location ? "opacity-50" : ""
-                      }`}
-                    >
-                      <select
-                        name="building"
-                        value={formData.building}
-                        onChange={handleBasicChange}
-                        className={`${inputClass} cursor-pointer`}
-                        disabled={!formData.location}
-                      >
-                        <option value="">Select Building</option>
-                        {filteredBuildings.map((b) => (
-                          <option key={b._id} value={b._id}>
-                            {b.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <CustomDropdown
+                      label="Building"
+                      value={formData.building}
+                      onChange={(val) => handleBasicChange("building", val)}
+                      options={buildingOptions}
+                      placeholder={
+                        !formData.location
+                          ? "Select Location First"
+                          : "Select Building"
+                      }
+                      icon={Briefcase}
+                      searchable={true}
+                      disabled={!formData.location}
+                    />
                   </div>
                   <div>
                     <label className={labelClass}>Flat No</label>
@@ -389,7 +462,9 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
                       <input
                         name="flat_no"
                         value={formData.flat_no}
-                        onChange={handleBasicChange}
+                        onChange={(e) =>
+                          handleBasicChange("flat_no", e.target.value)
+                        }
                         className={inputClass}
                         placeholder="101"
                       />
@@ -402,7 +477,7 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
               {formData.vehicles.map((vehicle, index) => (
                 <div
                   key={index}
-                  className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative"
+                  className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-visible"
                 >
                   <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
                     <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
@@ -428,7 +503,13 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
                         <input
                           name="registration_no"
                           value={vehicle.registration_no}
-                          onChange={(e) => handleVehicleChange(index, e)}
+                          onChange={(e) =>
+                            handleVehicleChange(
+                              index,
+                              "registration_no",
+                              e.target.value
+                            )
+                          }
                           className={`${inputClass} uppercase`}
                           placeholder="DXB 12345"
                           required
@@ -441,38 +522,46 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
                         <input
                           name="parking_no"
                           value={vehicle.parking_no}
-                          onChange={(e) => handleVehicleChange(index, e)}
+                          onChange={(e) =>
+                            handleVehicleChange(
+                              index,
+                              "parking_no",
+                              e.target.value
+                            )
+                          }
                           className={inputClass}
                           placeholder="B1-20"
                         />
                       </div>
                     </div>
+
+                    {/* Vehicle Type (Custom Dropdown) */}
                     <div>
-                      <label className={labelClass}>Type</label>
-                      <div className={wrapperClass}>
-                        <select
-                          name="vehicle_type"
-                          value={vehicle.vehicle_type}
-                          onChange={(e) => handleVehicleChange(index, e)}
-                          className={`${inputClass} cursor-pointer`}
-                        >
-                          <option value="sedan">Sedan</option>
-                          <option value="suv">SUV / 4x4</option>
-                          <option value="bike">Bike</option>
-                          <option value="hatchback">Hatchback</option>
-                          <option value="xuv">XUV</option>
-                        </select>
-                      </div>
+                      <CustomDropdown
+                        label="Type"
+                        value={vehicle.vehicle_type}
+                        onChange={(val) =>
+                          handleVehicleChange(index, "vehicle_type", val)
+                        }
+                        options={vehicleTypeOptions}
+                        placeholder="Sedan"
+                      />
                     </div>
+
                     <div>
                       <label className={labelClass}>Amount</label>
                       <div className={wrapperClass}>
-                        <DollarSign className="w-4 h-4 text-emerald-500 mr-1" />
+                        {/* Dynamic Currency */}
+                        <span className="text-[10px] font-extrabold text-emerald-600 pr-1.5">
+                          {currency}
+                        </span>
                         <input
                           type="number"
                           name="amount"
                           value={vehicle.amount}
-                          onChange={(e) => handleVehicleChange(index, e)}
+                          onChange={(e) =>
+                            handleVehicleChange(index, "amount", e.target.value)
+                          }
                           className={inputClass}
                           placeholder="0.00"
                         />
@@ -483,45 +572,45 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
                     <div>
                       <label className={labelClass}>Advance Amount</label>
                       <div className={wrapperClass}>
-                        <DollarSign className="w-4 h-4 text-emerald-500 mr-1" />
+                        {/* Dynamic Currency */}
+                        <span className="text-[10px] font-extrabold text-emerald-600 pr-1.5">
+                          {currency}
+                        </span>
                         <input
                           type="number"
                           name="advance_amount"
                           value={vehicle.advance_amount}
-                          onChange={(e) => handleVehicleChange(index, e)}
+                          onChange={(e) =>
+                            handleVehicleChange(
+                              index,
+                              "advance_amount",
+                              e.target.value
+                            )
+                          }
                           className={inputClass}
                           placeholder="0.00"
                         />
                       </div>
                     </div>
 
+                    {/* Worker Dropdown (Custom) */}
                     <div>
-                      <label className={labelClass}>Worker</label>
-                      <div
-                        className={`${wrapperClass} ${
-                          !formData.building ? "opacity-50" : ""
-                        }`}
-                      >
-                        <Briefcase className="w-4 h-4 text-slate-400 mr-2" />
-                        <select
-                          name="worker"
-                          value={vehicle.worker}
-                          onChange={(e) => handleVehicleChange(index, e)}
-                          className={`${inputClass} cursor-pointer`}
-                          disabled={!formData.building}
-                        >
-                          <option value="">
-                            {formData.building
-                              ? "Assign Worker"
-                              : "Select Building First"}
-                          </option>
-                          {filteredWorkers.map((w) => (
-                            <option key={w._id} value={w._id}>
-                              {w.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      <CustomDropdown
+                        label="Worker"
+                        value={vehicle.worker}
+                        onChange={(val) =>
+                          handleVehicleChange(index, "worker", val)
+                        }
+                        options={workerOptions}
+                        icon={Briefcase}
+                        placeholder={
+                          !formData.building
+                            ? "Select Building First"
+                            : "Assign Worker"
+                        }
+                        searchable={true}
+                        disabled={!formData.building}
+                      />
                     </div>
 
                     <div>
@@ -531,7 +620,13 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
                           type="date"
                           name="start_date"
                           value={vehicle.start_date}
-                          onChange={(e) => handleVehicleChange(index, e)}
+                          onChange={(e) =>
+                            handleVehicleChange(
+                              index,
+                              "start_date",
+                              e.target.value
+                            )
+                          }
                           className={`${inputClass} cursor-pointer`}
                         />
                       </div>
@@ -543,28 +638,92 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
                           type="date"
                           name="onboard_date"
                           value={vehicle.onboard_date}
-                          onChange={(e) => handleVehicleChange(index, e)}
+                          onChange={(e) =>
+                            handleVehicleChange(
+                              index,
+                              "onboard_date",
+                              e.target.value
+                            )
+                          }
                           className={`${inputClass} cursor-pointer`}
                         />
                       </div>
                     </div>
 
-                    {/* Row 3 - Full Width Schedule */}
-                    <div className="md:col-span-4">
-                      <label className={labelClass}>Schedule Type</label>
-                      <div className={wrapperClass}>
-                        <Clock className="w-4 h-4 text-slate-400 mr-2" />
-                        <select
-                          name="schedule_type"
+                    {/* Row 3 - Schedule & Days Selection */}
+                    <div className="md:col-span-4 flex gap-4">
+                      {/* Schedule Type (Custom) */}
+                      <div className="flex-1">
+                        <CustomDropdown
+                          label="Schedule Type"
                           value={vehicle.schedule_type}
-                          onChange={(e) => handleVehicleChange(index, e)}
-                          className={`${inputClass} cursor-pointer`}
-                        >
-                          <option value="daily">Daily</option>
-                          <option value="weekly">Weekly</option>
-                          <option value="onetime">One Time</option>
-                        </select>
+                          onChange={(val) =>
+                            handleVehicleChange(index, "schedule_type", val)
+                          }
+                          options={scheduleTypeOptions}
+                          icon={Clock}
+                          placeholder="Daily"
+                        />
                       </div>
+
+                      {/* Dynamic Weekly Days Dropdown */}
+                      {vehicle.schedule_type === "weekly" && (
+                        <div
+                          className="flex-1 relative"
+                          ref={(el) => (dayDropdownRefs.current[index] = el)}
+                        >
+                          <label className={labelClass}>Select Days</label>
+                          <div
+                            className={`${wrapperClass} cursor-pointer`}
+                            onClick={() =>
+                              setOpenDayDropdowns((prev) => ({
+                                ...prev,
+                                [index]: !prev[index],
+                              }))
+                            }
+                          >
+                            <Calendar className="w-4 h-4 text-slate-400 mr-2" />
+                            <span
+                              className={`truncate ${
+                                vehicle.schedule_days
+                                  ? "text-slate-700"
+                                  : "text-slate-400"
+                              }`}
+                            >
+                              {vehicle.schedule_days || "Select Days..."}
+                            </span>
+                          </div>
+
+                          {/* Days Dropdown Menu */}
+                          {openDayDropdowns[index] && (
+                            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                              {weekDays.map((day) => {
+                                const isSelected = vehicle.schedule_days
+                                  .split(",")
+                                  .includes(day);
+                                return (
+                                  <div
+                                    key={day}
+                                    onClick={() =>
+                                      toggleDaySelection(index, day)
+                                    }
+                                    className={`px-4 py-2 text-sm flex items-center justify-between cursor-pointer transition-colors ${
+                                      isSelected
+                                        ? "bg-indigo-50 text-indigo-600 font-bold"
+                                        : "text-slate-600 hover:bg-slate-50"
+                                    }`}
+                                  >
+                                    <span>{day}</span>
+                                    {isSelected && (
+                                      <Check className="w-4 h-4" />
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

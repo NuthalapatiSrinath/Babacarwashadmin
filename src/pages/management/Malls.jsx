@@ -4,7 +4,7 @@ import {
   Edit2,
   Trash2,
   ShoppingBag,
-  DollarSign,
+  DollarSign, // Kept for consistency, though unused in render now
   CreditCard,
   Search,
   Store,
@@ -22,6 +22,7 @@ import { mallService } from "../../api/mallService";
 const Malls = () => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
+  const [currency, setCurrency] = useState("AED"); // Default currency state
 
   // -- Modals --
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -41,6 +42,14 @@ const Malls = () => {
 
   // --- Search State ---
   const [currentSearch, setCurrentSearch] = useState("");
+
+  // --- Load Currency from Settings ---
+  useEffect(() => {
+    const savedCurrency = localStorage.getItem("app_currency");
+    if (savedCurrency) {
+      setCurrency(savedCurrency);
+    }
+  }, []);
 
   // --- Fetch Data ---
   const fetchData = async (page = 1, limit = 50, search = "") => {
@@ -167,7 +176,10 @@ const Malls = () => {
       accessor: "amount",
       render: (row) => (
         <div className="flex items-center gap-1.5 font-bold text-slate-700 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 w-fit">
-          <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
+          {/* ✅ DYNAMIC CURRENCY SYMBOL */}
+          <span className="text-[10px] font-extrabold text-emerald-600">
+            {currency}
+          </span>
           {row.amount?.toFixed(2) || "0.00"}
         </div>
       ),

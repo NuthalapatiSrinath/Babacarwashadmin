@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   X,
-  Save,
   Loader2,
   Building,
   Car,
   CreditCard,
   User,
   MapPin,
+  ShoppingBag,
+  Briefcase,
+  CheckCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
@@ -18,8 +20,12 @@ import { workerService } from "../../api/workerService";
 import { mallService } from "../../api/mallService";
 import { buildingService } from "../../api/buildingService";
 
+// Custom Components
+import CustomDropdown from "../ui/CustomDropdown";
+
 const OneWashModal = ({ isOpen, onClose, job, onSuccess }) => {
   const [loading, setLoading] = useState(false);
+  const [currency, setCurrency] = useState("AED"); // Default currency
 
   // Dropdown Data
   const [workers, setWorkers] = useState([]);
@@ -37,6 +43,12 @@ const OneWashModal = ({ isOpen, onClose, job, onSuccess }) => {
     payment_mode: "cash",
     status: "pending",
   });
+
+  // Load Currency
+  useEffect(() => {
+    const savedCurrency = localStorage.getItem("app_currency");
+    if (savedCurrency) setCurrency(savedCurrency);
+  }, []);
 
   // Load Dependencies
   useEffect(() => {
@@ -87,15 +99,21 @@ const OneWashModal = ({ isOpen, onClose, job, onSuccess }) => {
     }
   }, [isOpen, job]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  // --- Handlers ---
+
+  const handleFieldChange = (name, value) => {
     setFormData((prev) => {
-      // Clear conflicting fields if type changes
+      // Clear conflicting fields if service type changes
       if (name === "service_type") {
         return { ...prev, [name]: value, mall: "", building: "" };
       }
       return { ...prev, [name]: value };
     });
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -146,47 +164,77 @@ const OneWashModal = ({ isOpen, onClose, job, onSuccess }) => {
     }
   };
 
+  // --- Prepare Options ---
+  const serviceTypeOptions = [
+    { value: "mall", label: "Mall", icon: ShoppingBag },
+    { value: "residence", label: "Residence", icon: Building },
+  ];
+
+  const paymentModeOptions = [
+    { value: "cash", label: "Cash" },
+    { value: "card", label: "Card" },
+    { value: "bank transfer", label: "Bank Transfer" },
+  ];
+
+  const statusOptions = [
+    { value: "pending", label: "Pending", icon: Loader2 },
+    { value: "completed", label: "Completed", icon: CheckCircle },
+  ];
+
+  const mallOptions = useMemo(
+    () => malls.map((m) => ({ value: m._id, label: m.name })),
+    [malls]
+  );
+
+  const buildingOptions = useMemo(
+    () => buildings.map((b) => ({ value: b._id, label: b.name })),
+    [buildings]
+  );
+
+  const workerOptions = useMemo(
+    () => workers.map((w) => ({ value: w._id, label: w.name })),
+    [workers]
+  );
+
   // Styles
   const labelClass =
-    "block text-xs font-bold text-slate-500 uppercase mb-1 ml-1";
+    "block text-[11px] font-bold text-slate-500 uppercase mb-1.5 tracking-wide";
   const inputClass =
-    "w-full text-sm font-medium bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all";
+    "w-full text-sm font-semibold text-slate-700 outline-none bg-transparent placeholder:text-slate-400";
+  const wrapperClass =
+    "flex items-center bg-white border border-slate-200 rounded-xl px-3 py-2.5 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all shadow-sm";
 
   return (
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* 1. BACKDROP: Removed blur for performance */}
+          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/60" // Pure opacity is much faster than blur
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
           />
 
-          {/* 2. MODAL: Optimized Spring Physics */}
+          {/* Modal */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 15 }}
-            transition={{
-              type: "spring",
-              stiffness: 350,
-              damping: 25,
-              mass: 0.5, // Lower mass makes it snappier
-            }}
-            className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl relative z-10 flex flex-col max-h-[90vh] overflow-hidden"
+            transition={{ type: "spring", stiffness: 350, damping: 25 }}
+            className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl relative z-10 flex flex-col max-h-[90vh] overflow-hidden border border-slate-100"
           >
             {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
-              <h3 className="text-lg font-bold text-slate-800">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-20">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Car className="w-5 h-5 text-indigo-600" />
                 {job ? "Edit Job" : "New One Wash Job"}
               </h3>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"
+                className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -195,162 +243,148 @@ const OneWashModal = ({ isOpen, onClose, job, onSuccess }) => {
             {/* Form */}
             <form
               onSubmit={handleSubmit}
-              className="p-6 space-y-6 overflow-y-auto flex-1"
+              className="p-6 space-y-6 overflow-y-auto flex-1 bg-slate-50/50"
             >
               {/* Type Selection */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className={labelClass}>Service Type</label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                    <select
-                      name="service_type"
-                      value={formData.service_type}
-                      onChange={handleChange}
-                      className={`${inputClass} pl-9 cursor-pointer`}
-                    >
-                      <option value="mall">Mall</option>
-                      <option value="residence">Residence</option>
-                    </select>
-                  </div>
+                  <CustomDropdown
+                    label="Service Type"
+                    value={formData.service_type}
+                    onChange={(val) => handleFieldChange("service_type", val)}
+                    options={serviceTypeOptions}
+                    icon={MapPin}
+                    placeholder="Select Type"
+                  />
                 </div>
 
                 {/* Dynamic Location Field */}
                 <div>
-                  <label className={labelClass}>
-                    {formData.service_type === "mall"
-                      ? "Select Mall"
-                      : "Select Building"}
-                  </label>
-                  <div className="relative">
-                    <Building className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                    <select
-                      name={
-                        formData.service_type === "mall" ? "mall" : "building"
-                      }
-                      value={
-                        formData.service_type === "mall"
-                          ? formData.mall
-                          : formData.building
-                      }
-                      onChange={handleChange}
-                      className={`${inputClass} pl-9 cursor-pointer`}
-                    >
-                      <option value="">-- Select --</option>
-                      {(formData.service_type === "mall"
-                        ? malls
-                        : buildings
-                      ).map((item) => (
-                        <option key={item._id} value={item._id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {formData.service_type === "mall" ? (
+                    <CustomDropdown
+                      label="Select Mall"
+                      value={formData.mall}
+                      onChange={(val) => handleFieldChange("mall", val)}
+                      options={mallOptions}
+                      icon={ShoppingBag}
+                      placeholder="Select Mall"
+                      searchable={true}
+                    />
+                  ) : (
+                    <CustomDropdown
+                      label="Select Building"
+                      value={formData.building}
+                      onChange={(val) => handleFieldChange("building", val)}
+                      options={buildingOptions}
+                      icon={Building}
+                      placeholder="Select Building"
+                      searchable={true}
+                    />
+                  )}
                 </div>
               </div>
 
               {/* Vehicle & Payment Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={labelClass}>Car Plate No</label>
-                  <div className="relative">
-                    <Car className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                    <input
-                      name="registration_no"
-                      value={formData.registration_no}
-                      onChange={handleChange}
-                      className={`${inputClass} pl-9 font-bold uppercase`}
-                      placeholder="DXB 1234"
-                    />
+              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2 pb-2 border-b border-slate-100">
+                  <Car className="w-4 h-4 text-purple-500" /> Vehicle & Payment
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className={labelClass}>Car Plate No</label>
+                    <div className={wrapperClass}>
+                      <input
+                        name="registration_no"
+                        value={formData.registration_no}
+                        onChange={handleInputChange}
+                        className={`${inputClass} font-bold uppercase`}
+                        placeholder="DXB 1234"
+                      />
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <label className={labelClass}>Parking No</label>
-                  <input
-                    name="parking_no"
-                    value={formData.parking_no}
-                    onChange={handleChange}
-                    className={inputClass}
-                    placeholder="B1-20"
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>Amount (AED)</label>
-                  <input
-                    type="number"
-                    name="amount"
-                    value={formData.amount}
-                    onChange={handleChange}
-                    className={`${inputClass} font-bold text-emerald-600`}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>Payment Mode</label>
-                  <div className="relative">
-                    <CreditCard className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                    <select
-                      name="payment_mode"
+                  <div>
+                    <label className={labelClass}>Parking No</label>
+                    <div className={wrapperClass}>
+                      <input
+                        name="parking_no"
+                        value={formData.parking_no}
+                        onChange={handleInputChange}
+                        className={inputClass}
+                        placeholder="B1-20"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelClass}>Amount</label>
+                    <div className={wrapperClass}>
+                      <span className="text-[10px] font-extrabold text-emerald-600 pr-1.5">
+                        {currency}
+                      </span>
+                      <input
+                        type="number"
+                        name="amount"
+                        value={formData.amount}
+                        onChange={handleInputChange}
+                        className={`${inputClass} font-bold text-emerald-600`}
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <CustomDropdown
+                      label="Payment Mode"
                       value={formData.payment_mode}
-                      onChange={handleChange}
-                      className={`${inputClass} pl-9`}
-                    >
-                      <option value="cash">Cash</option>
-                      <option value="card">Card</option>
-                      <option value="bank transfer">Bank Transfer</option>
-                    </select>
+                      onChange={(val) => handleFieldChange("payment_mode", val)}
+                      options={paymentModeOptions}
+                      icon={CreditCard}
+                      placeholder="Select Mode"
+                    />
                   </div>
                 </div>
               </div>
 
               {/* Worker & Status */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={labelClass}>Assign Worker</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                    <select
-                      name="worker"
+              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2 pb-2 border-b border-slate-100">
+                  <User className="w-4 h-4 text-blue-500" /> Assignment
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <CustomDropdown
+                      label="Assign Worker"
                       value={formData.worker}
-                      onChange={handleChange}
-                      className={`${inputClass} pl-9 cursor-pointer`}
-                    >
-                      <option value="">Select Worker</option>
-                      {workers.map((w) => (
-                        <option key={w._id} value={w._id}>
-                          {w.name}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(val) => handleFieldChange("worker", val)}
+                      options={workerOptions}
+                      icon={Briefcase}
+                      placeholder="Select Worker"
+                      searchable={true}
+                    />
                   </div>
-                </div>
-                <div>
-                  <label className={labelClass}>Job Status</label>
-                  <select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleChange}
-                    className={`${inputClass} uppercase font-bold text-xs`}
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="completed">Completed</option>
-                  </select>
+                  <div>
+                    <CustomDropdown
+                      label="Job Status"
+                      value={formData.status}
+                      onChange={(val) => handleFieldChange("status", val)}
+                      options={statusOptions}
+                      placeholder="Pending"
+                    />
+                  </div>
                 </div>
               </div>
             </form>
 
-            <div className="p-4 bg-white border-t border-slate-100 flex justify-end gap-3">
+            {/* Footer */}
+            <div className="p-4 bg-white border-t border-slate-100 flex justify-end gap-3 sticky bottom-0 z-20">
               <button
                 onClick={onClose}
-                className="px-5 py-2.5 border border-slate-300 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors"
+                className="px-5 py-2.5 border border-slate-300 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors text-sm"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={loading}
-                className="px-8 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-lg shadow-indigo-200"
+                className="px-8 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-lg shadow-indigo-200 text-sm disabled:opacity-70"
               >
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />} Save
                 Job

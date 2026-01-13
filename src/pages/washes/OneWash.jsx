@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Plus,
   Trash2,
@@ -10,24 +10,29 @@ import {
   CreditCard,
   Banknote,
   Briefcase,
-  DollarSign,
   Layers,
   Calendar,
   Car,
   MapPin,
+  Coins,
+  Loader2,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import * as XLSX from "xlsx"; // Requires: npm install xlsx
 
 import DataTable from "../../components/DataTable";
 import OneWashModal from "../../components/modals/OneWashModal";
 import RichDateRangePicker from "../../components/inputs/RichDateRangePicker";
+import CustomDropdown from "../../components/ui/CustomDropdown";
 
 import { oneWashService } from "../../api/oneWashService";
 import { workerService } from "../../api/workerService";
 
 const OneWash = () => {
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [data, setData] = useState([]);
+  const [currency, setCurrency] = useState("AED");
 
   const [stats, setStats] = useState({
     totalAmount: 0,
@@ -39,10 +44,9 @@ const OneWash = () => {
 
   const [workers, setWorkers] = useState([]);
 
-  // -----------------------------
-  // DATE HELPERS (Local Time Safe)
-  // -----------------------------
+  // --- DATE HELPERS ---
   const formatDateLocal = (date) => {
+    if (!date) return "";
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
@@ -51,16 +55,15 @@ const OneWash = () => {
 
   const getToday = () => formatDateLocal(new Date());
 
-  // 🔹 CHANGED: Get 1st of current month
   const getFirstOfMonth = () => {
     const d = new Date();
-    d.setDate(1); // Set to 1st day of month
+    d.setDate(1);
     return formatDateLocal(d);
   };
 
   const [filters, setFilters] = useState({
-    startDate: getFirstOfMonth(), // Default: 1st of Month
-    endDate: getToday(), // Default: Today
+    startDate: getFirstOfMonth(),
+    endDate: getToday(),
     service_type: "",
     worker: "",
   });
@@ -77,11 +80,12 @@ const OneWash = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
 
-  // --------------------------------
-  // LOAD WORKERS ON MOUNT
-  // --------------------------------
+  // --- LOAD DATA ---
   useEffect(() => {
-    const loadWorkers = async () => {
+    const loadData = async () => {
+      const savedCurrency = localStorage.getItem("app_currency");
+      if (savedCurrency) setCurrency(savedCurrency);
+
       try {
         const res = await workerService.list(1, 1000);
         setWorkers(res.data || []);
@@ -89,40 +93,47 @@ const OneWash = () => {
         console.error(e);
       }
     };
-    loadWorkers();
+    loadData();
   }, []);
 
-  // --------------------------------
-  // AUTOMATIC FETCH EFFECTS
-  // --------------------------------
-
-  // 1. Trigger when filters change
+  // --- FETCH DATA ---
   useEffect(() => {
     fetchData(1, pagination.limit);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
-  // 2. Trigger when Search Term changes (Debounced)
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       fetchData(1, pagination.limit);
     }, 500);
-
     return () => clearTimeout(delayDebounceFn);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm]);
 
-  // --------------------------------
-  // FETCH DATA
-  // --------------------------------
   const fetchData = async (page = 1, limit = 50) => {
-    setLoading(true);
+    // ✅ FIX: Prevent fetching if dates are missing/invalid
+    if (!filters.startDate || !filters.endDate) return;
 
+    setLoading(true);
     try {
-      const apiFilters = { ...filters };
-      if (apiFilters.endDate) {
-        apiFilters.endDate = `${apiFilters.endDate}T23:59:59`;
+      const start = new Date(filters.startDate);
+      const end = new Date(filters.endDate);
+
+      // ✅ FIX: Validate Date objects
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        console.warn("Invalid Date Range Selected");
+        setLoading(false);
+        return;
       }
+
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+
+      const apiFilters = {
+        ...filters,
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+      };
 
       const res = await oneWashService.list(
         page,
@@ -132,7 +143,6 @@ const OneWash = () => {
       );
 
       setData(res.data || []);
-
       if (res.counts) setStats(res.counts);
 
       const total =
@@ -146,59 +156,134 @@ const OneWash = () => {
       });
     } catch (e) {
       console.error(e);
-      toast.error("Failed to load jobs");
+      // Removed toast error here to prevent spamming while typing/selecting dates
     } finally {
       setLoading(false);
     }
   };
 
-  // --------------------------------
-  // CLIENT-SIDE FILTERING (Strict Visual Match)
-  // --------------------------------
-  const filteredData = data.filter((row) => {
-    if (!searchTerm) return true;
-    const lowerTerm = searchTerm.toLowerCase();
+  // --- EXPORT LOGIC (Summary + Detailed) ---
+  const handleExport = async () => {
+    if (!filters.startDate || !filters.endDate) {
+      toast.error("Please select a valid date range");
+      return;
+    }
 
-    // Fields to search against
-    const id = String(row.id || "").toLowerCase();
-    const vehicle = row.registration_no?.toLowerCase() || "";
-    const parking = row.parking_no?.toLowerCase() || "";
-    const amount = String(row.amount || "").toLowerCase();
-    const tip = String(row.tip_amount || "").toLowerCase();
-    const payMode = row.payment_mode?.toLowerCase() || "";
-    const status = row.status?.toLowerCase() || "";
-    const workerName = row.worker?.name?.toLowerCase() || "";
+    setExporting(true);
+    try {
+      const start = new Date(filters.startDate);
+      const end = new Date(filters.endDate);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
 
-    const locationName =
-      (row.service_type === "mall"
-        ? row.mall?.name
-        : row.building?.name
-      )?.toLowerCase() || "";
+      const apiFilters = {
+        ...filters,
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+      };
 
-    const dateStr = new Date(row.createdAt).toLocaleString().toLowerCase();
+      // 1. Fetch All Data
+      const res = await oneWashService.list(1, 10000, searchTerm, apiFilters);
+      const exportData = res.data || [];
 
-    return (
-      id.includes(lowerTerm) ||
-      vehicle.includes(lowerTerm) ||
-      parking.includes(lowerTerm) ||
-      amount.includes(lowerTerm) ||
-      tip.includes(lowerTerm) ||
-      payMode.includes(lowerTerm) ||
-      status.includes(lowerTerm) ||
-      locationName.includes(lowerTerm) ||
-      workerName.includes(lowerTerm) ||
-      dateStr.includes(lowerTerm)
-    );
-  });
+      if (exportData.length === 0) {
+        toast.error("No data to export");
+        setExporting(false);
+        return;
+      }
 
-  // --------------------------------
-  // FILTER HANDLERS
-  // --------------------------------
+      // 2. Prepare Detailed Data
+      const detailedData = exportData.map((item) => ({
+        ID: item.id,
+        Date: new Date(item.createdAt).toLocaleDateString(),
+        "Service Type": item.service_type,
+        "Mall/Building": item.mall?.name || item.building?.name || "-",
+        Vehicle: item.registration_no,
+        Parking: item.parking_no,
+        Amount: item.amount,
+        "Payment Mode": item.payment_mode,
+        Status: item.status,
+        Worker: item.worker?.name || "Unassigned",
+      }));
+
+      // 3. Prepare Summary Data (Aggregated by Date & Location)
+      const summaryMap = {}; // Key: "YYYY-MM-DD_LocationName"
+
+      exportData.forEach((item) => {
+        const dateKey = new Date(item.createdAt).toISOString().split("T")[0];
+
+        let locationName = "Unknown";
+        if (item.service_type === "mall" && item.mall?.name) {
+          locationName = item.mall.name;
+        } else if (item.service_type === "residence" && item.building?.name) {
+          locationName = item.building.name;
+        }
+
+        const compositeKey = `${dateKey}_${locationName}`;
+
+        if (!summaryMap[compositeKey]) {
+          summaryMap[compositeKey] = {
+            date: dateKey,
+            location: locationName,
+            count: 0,
+            type: item.service_type === "mall" ? "Mall" : "Building",
+          };
+        }
+        summaryMap[compositeKey].count += 1;
+      });
+
+      const summaryArray = Object.values(summaryMap).sort(
+        (a, b) => new Date(a.date) - new Date(b.date)
+      );
+
+      const mallSummary = summaryArray.filter((i) => i.type === "Mall");
+      const buildingSummary = summaryArray.filter((i) => i.type === "Building");
+
+      const summarySheetRows = [];
+      if (mallSummary.length > 0) {
+        summarySheetRows.push(["Day", "Mall", "Count"]);
+        mallSummary.forEach((m) =>
+          summarySheetRows.push([m.date, m.location, m.count])
+        );
+        summarySheetRows.push([]);
+        summarySheetRows.push([]);
+      }
+
+      if (buildingSummary.length > 0) {
+        summarySheetRows.push(["Day", "Building", "Count"]);
+        buildingSummary.forEach((b) =>
+          summarySheetRows.push([b.date, b.location, b.count])
+        );
+      }
+
+      // 4. Generate Workbook
+      const workbook = XLSX.utils.book_new();
+
+      // If summary data exists, add it
+      if (summarySheetRows.length > 0) {
+        const wsSummary = XLSX.utils.aoa_to_sheet(summarySheetRows);
+        XLSX.utils.book_append_sheet(workbook, wsSummary, "Report");
+      }
+
+      const wsDetailed = XLSX.utils.json_to_sheet(detailedData);
+      XLSX.utils.book_append_sheet(workbook, wsDetailed, "Detailed Report");
+
+      XLSX.writeFile(workbook, `OneWash_Report_${filters.startDate}.xlsx`);
+      toast.success("Export successful!");
+    } catch (e) {
+      console.error("Export Error:", e);
+      toast.error("Export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // --- HANDLERS ---
   const handleDateChange = (field, value) => {
     if (field === "clear") {
       setFilters((prev) => ({
         ...prev,
-        startDate: getFirstOfMonth(), // Reset to 1st of month
+        startDate: getFirstOfMonth(),
         endDate: getToday(),
       }));
     } else {
@@ -206,13 +291,6 @@ const OneWash = () => {
     }
   };
 
-  const handleFilterChange = (e) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value });
-  };
-
-  // --------------------------------
-  // CRUD
-  // --------------------------------
   const handleCreate = () => {
     setSelectedJob(null);
     setIsModalOpen(true);
@@ -225,7 +303,6 @@ const OneWash = () => {
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this job record?")) return;
-
     try {
       await oneWashService.delete(id);
       toast.success("Deleted successfully");
@@ -235,58 +312,20 @@ const OneWash = () => {
     }
   };
 
-  const handleExport = async () => {
-    const toastId = toast.loading("Downloading report...");
-    try {
-      const exportFilters = { ...filters };
-      // Backend handles partial date strings, no need to add time manually for filtering
-      // just pass the dates as strings
+  // --- DROPDOWN OPTIONS ---
+  const serviceTypeOptions = [
+    { value: "", label: "All Services" },
+    { value: "mall", label: "Mall" },
+    { value: "residence", label: "Residence" },
+  ];
 
-      const blobData = await oneWashService.exportData({
-        ...exportFilters,
-        search: searchTerm,
-      });
+  const workerOptions = useMemo(() => {
+    const options = [{ value: "", label: "All Workers" }];
+    workers.forEach((w) => options.push({ value: w._id, label: w.name }));
+    return options;
+  }, [workers]);
 
-      const blob = new Blob([blobData], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-
-      const dateStr = new Date().toISOString().split("T")[0];
-      link.href = url;
-      link.setAttribute("download", `onewash_report_${dateStr}.xlsx`);
-
-      document.body.appendChild(link);
-      link.click();
-
-      link.parentNode.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast.success("Download complete", { id: toastId });
-    } catch (e) {
-      console.error("Export Error:", e);
-      if (e.response && e.response.data instanceof Blob) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          try {
-            const errorObj = JSON.parse(reader.result);
-            toast.error(errorObj.message || "Export failed", { id: toastId });
-          } catch {
-            toast.error("Export failed", { id: toastId });
-          }
-        };
-        reader.readAsText(e.response.data);
-      } else {
-        toast.error("Export failed", { id: toastId });
-      }
-    }
-  };
-
-  // --------------------------------
-  // TABLE COLUMNS
-  // --------------------------------
+  // --- COLUMNS ---
   const columns = [
     {
       header: "Id",
@@ -319,24 +358,15 @@ const OneWash = () => {
       ),
     },
     {
-      header: "Parking No",
-      accessor: "parking_no",
-      render: (row) => (
-        <span className="text-slate-600">{row.parking_no || "-"}</span>
-      ),
-    },
-    {
       header: "Amount",
       accessor: "amount",
       render: (row) => (
-        <span className="font-bold text-slate-800">{row.amount}</span>
-      ),
-    },
-    {
-      header: "Tip",
-      accessor: "tip_amount",
-      render: (row) => (
-        <span className="text-slate-600">{row.tip_amount || 0}</span>
+        <span className="font-bold text-slate-800 flex items-center gap-1">
+          <span className="text-[10px] text-emerald-600 font-extrabold">
+            {currency}
+          </span>
+          {row.amount}
+        </span>
       ),
     },
     {
@@ -405,7 +435,6 @@ const OneWash = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 font-sans">
-      {/* --- HEADER SECTION --- */}
       <div className="mb-6 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-3">
@@ -429,10 +458,12 @@ const OneWash = () => {
               </span>
             </div>
             <div className="bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm flex items-center gap-2">
-              <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
+              <Coins className="w-3.5 h-3.5 text-emerald-500" />
               <span>
                 Revenue:{" "}
-                <b className="text-emerald-700">{stats.totalAmount} AED</b>
+                <b className="text-emerald-700">
+                  {stats.totalAmount} {currency}
+                </b>
               </span>
             </div>
             <div className="bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm flex items-center gap-2">
@@ -453,9 +484,15 @@ const OneWash = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={handleExport}
-            className="h-11 px-5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-2"
+            disabled={exporting}
+            className="h-11 px-5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-2 disabled:opacity-70"
           >
-            <Download className="w-4 h-4 text-slate-500" /> Export
+            {exporting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4 text-slate-500" />
+            )}{" "}
+            Export
           </button>
           <button
             onClick={handleCreate}
@@ -466,9 +503,7 @@ const OneWash = () => {
         </div>
       </div>
 
-      {/* --- FILTERS & TABLE CONTAINER --- */}
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden flex flex-col">
-        {/* Filters Bar */}
         <div className="p-4 border-b border-gray-100 bg-slate-50/50 flex flex-col xl:flex-row gap-4 items-end">
           <div className="w-full xl:w-auto">
             <span className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
@@ -482,45 +517,28 @@ const OneWash = () => {
           </div>
 
           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-            <div className="relative">
-              <span className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
-                Service Type
-              </span>
-              <div className="relative">
-                <select
-                  name="service_type"
-                  value={filters.service_type}
-                  onChange={handleFilterChange}
-                  className="w-full h-[42px] bg-white border border-slate-200 rounded-lg px-4 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 appearance-none cursor-pointer font-medium text-slate-700"
-                >
-                  <option value="">All Services</option>
-                  <option value="mall">Mall</option>
-                  <option value="residence">Residence</option>
-                </select>
-                <Filter className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
+            <div>
+              <CustomDropdown
+                label="Service Type"
+                value={filters.service_type}
+                onChange={(val) =>
+                  setFilters({ ...filters, service_type: val })
+                }
+                options={serviceTypeOptions}
+                icon={Filter}
+                placeholder="All Services"
+              />
             </div>
-
-            <div className="relative">
-              <span className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
-                Worker
-              </span>
-              <div className="relative">
-                <select
-                  name="worker"
-                  value={filters.worker}
-                  onChange={handleFilterChange}
-                  className="w-full h-[42px] bg-white border border-slate-200 rounded-lg px-4 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 appearance-none cursor-pointer font-medium text-slate-700"
-                >
-                  <option value="">All Workers</option>
-                  {workers.map((w) => (
-                    <option key={w._id} value={w._id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
-                <User className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
+            <div>
+              <CustomDropdown
+                label="Worker"
+                value={filters.worker}
+                onChange={(val) => setFilters({ ...filters, worker: val })}
+                options={workerOptions}
+                icon={User}
+                placeholder="All Workers"
+                searchable={true}
+              />
             </div>
           </div>
 
@@ -535,16 +553,26 @@ const OneWash = () => {
                 placeholder="Search All Columns..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full h-full pl-10 pr-4 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 font-medium"
+                className="w-full h-full pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 font-medium transition-all"
               />
             </div>
           </div>
         </div>
 
-        {/* Data Table */}
         <DataTable
           columns={columns}
-          data={filteredData}
+          data={data.filter((row) => {
+            // Re-implement search logic here because filteredData variable was removed
+            // to simplify the flow and rely on 'data' state which is updated by fetchData
+            if (!searchTerm) return true;
+            const term = searchTerm.toLowerCase();
+            return (
+              String(row.id).toLowerCase().includes(term) ||
+              String(row.registration_no).toLowerCase().includes(term) ||
+              String(row.parking_no).toLowerCase().includes(term) ||
+              String(row.worker?.name).toLowerCase().includes(term)
+            );
+          })}
           loading={loading}
           pagination={pagination}
           onPageChange={(p) => fetchData(p, pagination.limit)}

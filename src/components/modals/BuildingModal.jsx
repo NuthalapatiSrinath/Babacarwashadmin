@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Building,
   MapPin,
   Loader2,
+  Calendar,
   DollarSign,
   CreditCard,
-  Calendar,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useDispatch } from "react-redux";
@@ -15,6 +15,7 @@ import {
 } from "../../redux/slices/buildingSlice";
 import { fetchLocations } from "../../redux/slices/locationSlice";
 import ModalManager from "./ModalManager";
+import CustomDropdown from "../ui/CustomDropdown"; // ✅ Import the new Dropdown
 
 const BuildingModal = ({ isOpen, onClose, onSuccess, editData }) => {
   const dispatch = useDispatch();
@@ -22,12 +23,12 @@ const BuildingModal = ({ isOpen, onClose, onSuccess, editData }) => {
   const [fetchingLocations, setFetchingLocations] = useState(false);
   const [locations, setLocations] = useState([]);
 
-  // Updated state to include new fields
+  // Updated state
   const [formData, setFormData] = useState({
     name: "",
     location_id: "",
-    amount: 0,
-    card_charges: 0,
+    amount: "", // String to handle decimals better during input
+    card_charges: "",
     schedule_today: false,
   });
 
@@ -45,11 +46,6 @@ const BuildingModal = ({ isOpen, onClose, onSuccess, editData }) => {
           const result = await dispatch(
             fetchLocations({ page: 1, limit: 100, search: "" })
           ).unwrap();
-          console.log(
-            "✅ [BUILDING MODAL] Locations loaded:",
-            result.data?.length,
-            "locations"
-          );
           setLocations(result.data || []);
         } catch (error) {
           console.error("❌ [BUILDING MODAL] Failed to load locations:", error);
@@ -62,56 +58,60 @@ const BuildingModal = ({ isOpen, onClose, onSuccess, editData }) => {
 
       // Populate form if editing
       if (editData) {
-        console.log("📝 [BUILDING MODAL] Edit data:", editData);
         setFormData({
           name: editData.name || "",
           location_id: editData.location_id?._id || editData.location_id || "",
-          amount: editData.amount || 0,
-          card_charges: editData.card_charges || 0,
+          amount: editData.amount || "",
+          card_charges: editData.card_charges || "",
           schedule_today: editData.schedule_today || false,
         });
       } else {
-        console.log("➕ [BUILDING MODAL] Creating new building");
         // Reset for new entry
         setFormData({
           name: "",
           location_id: "",
-          amount: 0,
-          card_charges: 0,
+          amount: "",
+          card_charges: "",
           schedule_today: false,
         });
       }
     }
   }, [isOpen, editData, dispatch]);
 
+  // ✅ Prepare Options for CustomDropdown
+  const locationOptions = useMemo(() => {
+    return locations.map((loc) => ({
+      value: loc._id,
+      label: loc.address,
+    }));
+  }, [locations]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     console.log("💾 [BUILDING MODAL] Submitting form:", formData);
 
     if (!formData.name.trim() || !formData.location_id) {
-      console.warn(
-        "⚠️ [BUILDING MODAL] Validation Failed: Name/Location empty"
-      );
       toast.error("Please fill in required fields (Name & Location)");
       return;
     }
 
     setLoading(true);
     try {
+      // Prepare payload with float conversion
+      const payload = {
+        ...formData,
+        amount: parseFloat(formData.amount) || 0,
+        card_charges: parseFloat(formData.card_charges) || 0,
+      };
+
       if (editData) {
-        console.log(
-          `✏️ [BUILDING MODAL] Updating via Redux - ID: ${editData._id}`
-        );
         await dispatch(
-          updateBuilding({ id: editData._id, data: formData })
+          updateBuilding({ id: editData._id, data: payload })
         ).unwrap();
         toast.success("Building updated successfully");
-        console.log("✅ [BUILDING MODAL] Building updated successfully");
       } else {
-        console.log("➕ [BUILDING MODAL] Creating via Redux");
-        await dispatch(createBuilding(formData)).unwrap();
+        await dispatch(createBuilding(payload)).unwrap();
         toast.success("Building created successfully");
-        console.log("✅ [BUILDING MODAL] Building created successfully");
       }
       onSuccess();
       onClose();
@@ -135,7 +135,7 @@ const BuildingModal = ({ isOpen, onClose, onSuccess, editData }) => {
       <form onSubmit={handleSubmit} className="p-6 space-y-5">
         {/* Row 1: Name & Location */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Name */}
+          {/* Name Input */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700">
               Building Name <span className="text-red-500">*</span>
@@ -150,90 +150,81 @@ const BuildingModal = ({ isOpen, onClose, onSuccess, editData }) => {
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm"
+                className="w-full pl-9 pr-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm transition-all"
                 placeholder="Building Name"
               />
             </div>
           </div>
 
-          {/* Location */}
+          {/* Location Dropdown (Using CustomDropdown) */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700">
               Location <span className="text-red-500">*</span>
             </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <MapPin className="h-4 w-4 text-slate-400" />
-              </div>
-              <select
-                value={formData.location_id}
-                onChange={(e) =>
-                  setFormData({ ...formData, location_id: e.target.value })
-                }
-                disabled={fetchingLocations}
-                className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none appearance-none bg-white text-sm"
-              >
-                <option value="">Select Location</option>
-                {locations.map((loc) => (
-                  <option key={loc._id} value={loc._id}>
-                    {loc.address}
-                  </option>
-                ))}
-              </select>
-              {fetchingLocations && (
-                <div className="absolute inset-y-0 right-8 flex items-center pointer-events-none">
-                  <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />
-                </div>
-              )}
-            </div>
+            {/* We render the label manually above to keep style consistent with Name input.
+               So we don't pass 'label' prop to CustomDropdown.
+            */}
+            <CustomDropdown
+              value={formData.location_id}
+              onChange={(val) => setFormData({ ...formData, location_id: val })}
+              options={locationOptions}
+              placeholder={fetchingLocations ? "Loading..." : "Select Location"}
+              icon={MapPin}
+              // searchable={true}
+              disabled={fetchingLocations}
+            />
           </div>
         </div>
 
         {/* Row 2: Amount & Card Charges */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Amount */}
+          {/* Amount (AED) */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700">Amount</label>
+            <label className="text-sm font-medium text-slate-700">
+              Amount (AED)
+            </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <DollarSign className="h-4 w-4 text-slate-400" />
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
+                AED
               </div>
               <input
                 type="number"
+                step="any" // ✅ Decimals allowed
                 min="0"
                 value={formData.amount}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    amount: parseFloat(e.target.value) || 0,
+                    amount: e.target.value,
                   })
                 }
-                className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm"
+                className="w-full pl-11 pr-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm transition-all"
                 placeholder="0.00"
               />
             </div>
           </div>
 
-          {/* Card Charges */}
+          {/* Card Charges (AED) */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700">
-              Card Charges
+              Card Charges (AED)
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <CreditCard className="h-4 w-4 text-slate-400" />
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
+                AED
               </div>
               <input
                 type="number"
+                step="any" // ✅ Decimals allowed
                 min="0"
                 value={formData.card_charges}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    card_charges: parseFloat(e.target.value) || 0,
+                    card_charges: e.target.value,
                   })
                 }
-                className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm"
+                className="w-full pl-11 pr-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm transition-all"
                 placeholder="0.00"
               />
             </div>

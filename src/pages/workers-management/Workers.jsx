@@ -26,6 +26,7 @@ const Workers = () => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [activeTab, setActiveTab] = useState("active"); // "active" or "inactive"
+  const [currency, setCurrency] = useState("AED"); // Default currency
 
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,6 +43,14 @@ const Workers = () => {
     total: 0,
     totalPages: 1,
   });
+
+  // --- Load Currency from Settings ---
+  useEffect(() => {
+    const savedCurrency = localStorage.getItem("app_currency");
+    if (savedCurrency) {
+      setCurrency(savedCurrency);
+    }
+  }, []);
 
   // --- Fetch Data ---
   const fetchData = async (
@@ -209,7 +218,8 @@ const Workers = () => {
             className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 hover:text-green-700 transition-colors shadow-sm border border-green-100"
             title="Payments"
           >
-            <span className="text-[10px] font-bold px-1">$</span>
+            {/* ✅ DYNAMIC CURRENCY SYMBOL */}
+            <span className="text-[10px] font-bold px-1">{currency}</span>
           </button>
 
           <button

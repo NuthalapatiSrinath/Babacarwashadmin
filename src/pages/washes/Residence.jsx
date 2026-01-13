@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Plus,
   Trash2,
@@ -15,13 +15,16 @@ import {
   Briefcase,
   Phone,
   Building2,
+  Loader2,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import * as XLSX from "xlsx"; // Requires: npm install xlsx
 
 // Components
 import DataTable from "../../components/DataTable";
 import JobModal from "../../components/modals/JobModal";
 import RichDateRangePicker from "../../components/inputs/RichDateRangePicker";
+import CustomDropdown from "../../components/ui/CustomDropdown";
 
 // API
 import { jobService } from "../../api/jobService";
@@ -30,12 +33,14 @@ import { buildingService } from "../../api/buildingService";
 
 const Residence = () => {
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [data, setData] = useState([]);
   const [workers, setWorkers] = useState([]);
   const [buildings, setBuildings] = useState([]);
 
   // --- DATE HELPERS ---
   const formatDateLocal = (date) => {
+    if (!date) return "";
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
@@ -44,15 +49,14 @@ const Residence = () => {
 
   const getToday = () => formatDateLocal(new Date());
 
-  const getLast10Days = () => {
+  const getFirstOfMonth = () => {
     const d = new Date();
-    d.setDate(d.getDate() - 10);
+    d.setDate(1);
     return formatDateLocal(d);
   };
 
-  // 🔹 FILTERS STATE
   const [filters, setFilters] = useState({
-    startDate: getLast10Days(),
+    startDate: getFirstOfMonth(),
     endDate: getToday(),
     worker: "",
     status: "",
@@ -71,18 +75,14 @@ const Residence = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
 
-  // --- Initial Load ---
+  // --- LOAD DATA ---
   useEffect(() => {
     const loadResources = async () => {
       try {
         const wRes = await workerService.list(1, 1000);
         setWorkers(wRes.data || []);
-        try {
-          const bRes = await buildingService.list(1, 1000);
-          setBuildings(bRes.data || []);
-        } catch (err) {
-          console.warn("Failed to load buildings", err);
-        }
+        const bRes = await buildingService.list(1, 1000);
+        setBuildings(bRes.data || []);
       } catch (e) {
         console.error(e);
       }
@@ -90,13 +90,12 @@ const Residence = () => {
     loadResources();
   }, []);
 
-  // --- Automatic Fetch on Filter Change ---
+  // --- AUTOMATIC FETCH ---
   useEffect(() => {
     fetchData(1, pagination.limit);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
-  // --- Instant Search Fetch (Server Side) ---
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       fetchData(1, pagination.limit);
@@ -105,34 +104,47 @@ const Residence = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm]);
 
-  // --- Fetch Data ---
   const fetchData = async (page = 1, limit = 50) => {
+    // ✅ FIX: Strict validation. If dates are missing/invalid, STOP silently.
+    if (!filters.startDate || !filters.endDate) return;
+
+    const start = new Date(filters.startDate);
+    const end = new Date(filters.endDate);
+
+    // If date format is invalid, stop.
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
+
     setLoading(true);
     try {
-      // FIX: Send raw YYYY-MM-DD. Backend now handles end-of-day logic.
-      const apiFilters = { ...filters };
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+
+      const apiFilters = {
+        ...filters,
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+      };
 
       const res = await jobService.list(page, limit, searchTerm, apiFilters);
       let fetchedData = res.data || [];
 
-      // Sort by assignedDate descending
-      fetchedData.sort((a, b) => {
-        const dateA = new Date(a.assignedDate);
-        const dateB = new Date(b.assignedDate);
-        return dateB - dateA;
-      });
+      fetchedData.sort(
+        (a, b) => new Date(b.assignedDate) - new Date(a.assignedDate)
+      );
 
       setData(fetchedData);
-      const totalCount = res.total || 0;
       setPagination({
         page,
         limit,
-        total: totalCount,
-        totalPages: Math.ceil(totalCount / limit) || 1,
+        total: res.total || 0,
+        totalPages: Math.ceil((res.total || 0) / limit) || 1,
       });
     } catch (e) {
-      toast.error("Failed to load jobs");
-      setData([]);
+      console.error(e);
+      // Only show error if it's NOT a cancellation or abort error
+      if (e.code !== "ERR_CANCELED") {
+        toast.error("Failed to load jobs");
+      }
     } finally {
       setLoading(false);
     }
@@ -158,21 +170,120 @@ const Residence = () => {
     );
   });
 
+  // --- MULTI-SHEET EXPORT (Summary + Detailed) ---
+  const handleExport = async () => {
+    if (!filters.startDate || !filters.endDate) {
+      toast.error("Please select a valid date range");
+      return;
+    }
+
+    setExporting(true);
+    const toastId = toast.loading("Preparing download...");
+    try {
+      const start = new Date(filters.startDate);
+      const end = new Date(filters.endDate);
+
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        toast.error("Invalid dates selected", { id: toastId });
+        setExporting(false);
+        return;
+      }
+
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+
+      const apiFilters = {
+        ...filters,
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+      };
+
+      // 1. Fetch All Data
+      const res = await jobService.list(1, 10000, searchTerm, apiFilters);
+      const exportData = res.data || [];
+
+      if (exportData.length === 0) {
+        toast.error("No data to export", { id: toastId });
+        setExporting(false);
+        return;
+      }
+
+      // 2. Summary Sheet (Building Counts)
+      const buildingCounts = {};
+
+      exportData.forEach((item) => {
+        const dateKey = new Date(item.assignedDate).toISOString().split("T")[0];
+        const bName = item.building?.name || "Unknown";
+
+        const compositeKey = `${dateKey}_${bName}`;
+
+        if (!buildingCounts[compositeKey]) {
+          buildingCounts[compositeKey] = {
+            date: dateKey,
+            building: bName,
+            count: 0,
+          };
+        }
+        buildingCounts[compositeKey].count += 1;
+      });
+
+      const summaryArray = Object.values(buildingCounts).sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return a.building.localeCompare(b.building);
+      });
+
+      const summarySheetRows = [["Day", "Building", "Count"]];
+      summaryArray.forEach((item) => {
+        summarySheetRows.push([item.date, item.building, item.count]);
+      });
+
+      // 3. Detailed Sheet
+      const detailedData = exportData.map((item) => ({
+        ID: item.id,
+        Date: new Date(item.assignedDate).toLocaleDateString(),
+        Customer: item.customer?.mobile || "-",
+        Building: item.building?.name || "-",
+        Vehicle: item.vehicle?.registration_no || "-",
+        Parking: item.vehicle?.parking_no || "-",
+        Status: item.status,
+        Worker: item.worker?.name || "Unassigned",
+        Completed: item.completedDate
+          ? new Date(item.completedDate).toLocaleDateString()
+          : "-",
+      }));
+
+      // 4. Generate Workbook
+      const workbook = XLSX.utils.book_new();
+
+      if (summarySheetRows.length > 1) {
+        const wsSummary = XLSX.utils.aoa_to_sheet(summarySheetRows);
+        XLSX.utils.book_append_sheet(workbook, wsSummary, "Report");
+      }
+
+      const wsDetailed = XLSX.utils.json_to_sheet(detailedData);
+      XLSX.utils.book_append_sheet(workbook, wsDetailed, "Detailed Report");
+
+      XLSX.writeFile(workbook, `Residence_Jobs_${filters.startDate}.xlsx`);
+      toast.success("Download complete", { id: toastId });
+    } catch (e) {
+      console.error("Export Error:", e);
+      toast.error("Export failed", { id: toastId });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // --- Handlers ---
   const handleDateChange = (field, value) => {
     if (field === "clear") {
       setFilters((prev) => ({
         ...prev,
-        startDate: getLast10Days(),
+        startDate: getFirstOfMonth(),
         endDate: getToday(),
       }));
     } else {
       setFilters((prev) => ({ ...prev, [field]: value }));
     }
-  };
-
-  const handleFilterChange = (e) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value });
   };
 
   const handleCreate = () => {
@@ -196,53 +307,25 @@ const Residence = () => {
     }
   };
 
-  const handleExport = async () => {
-    const toastId = toast.loading("Preparing download...");
-    try {
-      const exportFilters = { ...filters };
-      // Backend now handles dates robustly (no need to manually append time)
+  // --- Dropdown Options ---
+  const statusOptions = [
+    { value: "", label: "All Status" },
+    { value: "pending", label: "Pending" },
+    { value: "completed", label: "Completed" },
+    { value: "cancelled", label: "Cancelled" },
+  ];
 
-      const blobData = await jobService.exportData({
-        ...exportFilters,
-        search: searchTerm,
-      });
+  const buildingOptions = useMemo(() => {
+    const options = [{ value: "", label: "All Buildings" }];
+    buildings.forEach((b) => options.push({ value: b._id, label: b.name }));
+    return options;
+  }, [buildings]);
 
-      const blob = new Blob([blobData], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-
-      const dateStr = new Date().toISOString().split("T")[0];
-      link.href = url;
-      link.setAttribute("download", `residence_jobs_${dateStr}.xlsx`);
-
-      document.body.appendChild(link);
-      link.click();
-
-      link.parentNode.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast.success("Download complete", { id: toastId });
-    } catch (e) {
-      console.error("Export Error:", e);
-      if (e.response && e.response.data instanceof Blob) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          try {
-            const errorObj = JSON.parse(reader.result);
-            toast.error(errorObj.message || "Export failed", { id: toastId });
-          } catch {
-            toast.error("Export failed", { id: toastId });
-          }
-        };
-        reader.readAsText(e.response.data);
-      } else {
-        toast.error("Export failed", { id: toastId });
-      }
-    }
-  };
+  const workerOptions = useMemo(() => {
+    const options = [{ value: "", label: "All Workers" }];
+    workers.forEach((w) => options.push({ value: w._id, label: w.name }));
+    return options;
+  }, [workers]);
 
   // --- Columns ---
   const columns = [
@@ -297,24 +380,21 @@ const Residence = () => {
       className: "w-24 text-center",
       render: (row) => {
         const status = (row.status || "pending").toLowerCase();
-        const statusConfig = {
+        const config = {
           completed: {
             classes: "bg-emerald-50 text-emerald-600 border-emerald-100",
             icon: CheckCircle,
-            label: "Completed",
           },
           cancelled: {
             classes: "bg-red-50 text-red-600 border-red-100",
             icon: XCircle,
-            label: "Cancelled",
           },
           pending: {
             classes: "bg-amber-50 text-amber-600 border-amber-100",
             icon: Clock,
-            label: "Pending",
           },
-        };
-        const config = statusConfig[status] || statusConfig.pending;
+        }[status] || { classes: "bg-gray-50 text-gray-600", icon: Clock };
+
         const Icon = config.icon;
         return (
           <div
@@ -371,7 +451,7 @@ const Residence = () => {
       accessor: "worker.name",
       render: (row) => (
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center text-purple-700 text-xs font-bold border border-purple-200">
+          <div className="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 text-xs font-bold border border-purple-200">
             {row.worker?.name?.[0] || "U"}
           </div>
           <span className="text-sm text-slate-700 font-medium">
@@ -384,21 +464,18 @@ const Residence = () => {
     },
     {
       header: "Actions",
-      className:
-        "text-right w-24 sticky right-0 bg-white shadow-[-5px_0_10px_-5px_rgba(0,0,0,0.05)]",
+      className: "text-right w-24 sticky right-0 bg-white",
       render: (row) => (
         <div className="flex justify-end gap-1.5 pr-2">
           <button
             onClick={() => handleEdit(row)}
             className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg transition-all"
-            title="Edit"
           >
             <Edit2 className="w-4 h-4" />
           </button>
           <button
             onClick={() => handleDelete(row._id)}
             className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-all"
-            title="Delete"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -429,9 +506,15 @@ const Residence = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={handleExport}
-            className="h-11 px-5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-2"
+            disabled={exporting}
+            className="h-11 px-5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-2 disabled:opacity-70"
           >
-            <Download className="w-4 h-4 text-slate-500" /> Export
+            {exporting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4 text-slate-500" />
+            )}{" "}
+            Export
           </button>
           <button
             onClick={handleCreate}
@@ -456,70 +539,38 @@ const Residence = () => {
           </div>
 
           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
-            <div className="relative">
-              <span className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
-                Status
-              </span>
-              <div className="relative">
-                <select
-                  name="status"
-                  value={filters.status}
-                  onChange={handleFilterChange}
-                  className="w-full h-[42px] bg-white border border-slate-200 rounded-lg px-4 text-sm text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 appearance-none cursor-pointer font-medium uppercase"
-                >
-                  <option value="">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-                <Filter className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
+            <div>
+              <CustomDropdown
+                label="Status"
+                value={filters.status}
+                onChange={(val) => setFilters({ ...filters, status: val })}
+                options={statusOptions}
+                icon={Filter}
+                placeholder="All Status"
+              />
             </div>
-
-            <div className="relative">
-              <span className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
-                Building
-              </span>
-              <div className="relative">
-                <select
-                  name="building"
-                  value={filters.building}
-                  onChange={handleFilterChange}
-                  className="w-full h-[42px] bg-white border border-slate-200 rounded-lg px-4 text-sm text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 appearance-none cursor-pointer font-medium"
-                >
-                  <option value="">All Buildings</option>
-                  {buildings.map((b) => (
-                    <option key={b._id} value={b._id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-                <Building2 className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
+            <div>
+              <CustomDropdown
+                label="Building"
+                value={filters.building}
+                onChange={(val) => setFilters({ ...filters, building: val })}
+                options={buildingOptions}
+                icon={Building2}
+                placeholder="All Buildings"
+                searchable={true}
+              />
             </div>
-
-            <div className="relative">
-              <span className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
-                Worker
-              </span>
-              <div className="relative">
-                <select
-                  name="worker"
-                  value={filters.worker}
-                  onChange={handleFilterChange}
-                  className="w-full h-[42px] bg-white border border-slate-200 rounded-lg px-4 text-sm text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 appearance-none cursor-pointer font-medium"
-                >
-                  <option value="">All Workers</option>
-                  {workers.map((w) => (
-                    <option key={w._id} value={w._id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
-                <User className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
+            <div>
+              <CustomDropdown
+                label="Worker"
+                value={filters.worker}
+                onChange={(val) => setFilters({ ...filters, worker: val })}
+                options={workerOptions}
+                icon={User}
+                placeholder="All Workers"
+                searchable={true}
+              />
             </div>
-
             <div className="relative">
               <span className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
                 Search
@@ -528,10 +579,10 @@ const Residence = () => {
                 <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search Vehicle, Parking, Mobile or Worker..."
+                  placeholder="Search..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full h-full pl-10 pr-4 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 font-medium"
+                  className="w-full h-full pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 font-medium transition-all"
                 />
               </div>
             </div>

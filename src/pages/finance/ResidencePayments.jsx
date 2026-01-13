@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   Download,
@@ -30,6 +30,7 @@ import ViewPaymentModal from "../../components/modals/ViewPaymentModal";
 import DeleteModal from "../../components/modals/DeleteModal";
 import PaymentModal from "../../components/modals/PaymentModal";
 import RichDateRangePicker from "../../components/inputs/RichDateRangePicker";
+import CustomDropdown from "../../components/ui/CustomDropdown"; // Import CustomDropdown
 
 // Redux
 import {
@@ -50,6 +51,8 @@ const ResidencePayments = () => {
     (state) => state.residencePayment
   );
   const { workers } = useSelector((state) => state.worker);
+
+  const [currency, setCurrency] = useState("AED"); // Default Currency
 
   // --- DATES & TABS LOGIC ---
 
@@ -123,7 +126,11 @@ const ResidencePayments = () => {
   const [isSettling, setIsSettling] = useState(false);
   const [isMarkingPaid, setIsMarkingPaid] = useState(false);
 
+  // Load Currency & Initial Data
   useEffect(() => {
+    const savedCurrency = localStorage.getItem("app_currency");
+    if (savedCurrency) setCurrency(savedCurrency);
+
     dispatch(fetchWorkers({ page: 1, limit: 1000, status: 1 }));
     fetchData(1, 50);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -288,15 +295,12 @@ const ResidencePayments = () => {
 
   const handleDateChange = (field, value) => {
     if (field === "clear") {
+      // If clearing manually, revert to This Month
       handleTabChange("this_month");
     } else {
       setFilters((prev) => ({ ...prev, [field]: value }));
-      setActiveTab("custom");
+      setActiveTab("custom"); // If manual date pick, deselect tabs
     }
-  };
-
-  const handleFilterChange = (e) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value });
   };
 
   // ✅ UPDATED: Handle Open Doc with Serial Number Logic
@@ -386,6 +390,24 @@ const ResidencePayments = () => {
       toast.error("Export failed", { id: toastId });
     }
   };
+
+  // --- Prepare Dropdown Options ---
+  const statusOptions = [
+    { value: "", label: "All Status" },
+    { value: "completed", label: "Completed" },
+    { value: "pending", label: "Pending" },
+    { value: "cancelled", label: "Cancelled" },
+  ];
+
+  const workerOptions = useMemo(() => {
+    const options = [{ value: "", label: "All Workers" }];
+    if (workers && workers.length > 0) {
+      workers.forEach((w) => {
+        options.push({ value: w._id, label: w.name });
+      });
+    }
+    return options;
+  }, [workers]);
 
   // --- RENDER EXPANDED ROW ---
   const renderExpandedRow = (row) => {
@@ -541,7 +563,8 @@ const ResidencePayments = () => {
       className: "text-right",
       render: (row) => (
         <span className="font-bold text-indigo-600 text-sm">
-          {row.total_amount}
+          {row.total_amount}{" "}
+          <span className="text-[10px] text-indigo-400">{currency}</span>
         </span>
       ),
     },
@@ -551,7 +574,8 @@ const ResidencePayments = () => {
       className: "text-right",
       render: (row) => (
         <span className="font-bold text-emerald-600 text-sm">
-          {row.amount_paid}
+          {row.amount_paid}{" "}
+          <span className="text-[10px] text-emerald-400">{currency}</span>
         </span>
       ),
     },
@@ -621,17 +645,22 @@ const ResidencePayments = () => {
     {
       header: "Worker",
       accessor: "worker.name",
-      render: (row) => (
-        <div className="flex items-start gap-1.5 min-w-[100px]">
-          <User className="w-3 h-3 text-slate-400 mt-0.5 shrink-0" />
-          <span
-            className="text-xs font-semibold text-slate-700 whitespace-normal break-words leading-tight"
-            title={row.worker?.name}
-          >
-            {row.worker?.name}
-          </span>
-        </div>
-      ),
+      render: (row) => {
+        if (!row.worker?.name) return null;
+        return (
+          <div className="flex items-start gap-1.5 min-w-[100px]">
+            <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
+              {row.worker.name[0]}
+            </div>
+            <span
+              className="text-xs font-semibold text-slate-700 whitespace-normal break-words leading-tight"
+              title={row.worker?.name}
+            >
+              {row.worker?.name}
+            </span>
+          </div>
+        );
+      },
     },
     // ✅ MODIFIED: Pass Serial Number to Invoice
     {
@@ -722,7 +751,7 @@ const ResidencePayments = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              {/* ✅ TAB SWITCHER */}
+              {/* TAB SWITCHER */}
               <div className="bg-slate-100 p-1 rounded-xl flex">
                 <button
                   onClick={() => handleTabChange("last_month")}
@@ -746,7 +775,7 @@ const ResidencePayments = () => {
                 </button>
               </div>
 
-              {/* ✅ MARK ALL PAID BUTTON */}
+              {/* MARK ALL PAID BUTTON */}
               <button
                 onClick={handleBulkMarkPaid}
                 disabled={isMarkingPaid}
@@ -758,7 +787,7 @@ const ResidencePayments = () => {
                 {isMarkingPaid ? "Updating..." : `Mark Status This Page Paid`}
               </button>
 
-              {/* ✅ SETTLE ALL BUTTON */}
+              {/* SETTLE ALL BUTTON */}
               <button
                 onClick={handleBulkSettle}
                 disabled={isSettling}
@@ -787,7 +816,9 @@ const ResidencePayments = () => {
               </p>
               <h3 className="text-2xl font-bold text-indigo-700">
                 {stats.totalAmount || 0}{" "}
-                <span className="text-sm font-normal text-indigo-400">AED</span>
+                <span className="text-sm font-normal text-indigo-400">
+                  {currency}
+                </span>
               </h3>
             </div>
             {/* ... Other stats (Cash, Card, Bank) ... */}
@@ -848,41 +879,29 @@ const ResidencePayments = () => {
             </div>
 
             <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-              <div className="relative group">
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">
-                  Payment Status
-                </label>
-                <select
-                  name="status"
+              {/* Payment Status Dropdown (CustomDropdown) */}
+              <div>
+                <CustomDropdown
+                  label="Payment Status"
                   value={filters.status}
-                  onChange={handleFilterChange}
-                  className="w-full h-[42px] bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl px-4 text-sm text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all appearance-none cursor-pointer uppercase font-medium"
-                >
-                  <option value="">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="completed">Completed</option>
-                </select>
-                <Filter className="absolute right-3.5 top-[2.1rem] w-4 h-4 text-slate-400 pointer-events-none group-hover:text-indigo-500 transition-colors" />
+                  onChange={(val) => setFilters({ ...filters, status: val })}
+                  options={statusOptions}
+                  icon={Filter}
+                  placeholder="All Status"
+                />
               </div>
 
-              <div className="relative group">
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">
-                  Assigned Worker
-                </label>
-                <select
-                  name="worker"
+              {/* Assigned Worker Dropdown (CustomDropdown) */}
+              <div>
+                <CustomDropdown
+                  label="Assigned Worker"
                   value={filters.worker}
-                  onChange={handleFilterChange}
-                  className="w-full h-[42px] bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl px-4 text-sm text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all appearance-none cursor-pointer font-medium"
-                >
-                  <option value="">All Workers</option>
-                  {workers.map((w) => (
-                    <option key={w._id} value={w._id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
-                <User className="absolute right-3.5 top-[2.1rem] w-4 h-4 text-slate-400 pointer-events-none group-hover:text-indigo-500 transition-colors" />
+                  onChange={(val) => setFilters({ ...filters, worker: val })}
+                  options={workerOptions}
+                  icon={User}
+                  placeholder="All Workers"
+                  searchable={true}
+                />
               </div>
             </div>
 
@@ -897,7 +916,7 @@ const ResidencePayments = () => {
                   placeholder="Search All Columns..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full h-[42px] pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all"
+                  className="w-full h-11 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all"
                 />
               </div>
             </div>

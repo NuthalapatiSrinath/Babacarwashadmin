@@ -1,15 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  Download,
-  Layers,
-  Calendar,
-  ChevronDown,
   FileSpreadsheet,
   Building,
   User,
   Loader2,
   Filter,
+  Layers,
+  Calendar,
+  Download, // ✅ Fixed: Added missing import
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -17,6 +16,9 @@ import toast from "react-hot-toast";
 import { fetchBuildings } from "../../redux/slices/buildingSlice";
 import { fetchWorkers } from "../../redux/slices/workerSlice";
 import { downloadCollectionSheet } from "../../redux/slices/collectionSheetSlice";
+
+// Custom Components
+import CustomDropdown from "../../components/ui/CustomDropdown";
 
 const CollectionSheet = () => {
   const dispatch = useDispatch();
@@ -46,8 +48,9 @@ const CollectionSheet = () => {
     dispatch(fetchWorkers({ page: 1, limit: 1000, status: 1 }));
   }, [dispatch]);
 
-  const handleFilterChange = (e) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value });
+  // Handle Dropdown Changes
+  const handleFilterChange = (name, value) => {
+    setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleDownload = async () => {
@@ -84,8 +87,13 @@ const CollectionSheet = () => {
     }
   };
 
-  // --- STATIC OPTIONS ---
-  const months = [
+  // --- OPTIONS ---
+  const serviceTypeOptions = [
+    { value: "residence", label: "Residence", icon: Layers },
+    { value: "onewash", label: "One Wash", icon: Filter },
+  ];
+
+  const monthOptions = [
     { value: 1, label: "January" },
     { value: 2, label: "February" },
     { value: 3, label: "March" },
@@ -100,7 +108,32 @@ const CollectionSheet = () => {
     { value: 12, label: "December" },
   ];
 
-  const years = [2024, 2025, 2026, 2027];
+  const yearOptions = [
+    { value: 2024, label: "2024" },
+    { value: 2025, label: "2025" },
+    { value: 2026, label: "2026" },
+    { value: 2027, label: "2027" },
+  ];
+
+  const buildingOptions = useMemo(() => {
+    const options = [{ value: "all", label: "All Buildings" }];
+    if (buildings) {
+      buildings.forEach((b) => {
+        options.push({ value: b._id, label: b.name });
+      });
+    }
+    return options;
+  }, [buildings]);
+
+  const workerOptions = useMemo(() => {
+    const options = [{ value: "all", label: "All Workers" }];
+    if (workers) {
+      workers.forEach((w) => {
+        options.push({ value: w._id, label: w.name });
+      });
+    }
+    return options;
+  }, [workers]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 font-sans">
@@ -122,9 +155,9 @@ const CollectionSheet = () => {
       </div>
 
       {/* --- FILTER CARD --- */}
-      <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden relative">
+      <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-xl border border-slate-100 relative">
         {/* Top Decorative Line */}
-        <div className="h-1.5 w-full bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500"></div>
+        <div className="h-1.5 w-full bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 rounded-t-2xl"></div>
 
         <div className="p-6 md:p-8">
           <div className="flex items-center gap-2 mb-6 text-slate-400 text-xs font-bold uppercase tracking-wider">
@@ -134,116 +167,64 @@ const CollectionSheet = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 items-end">
             {/* 1. Service Type */}
             <div className="relative group md:col-span-1">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">
-                Service Type
-              </label>
-              <div className="relative">
-                <select
-                  name="serviceType"
-                  value={filters.serviceType}
-                  onChange={handleFilterChange}
-                  className="w-full h-12 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium rounded-xl pl-11 pr-8 appearance-none outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-50 transition-all cursor-pointer shadow-sm"
-                >
-                  <option value="residence">Residence</option>
-                  <option value="onewash">One Wash</option>
-                </select>
-                <Layers className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400 group-hover:text-emerald-500 transition-colors" />
-                <ChevronDown className="absolute right-3 top-4 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
+              <CustomDropdown
+                label="Service Type"
+                value={filters.serviceType}
+                onChange={(val) => handleFilterChange("serviceType", val)}
+                options={serviceTypeOptions}
+                icon={Layers}
+                placeholder="Select Service"
+              />
             </div>
 
             {/* 2. Select Buildings */}
             <div className="relative group md:col-span-1 xl:col-span-1">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">
-                Building
-              </label>
-              <div className="relative">
-                <select
-                  name="building"
-                  value={filters.building}
-                  onChange={handleFilterChange}
-                  className="w-full h-12 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium rounded-xl pl-11 pr-8 appearance-none outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-50 transition-all cursor-pointer shadow-sm"
-                >
-                  <option value="all">All Buildings</option>
-                  {buildings.map((b) => (
-                    <option key={b._id} value={b._id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-                <Building className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400 group-hover:text-emerald-500 transition-colors" />
-                <ChevronDown className="absolute right-3 top-4 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
+              <CustomDropdown
+                label="Building"
+                value={filters.building}
+                onChange={(val) => handleFilterChange("building", val)}
+                options={buildingOptions}
+                icon={Building}
+                placeholder="All Buildings"
+                searchable={true}
+              />
             </div>
 
             {/* 3. Select Workers */}
             <div className="relative group md:col-span-1 xl:col-span-1">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">
-                Worker
-              </label>
-              <div className="relative">
-                <select
-                  name="worker"
-                  value={filters.worker}
-                  onChange={handleFilterChange}
-                  className="w-full h-12 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium rounded-xl pl-11 pr-8 appearance-none outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-50 transition-all cursor-pointer shadow-sm"
-                >
-                  <option value="all">All Workers</option>
-                  {workers.map((w) => (
-                    <option key={w._id} value={w._id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
-                <User className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400 group-hover:text-emerald-500 transition-colors" />
-                <ChevronDown className="absolute right-3 top-4 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
+              <CustomDropdown
+                label="Worker"
+                value={filters.worker}
+                onChange={(val) => handleFilterChange("worker", val)}
+                options={workerOptions}
+                icon={User}
+                placeholder="All Workers"
+                searchable={true}
+              />
             </div>
 
             {/* 4. Select Month */}
             <div className="relative group md:col-span-1">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">
-                Month
-              </label>
-              <div className="relative">
-                <select
-                  name="month"
-                  value={filters.month}
-                  onChange={handleFilterChange}
-                  className="w-full h-12 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium rounded-xl pl-11 pr-8 appearance-none outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-50 transition-all cursor-pointer shadow-sm"
-                >
-                  {months.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
-                <Calendar className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400 group-hover:text-emerald-500 transition-colors" />
-                <ChevronDown className="absolute right-3 top-4 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
+              <CustomDropdown
+                label="Month"
+                value={filters.month}
+                onChange={(val) => handleFilterChange("month", Number(val))}
+                options={monthOptions}
+                icon={Calendar}
+                placeholder="Select Month"
+              />
             </div>
 
             {/* 5. Select Year */}
             <div className="relative group md:col-span-1">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">
-                Year
-              </label>
-              <div className="relative">
-                <select
-                  name="year"
-                  value={filters.year}
-                  onChange={handleFilterChange}
-                  className="w-full h-12 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium rounded-xl pl-11 pr-8 appearance-none outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-50 transition-all cursor-pointer shadow-sm"
-                >
-                  {years.map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
-                <Calendar className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400 group-hover:text-emerald-500 transition-colors" />
-                <ChevronDown className="absolute right-3 top-4 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
+              <CustomDropdown
+                label="Year"
+                value={filters.year}
+                onChange={(val) => handleFilterChange("year", Number(val))}
+                options={yearOptions}
+                icon={Calendar}
+                placeholder="Select Year"
+              />
             </div>
 
             {/* 6. Download Button */}
@@ -251,7 +232,7 @@ const CollectionSheet = () => {
               <button
                 onClick={handleDownload}
                 disabled={downloading}
-                className="w-full h-12 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl shadow-emerald-200 hover:shadow-emerald-200 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                className="w-full h-[42px] bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl shadow-emerald-200 hover:shadow-emerald-200 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 {downloading ? (
                   <Loader2 className="w-5 h-5 animate-spin" />

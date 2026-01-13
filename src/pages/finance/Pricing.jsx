@@ -258,6 +258,7 @@ const Pricing = () => {
           columns={columns}
           data={data}
           loading={loading}
+          hideSearch={true}
           pagination={pagination}
           onPageChange={(p) => fetchData(p, pagination.limit)}
           onLimitChange={(l) => fetchData(1, l)}

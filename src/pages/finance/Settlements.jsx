@@ -3,14 +3,12 @@ import { useDispatch, useSelector } from "react-redux";
 import {
   CheckCircle,
   Clock,
-  DollarSign,
   Calendar,
   X,
   Landmark,
   Banknote,
   CreditCard,
-  Briefcase,
-} from "lucide-react";
+} from "lucide-react"; // Removed extra Search icon import
 import toast from "react-hot-toast";
 import DataTable from "../../components/DataTable";
 import {
@@ -23,19 +21,38 @@ import {
 const Settlements = () => {
   const dispatch = useDispatch();
   const [showApproveModal, setShowApproveModal] = useState(false);
+  const [currency, setCurrency] = useState("AED"); // Default Currency
+  const [searchTerm, setSearchTerm] = useState(""); // Search State
 
-  const {
-    settlements,
-    total,
-    loading,
-    currentPage,
-    totalPages,
-    selectedSettlement,
-  } = useSelector((state) => state.settlement);
+  const { settlements, total, loading, currentPage, selectedSettlement } =
+    useSelector((state) => state.settlement);
 
+  // --- 1. Load Data & Currency ---
   useEffect(() => {
+    const savedCurrency = localStorage.getItem("app_currency");
+    if (savedCurrency) setCurrency(savedCurrency);
+
     dispatch(fetchSettlements({ page: 1, limit: 50 }));
   }, [dispatch]);
+
+  // --- 2. Search Logic (Client-Side) ---
+  const filteredSettlements = settlements.filter((row) => {
+    if (!searchTerm) return true;
+    const lowerTerm = searchTerm.toLowerCase();
+
+    // Fields to search
+    const supervisorName = row.supervisor?.name?.toLowerCase() || "";
+    const amount = String(row.amount || "").toLowerCase();
+    const status = row.status?.toLowerCase() || "";
+    const date = new Date(row.createdAt).toLocaleDateString().toLowerCase();
+
+    return (
+      supervisorName.includes(lowerTerm) ||
+      amount.includes(lowerTerm) ||
+      status.includes(lowerTerm) ||
+      date.includes(lowerTerm)
+    );
+  });
 
   // --- APPROVE HANDLERS ---
   const handleApproveClick = (settlement) => {
@@ -122,7 +139,7 @@ const Settlements = () => {
             {row.amount || 0}
           </span>
           <span className="text-[10px] font-medium text-slate-400 ml-1">
-            AED
+            {currency}
           </span>
         </div>
       ),
@@ -205,11 +222,11 @@ const Settlements = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-3 font-sans">
-      {/* TABLE */}
+      {/* TABLE with Built-in Search */}
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
         <DataTable
           columns={columns}
-          data={settlements}
+          data={filteredSettlements}
           loading={loading}
           pagination={{
             page: currentPage,
@@ -218,6 +235,9 @@ const Settlements = () => {
           }}
           onPageChange={handlePageChange}
           emptyMessage="No settlements found"
+          // ✅ Enabled Built-in Search
+          onSearch={(term) => setSearchTerm(term)}
+          searchPlaceholder="Search Supervisor, Amount..."
         />
       </div>
 
@@ -264,7 +284,7 @@ const Settlements = () => {
                     Total Amount
                   </span>
                   <span className="font-bold text-lg text-indigo-600">
-                    {selectedSettlement.amount || 0} AED
+                    {selectedSettlement.amount || 0} {currency}
                   </span>
                 </div>
 

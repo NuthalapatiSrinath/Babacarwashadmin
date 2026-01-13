@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   Download,
-  ChevronDown,
   Loader2,
   FileSpreadsheet,
   Layers,
@@ -11,6 +10,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { downloadWorkRecordsStatement } from "../../redux/slices/workRecordsSlice";
+import CustomDropdown from "../../components/ui/CustomDropdown";
 
 const WorkRecords = () => {
   const dispatch = useDispatch();
@@ -18,14 +18,45 @@ const WorkRecords = () => {
   // Redux State
   const { downloading } = useSelector((state) => state.workRecords);
 
-  // Default to Current Date
+  // --- DYNAMIC DATE LOGIC ---
   const today = new Date();
+  const currentMonth = today.getMonth() + 1; // 1-12 (January is 1)
+  const currentYear = today.getFullYear();
+
+  // 1. Calculate the latest year that has completed data.
+  // If we are in January (1), the current year has NO completed months yet.
+  // So the latest valid year is the previous year (2025).
+  // If we are in Feb (2) or later, the current year (2026) has at least Jan completed.
+  const maxValidYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+
+  // 2. Initial State Logic
+  // If maxValidYear is previous year (e.g. 2025), default to December.
+  // If maxValidYear is current year (e.g. 2026), default to last completed month (currentMonth - 1).
+  const initialYear = maxValidYear;
+  const initialMonth = maxValidYear < currentYear ? 12 : currentMonth - 1;
 
   const [filters, setFilters] = useState({
-    serviceType: "residence", // ✅ CHANGE 1: Default to Residence
-    month: today.getMonth() + 1, // Keep UI 1-12
-    year: today.getFullYear(),
+    serviceType: "residence",
+    month: initialMonth,
+    year: initialYear,
   });
+
+  // --- DROPDOWN OPTIONS ---
+
+  const serviceTypeOptions = [
+    { value: "residence", label: "Residence", icon: Layers },
+    { value: "onewash", label: "Onewash", icon: Filter },
+  ];
+
+  // Generate Year Options dynamically up to maxValidYear
+  const yearOptions = useMemo(() => {
+    const startYear = 2024; // Base year
+    const years = [];
+    for (let y = startYear; y <= maxValidYear; y++) {
+      years.push({ value: y, label: y.toString() });
+    }
+    return years.reverse(); // Show newest year first (e.g., 2025, 2024)
+  }, [maxValidYear]);
 
   // --- MONTH LOGIC ---
   const availableMonths = useMemo(() => {
@@ -44,36 +75,31 @@ const WorkRecords = () => {
       { value: 12, label: "December" },
     ];
 
-    // ✅ CHANGE 2: For OneWash, only show months that are strictly "Over" (Past)
-    if (filters.serviceType === "onewash") {
-      const currentYear = today.getFullYear();
-      const currentMonth = today.getMonth() + 1; // 1-12
-      const selectedYear = Number(filters.year);
+    const selectedYear = Number(filters.year);
 
-      return allMonths.filter((m) => {
-        // If selected year is in the past (e.g., 2025), all months are valid
-        if (selectedYear < currentYear) return true;
+    return allMonths.filter((m) => {
+      // 1. If selected year is purely in the past (e.g. 2024 when we are in 2025/2026)
+      // All months are valid/completed.
+      if (selectedYear < currentYear) return true;
 
-        // If selected year is future, no months are valid
-        if (selectedYear > currentYear) return false;
-
-        // If selected year is current year (2026), only show past months
-        // e.g. If current is Jan (1), m.value < 1 is false for all. Correct.
+      // 2. If selected year IS the current year (e.g. 2026)
+      // We only show months strictly LESS than current month.
+      // (e.g. if Today is Feb 15, currentMonth=2. We show Jan (1). 1 < 2 is True).
+      if (selectedYear === currentYear) {
         return m.value < currentMonth;
-      });
-    }
+      }
 
-    // For Residence, show all months
-    return allMonths;
-  }, [filters.serviceType, filters.year]);
+      return false; // Should not happen given yearOptions logic, but safe fallback
+    });
+  }, [filters.year, currentMonth, currentYear]);
 
   // Safety Effect: If current selected month becomes invalid (hidden), reset it
   useEffect(() => {
     const isCurrentMonthValid = availableMonths.some(
       (m) => m.value === Number(filters.month)
     );
+
     if (!isCurrentMonthValid && availableMonths.length > 0) {
-      // Auto-select the last available month (e.g. December of previous year)
       setFilters((prev) => ({
         ...prev,
         month: availableMonths[availableMonths.length - 1].value,
@@ -81,17 +107,12 @@ const WorkRecords = () => {
     }
   }, [availableMonths, filters.month]);
 
-  const handleFilterChange = (e) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value });
-  };
-
   const handleDownload = async () => {
     const toastId = toast.loading(
       `Generating ${filters.serviceType} report...`
     );
 
     try {
-      // 1. Dispatch Redux Thunk
       const result = await dispatch(
         downloadWorkRecordsStatement({
           serviceType: filters.serviceType,
@@ -101,21 +122,17 @@ const WorkRecords = () => {
       ).unwrap();
       const blob = result.blob;
 
-      // 2. Check if file is valid
       if (blob.size < 100) {
         console.warn("File size is very small, might be empty.");
       }
 
-      // 3. Create Download Link
       const url = window.URL.createObjectURL(new Blob([blob]));
       const link = document.createElement("a");
       link.href = url;
-      // Filename: Statement_residence_2025_12.xlsx
       link.download = `Statement_${filters.serviceType}_${filters.year}_${filters.month}.xlsx`;
       document.body.appendChild(link);
       link.click();
 
-      // Cleanup
       link.remove();
       window.URL.revokeObjectURL(url);
 
@@ -127,8 +144,6 @@ const WorkRecords = () => {
       });
     }
   };
-
-  const years = [2024, 2025, 2026, 2027];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 font-sans">
@@ -150,9 +165,8 @@ const WorkRecords = () => {
       </div>
 
       {/* --- FILTER CARD --- */}
-      <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden relative">
-        {/* Top Decorative Line */}
-        <div className="h-1.5 w-full bg-gradient-to-r from-indigo-400 via-blue-500 to-cyan-500"></div>
+      <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-xl border border-slate-100 relative">
+        <div className="h-1.5 w-full bg-gradient-to-r from-indigo-400 via-blue-500 to-cyan-500 rounded-t-2xl"></div>
 
         <div className="p-6 md:p-8">
           <div className="flex items-center gap-2 mb-6 text-slate-400 text-xs font-bold uppercase tracking-wider">
@@ -161,73 +175,48 @@ const WorkRecords = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
             {/* Service Type */}
-            <div className="relative group">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">
-                Service Type
-              </label>
-              <div className="relative">
-                <select
-                  name="serviceType"
-                  value={filters.serviceType}
-                  onChange={handleFilterChange}
-                  className="w-full h-12 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium rounded-xl pl-11 pr-8 appearance-none outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 transition-all cursor-pointer shadow-sm"
-                >
-                  <option value="residence">Residence</option>
-                  <option value="onewash">Onewash</option>
-                </select>
-                <Layers className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400 group-hover:text-indigo-500 transition-colors" />
-                <ChevronDown className="absolute right-3 top-4 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
+            <div>
+              <CustomDropdown
+                label="Service Type"
+                value={filters.serviceType}
+                onChange={(val) => setFilters({ ...filters, serviceType: val })}
+                options={serviceTypeOptions}
+                icon={Layers}
+                placeholder="Select Service"
+              />
             </div>
 
             {/* Year */}
-            <div className="relative group">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">
-                Year
-              </label>
-              <div className="relative">
-                <select
-                  name="year"
-                  value={filters.year}
-                  onChange={handleFilterChange}
-                  className="w-full h-12 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium rounded-xl pl-11 pr-8 appearance-none outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 transition-all cursor-pointer shadow-sm"
-                >
-                  {years.map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
-                <Calendar className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400 group-hover:text-indigo-500 transition-colors" />
-                <ChevronDown className="absolute right-3 top-4 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
+            <div>
+              <CustomDropdown
+                label="Year"
+                value={filters.year}
+                onChange={(val) =>
+                  setFilters({ ...filters, year: Number(val) })
+                }
+                options={yearOptions}
+                icon={Calendar}
+                placeholder="Select Year"
+              />
             </div>
 
             {/* Month */}
-            <div className="relative group">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">
-                Month
-              </label>
-              <div className="relative">
-                <select
-                  name="month"
-                  value={filters.month}
-                  onChange={handleFilterChange}
-                  className="w-full h-12 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium rounded-xl pl-11 pr-8 appearance-none outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 transition-all cursor-pointer shadow-sm"
-                >
-                  {availableMonths.length > 0 ? (
-                    availableMonths.map((m) => (
-                      <option key={m.value} value={m.value}>
-                        {m.label}
-                      </option>
-                    ))
-                  ) : (
-                    <option disabled>No valid months</option>
-                  )}
-                </select>
-                <Calendar className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400 group-hover:text-indigo-500 transition-colors" />
-                <ChevronDown className="absolute right-3 top-4 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
+            <div>
+              <CustomDropdown
+                label="Month"
+                value={filters.month}
+                onChange={(val) =>
+                  setFilters({ ...filters, month: Number(val) })
+                }
+                options={availableMonths}
+                icon={Calendar}
+                placeholder={
+                  availableMonths.length === 0
+                    ? "No completed months"
+                    : "Select Month"
+                }
+                disabled={availableMonths.length === 0}
+              />
             </div>
 
             {/* Download Button */}
@@ -235,7 +224,7 @@ const WorkRecords = () => {
               <button
                 onClick={handleDownload}
                 disabled={downloading || availableMonths.length === 0}
-                className="w-full h-12 bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl shadow-indigo-200 hover:shadow-indigo-200 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                className="w-full h-[42px] bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl shadow-indigo-200 hover:shadow-indigo-200 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed text-sm"
               >
                 {downloading ? (
                   <Loader2 className="w-5 h-5 animate-spin" />

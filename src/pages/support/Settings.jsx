@@ -10,6 +10,8 @@ import {
   Palette,
   Sun,
   Moon,
+  Coins, // Changed from DollarSign to Coins for generic currency
+  ChevronDown,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { configurationService } from "../../api/configurationService";
@@ -62,6 +64,20 @@ const DEFAULT_THEME_CONFIG = {
   },
 };
 
+// --- CURRENCY OPTIONS ---
+const CURRENCY_OPTIONS = [
+  { value: "AED", label: "AED - UAE Dirham" },
+  { value: "$", label: "$ - US Dollar" },
+  { value: "€", label: "€ - Euro" },
+  { value: "£", label: "£ - British Pound" },
+  { value: "₹", label: "₹ - Indian Rupee" },
+  { value: "SAR", label: "SAR - Saudi Riyal" },
+  { value: "QAR", label: "QAR - Qatari Riyal" },
+  { value: "OMR", label: "OMR - Omani Rial" },
+  { value: "KWD", label: "KWD - Kuwaiti Dinar" },
+  { value: "BHD", label: "BHD - Bahraini Dinar" },
+];
+
 const Settings = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -72,6 +88,7 @@ const Settings = () => {
   const [formData, setFormData] = useState({
     contactNumber: "",
     primaryColor: "#2563eb",
+    currency: "AED", // Default
     graphs: DEFAULT_GRAPH_SETTINGS,
     themeConfig: DEFAULT_THEME_CONFIG,
   });
@@ -88,8 +105,6 @@ const Settings = () => {
             contactNumber: response.data.contactNumber || "",
             primaryColor: response.data.primaryColor || "#2563eb",
           }));
-          // Note: We leave the general primary color handling here for legacy support,
-          // but the Theme Config below overrides the visual styles.
         }
 
         // 2. Fetch Local Storage Graph Settings
@@ -98,7 +113,13 @@ const Settings = () => {
           setFormData((prev) => ({ ...prev, graphs: JSON.parse(savedGraphs) }));
         }
 
-        // 3. Fetch Theme Config from LocalStorage
+        // 3. Fetch Local Storage Currency
+        const savedCurrency = localStorage.getItem("app_currency");
+        if (savedCurrency) {
+          setFormData((prev) => ({ ...prev, currency: savedCurrency }));
+        }
+
+        // 4. Fetch Theme Config from LocalStorage
         const savedThemeConfig = localStorage.getItem("themeConfigV2");
         if (savedThemeConfig) {
           const config = JSON.parse(savedThemeConfig);
@@ -267,6 +288,12 @@ const Settings = () => {
         JSON.stringify(formData.themeConfig)
       );
 
+      // ✅ Save Currency to LocalStorage
+      localStorage.setItem("app_currency", formData.currency || "AED");
+
+      // Trigger a custom event so other components can update immediately if they listen
+      window.dispatchEvent(new Event("storage"));
+
       toast.success("All settings saved successfully");
     } catch (error) {
       console.error(error);
@@ -301,7 +328,7 @@ const Settings = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="max-w-6xl grid gap-8">
-        {/* --- 1. GENERAL SETTINGS (Untouched) --- */}
+        {/* --- 1. GENERAL SETTINGS --- */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm max-w-4xl">
           <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
             <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
@@ -311,12 +338,14 @@ const Settings = () => {
               General Information
             </h2>
           </div>
-          <div className="grid gap-6">
+
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Contact Number Field */}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Support Contact Number
               </label>
-              <div className="relative max-w-md">
+              <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Phone className="h-4 w-4 text-slate-400" />
                 </div>
@@ -327,8 +356,41 @@ const Settings = () => {
                     setFormData({ ...formData, contactNumber: e.target.value })
                   }
                   className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-all text-slate-700"
+                  placeholder="+971 50 000 0000"
                 />
               </div>
+            </div>
+
+            {/* ✅ NEW: Currency Selector */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Global Currency Symbol
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Coins className="h-4 w-4 text-slate-400" />
+                </div>
+                <select
+                  value={formData.currency}
+                  onChange={(e) =>
+                    setFormData({ ...formData, currency: e.target.value })
+                  }
+                  className="w-full pl-10 pr-8 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-all text-slate-700 appearance-none cursor-pointer font-medium"
+                >
+                  {CURRENCY_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <ChevronDown className="h-4 w-4 text-slate-400" />
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1 pl-1">
+                This currency symbol will be used across all receipts and
+                tables.
+              </p>
             </div>
           </div>
         </div>
