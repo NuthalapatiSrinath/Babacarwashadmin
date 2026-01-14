@@ -2,7 +2,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 
 // HARDCODED BASE URL
-// This forces the request to be relative (e.g., https://your-site.com/api/...)
+// This forces the request to be relative (e.g., https://your-site.scom/api/...)
 // It relies entirely on your proxy configuration (vercel.json or vite.config.js)
 const baseURL = "https://api.friendcircles.in/api";
 
