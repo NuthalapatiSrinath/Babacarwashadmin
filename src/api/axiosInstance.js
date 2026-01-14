@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 // HARDCODED BASE URL
 // This forces the request to be relative (e.g., https://your-site.com/api/...)
 // It relies entirely on your proxy configuration (vercel.json or vite.config.js)
-const baseURL = "http://locg84s4w4scsg8ckgww0kcc.140.245.229.141.sslip.io/api";
+const baseURL = "https://api.friendcircles.in/api";
 
 const api = axios.create({
   baseURL: baseURL,
