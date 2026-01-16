@@ -47,6 +47,7 @@ import WorkerCustomers from "./pages/workers-management/WorkerCustomers";
 import WorkerPayments from "./pages/workers-management/WorkerPayments";
 import WorkerWashedCars from "./pages/workers-management/WorkerWashedCars";
 import WorkerHistory from "./pages/workers-management/WorkerHistory";
+import StaffProfile from "./pages/workers-management/StaffProfile";
 
 export const routes = [
   // --- OVERVIEW ---
@@ -114,6 +115,13 @@ export const routes = [
     component: <Staff />,
     icon: Users,
   },
+  {
+    path: "/workers/staff/:id",
+    title: "Staff",
+    component: <StaffProfile />,
+    icon: Users,
+  },
+
   {
     path: "/workers/attendance",
     title: "Attendance",

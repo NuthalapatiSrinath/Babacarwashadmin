@@ -450,7 +450,7 @@ const OneWash = () => {
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 text-xs font-medium text-slate-600 mt-1">
+          {/* <div className="flex flex-wrap gap-2 text-xs font-medium text-slate-600 mt-1">
             <div className="bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm flex items-center gap-2">
               <Briefcase className="w-3.5 h-3.5 text-indigo-500" />
               <span>
@@ -478,7 +478,7 @@ const OneWash = () => {
                 Card: <b>{stats.card}</b>
               </span>
             </div>
-          </div>
+          </div> */}
         </div>
 
         <div className="flex items-center gap-3">

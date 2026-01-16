@@ -115,8 +115,6 @@ export const staffService = {
     return finalUrl;
   },
 
-  // NOTE: downloadTemplate removed (Moved to Frontend Staff.jsx)
-
   exportData: async () => {
     console.log("[StaffService] Export Data Request");
     try {
@@ -153,6 +151,27 @@ export const staffService = {
       return response.data;
     } catch (error) {
       console.error("[StaffService] Get Expiring Error:", error);
+      throw error;
+    }
+  },
+
+  // ✅ UPLOAD PROFILE IMAGE
+  uploadProfileImage: async (id, file) => {
+    console.log(`[StaffService] Uploading Profile Image -> ID: ${id}`);
+    try {
+      const formData = new FormData();
+      formData.append("file", file); // Backend expects 'file'
+
+      const response = await api.post(
+        `/admin/staff/${id}/profile-image`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+
+      console.log("[StaffService] Profile Image Success ->", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("[StaffService] Profile Image Error:", error);
       throw error;
     }
   },

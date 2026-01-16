@@ -12,6 +12,8 @@ import {
   Globe,
   FileText,
   Upload,
+  Phone,
+  Mail,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
@@ -37,9 +39,12 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
     companyName: "",
     joiningDate: "",
     site: "",
+    mobile: "",
+    email: "",
     passportNumber: "",
     passportExpiry: "",
     passportDocument: "",
+    visaNumber: "", // ✅ Added
     visaExpiry: "",
     visaDocument: "",
     emiratesId: "",
@@ -56,7 +61,7 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
           const response = await siteService.list(1, 1000);
           setSites(response.data || []);
         } catch (error) {
-          toast.error("Failed to load sites");
+          console.error("Failed to load sites", error);
         } finally {
           setFetchingSites(false);
         }
@@ -75,11 +80,14 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
             editData.site && typeof editData.site === "object"
               ? editData.site._id
               : editData.site || "",
+          mobile: editData.mobile || "",
+          email: editData.email || "",
           passportNumber: editData.passportNumber || "",
           passportExpiry: editData.passportExpiry
             ? editData.passportExpiry.split("T")[0]
             : "",
           passportDocument: editData.passportDocument || "",
+          visaNumber: editData.visaNumber || "", // ✅ Populates from editData
           visaExpiry: editData.visaExpiry
             ? editData.visaExpiry.split("T")[0]
             : "",
@@ -97,9 +105,12 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
           companyName: "",
           joiningDate: "",
           site: "",
+          mobile: "",
+          email: "",
           passportNumber: "",
           passportExpiry: "",
           passportDocument: "",
+          visaNumber: "",
           visaExpiry: "",
           visaDocument: "",
           emiratesId: "",
@@ -146,28 +157,21 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
 
   const handleDocumentUpload = async (docType) => {
     if (!editData?._id) {
-      toast.error("Please save the staff first before uploading documents");
+      toast.error(
+        "Please save the staff details first before uploading documents."
+      );
       return;
     }
-
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".pdf";
     input.onchange = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-
       if (!file.name.toLowerCase().endsWith(".pdf")) {
         toast.error("Only PDF files are allowed");
         return;
       }
-
-      const maxSize = 10 * 1024 * 1024;
-      if (file.size > maxSize) {
-        toast.error("File size must be less than 10MB");
-        return;
-      }
-
       const docKey =
         docType === "Passport"
           ? "passport"
@@ -175,7 +179,6 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
           ? "visa"
           : "emiratesId";
       setUploadingDoc((prev) => ({ ...prev, [docKey]: true }));
-
       const toastId = toast.loading(`Uploading ${docType}...`);
       try {
         const response = await staffService.uploadDocument(
@@ -184,8 +187,6 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
           docType
         );
         toast.success(`${docType} uploaded successfully!`, { id: toastId });
-
-        // Update formData with document info (the response contains fileName)
         const fieldName =
           docType === "Passport"
             ? "passportDocument"
@@ -194,13 +195,9 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
             : "emiratesIdDocument";
         setFormData((prev) => ({
           ...prev,
-          [fieldName]: {
-            filename: response.fileName,
-            data: "stored_in_db", // Placeholder since we don't need base64 in frontend
-          },
+          [fieldName]: { filename: response.fileName },
         }));
       } catch (error) {
-        console.error("Upload error:", error);
         toast.error(`Failed to upload ${docType}`, { id: toastId });
       } finally {
         setUploadingDoc((prev) => ({ ...prev, [docKey]: false }));
@@ -214,417 +211,337 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
           onClick={onClose}
-          className="absolute inset-0 bg-black/50"
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         />
-
-        {/* Modal Content */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
-          className="bg-white w-full max-w-lg rounded-lg shadow-2xl overflow-hidden relative z-10 flex flex-col"
+          className="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden relative z-10 flex flex-col max-h-[90vh]"
         >
-          {/* Header */}
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="text-xl font-bold text-gray-800">
-              {editData ? "Edit Staff" : "Add New Staff"}
-            </h3>
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+            <div>
+              <h3 className="text-lg font-bold text-gray-800">
+                {editData ? "Edit Staff Details" : "Add New Staff Member"}
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Fill in the information below to{" "}
+                {editData ? "update" : "create"} a record.
+              </p>
+            </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
+              className="p-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Form Body */}
-          <div className="p-6 max-h-[70vh] overflow-y-auto">
-            <form id="staffForm" onSubmit={handleSubmit} className="space-y-5">
-              {/* Company Name */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1 ml-1">
-                  Company Name <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Briefcase className="h-4 w-4 text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    value={formData.companyName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, companyName: e.target.value })
-                    }
-                    className="w-full pl-9 pr-4 py-3 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm"
-                    placeholder="e.g. Baba Car Wash"
-                  />
-                </div>
-              </div>
-
-              {/* Name */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1 ml-1">
-                  Employee Name <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-4 w-4 text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    className="w-full pl-9 pr-4 py-3 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm"
-                    placeholder="Enter employee name"
-                  />
-                </div>
-              </div>
-
-              {/* Employee Code */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1 ml-1">
-                  Employee Code <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Hash className="h-4 w-4 text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    value={formData.employeeCode}
-                    onChange={(e) =>
-                      setFormData({ ...formData, employeeCode: e.target.value })
-                    }
-                    className="w-full pl-9 pr-4 py-3 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm"
-                    placeholder="e.g. EMP-001"
-                  />
-                </div>
-              </div>
-
-              {/* Joining Date */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1 ml-1">
-                  Date of Joining
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Calendar className="h-4 w-4 text-gray-400" />
-                  </div>
-                  <input
-                    type="date"
-                    value={formData.joiningDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, joiningDate: e.target.value })
-                    }
-                    className="w-full pl-9 pr-4 py-3 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Site Selection */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1 ml-1">
-                  Assigned Site <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Map className="h-4 w-4 text-gray-400" />
-                  </div>
-                  <select
-                    value={formData.site}
-                    onChange={(e) =>
-                      setFormData({ ...formData, site: e.target.value })
-                    }
-                    disabled={fetchingSites}
-                    className="w-full pl-9 pr-8 py-3 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none appearance-none bg-white text-sm"
-                  >
-                    <option value="">Select a Site</option>
-                    {sites.map((site) => (
-                      <option key={site._id} value={site._id}>
-                        {site.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-3.5 w-4 h-4 text-gray-400 pointer-events-none" />
-
-                  {fetchingSites && (
-                    <div className="absolute right-8 top-3.5">
-                      <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+          <div className="p-6 overflow-y-auto custom-scrollbar">
+            <form id="staffForm" onSubmit={handleSubmit} className="space-y-6">
+              {/* Personal & Job Information */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold text-gray-900 border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
+                  <User className="w-4 h-4 text-blue-500" /> Personal & Job
+                  Information
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Company Name <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Briefcase className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={formData.companyName}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            companyName: e.target.value,
+                          })
+                        }
+                        className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:border-blue-500 outline-none transition-all"
+                        placeholder="e.g. Baba Car Wash"
+                      />
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Passport Number */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1 ml-1">
-                  Passport Number
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Globe className="h-4 w-4 text-gray-400" />
                   </div>
-                  <input
-                    type="text"
-                    value={formData.passportNumber}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        passportNumber: e.target.value,
-                      })
-                    }
-                    className="w-full pl-9 pr-4 py-3 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm"
-                    placeholder="e.g. A1234567"
-                  />
-                </div>
-              </div>
-
-              {/* Passport Expiry */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1 ml-1">
-                  Passport Expiry Date
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Calendar className="h-4 w-4 text-gray-400" />
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Full Name <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={formData.name}
+                        onChange={(e) =>
+                          setFormData({ ...formData, name: e.target.value })
+                        }
+                        className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:border-blue-500 outline-none transition-all"
+                        placeholder="John Doe"
+                      />
+                    </div>
                   </div>
-                  <input
-                    type="date"
-                    value={formData.passportExpiry}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        passportExpiry: e.target.value,
-                      })
-                    }
-                    className="w-full pl-9 pr-4 py-3 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Visa Expiry */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1 ml-1">
-                  Visa Expiry Date
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <FileText className="h-4 w-4 text-gray-400" />
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Employee Code <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Hash className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={formData.employeeCode}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            employeeCode: e.target.value,
+                          })
+                        }
+                        className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:border-blue-500 outline-none transition-all"
+                        placeholder="EMP-001"
+                      />
+                    </div>
                   </div>
-                  <input
-                    type="date"
-                    value={formData.visaExpiry}
-                    onChange={(e) =>
-                      setFormData({ ...formData, visaExpiry: e.target.value })
-                    }
-                    className="w-full pl-9 pr-4 py-3 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Emirates ID */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1 ml-1">
-                  Emirates ID Number
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <CreditCard className="h-4 w-4 text-gray-400" />
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Assigned Site <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Map className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                      <select
+                        value={formData.site}
+                        onChange={(e) =>
+                          setFormData({ ...formData, site: e.target.value })
+                        }
+                        disabled={fetchingSites}
+                        className="w-full pl-9 pr-8 py-2 rounded-lg border border-gray-300 text-sm focus:border-blue-500 outline-none bg-white appearance-none transition-all"
+                      >
+                        <option value="">Select Site</option>
+                        {sites.map((site) => (
+                          <option key={site._id} value={site._id}>
+                            {site.name}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-3 top-3 h-4 w-4 text-gray-400 pointer-events-none" />
+                    </div>
                   </div>
-                  <input
-                    type="text"
-                    value={formData.emiratesId}
-                    onChange={(e) =>
-                      setFormData({ ...formData, emiratesId: e.target.value })
-                    }
-                    className="w-full pl-9 pr-4 py-3 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm"
-                    placeholder="e.g. 784-1234-1234567-1"
-                  />
-                </div>
-              </div>
-
-              {/* Emirates ID Expiry */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1 ml-1">
-                  Emirates ID Expiry Date
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Calendar className="h-4 w-4 text-gray-400" />
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Joining Date
+                    </label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                      <input
+                        type="date"
+                        value={formData.joiningDate}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            joiningDate: e.target.value,
+                          })
+                        }
+                        className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:border-blue-500 outline-none transition-all"
+                      />
+                    </div>
                   </div>
-                  <input
-                    type="date"
-                    value={formData.emiratesIdExpiry}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        emiratesIdExpiry: e.target.value,
-                      })
-                    }
-                    className="w-full pl-9 pr-4 py-3 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm"
-                  />
                 </div>
               </div>
 
-              {/* Document Uploads - Only show when editing */}
+              {/* Contact Information */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold text-gray-900 border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-emerald-500" /> Contact
+                  Information
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Mobile Number
+                    </label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                      <input
+                        type="tel"
+                        value={formData.mobile}
+                        onChange={(e) =>
+                          setFormData({ ...formData, mobile: e.target.value })
+                        }
+                        className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:border-blue-500 outline-none"
+                        placeholder="+971 50 123 4567"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Email Address
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                      <input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) =>
+                          setFormData({ ...formData, email: e.target.value })
+                        }
+                        className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:border-blue-500 outline-none"
+                        placeholder="john@example.com"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Official Documents */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold text-gray-900 border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-indigo-500" /> Official
+                  Documents
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Passport Section */}
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 space-y-2">
+                    <span className="text-[10px] font-bold text-indigo-600 uppercase flex items-center gap-1">
+                      <Globe className="w-3 h-3" /> Passport
+                    </span>
+                    <input
+                      type="text"
+                      value={formData.passportNumber}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          passportNumber: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-1.5 rounded border border-gray-300 text-sm focus:border-indigo-500 outline-none"
+                      placeholder="Passport No."
+                    />
+                    <input
+                      type="date"
+                      value={formData.passportExpiry}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          passportExpiry: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-1.5 rounded border border-gray-300 text-sm focus:border-indigo-500 outline-none"
+                    />
+                  </div>
+
+                  {/* Visa Section */}
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 space-y-2">
+                    <span className="text-[10px] font-bold text-blue-600 uppercase flex items-center gap-1">
+                      <FileText className="w-3 h-3" /> Visa
+                    </span>
+                    <input
+                      type="text"
+                      value={formData.visaNumber}
+                      onChange={(e) =>
+                        setFormData({ ...formData, visaNumber: e.target.value })
+                      }
+                      className="w-full px-3 py-1.5 rounded border border-gray-300 text-sm focus:border-blue-500 outline-none"
+                      placeholder="Visa No."
+                    />
+                    <input
+                      type="date"
+                      value={formData.visaExpiry}
+                      onChange={(e) =>
+                        setFormData({ ...formData, visaExpiry: e.target.value })
+                      }
+                      className="w-full px-3 py-1.5 rounded border border-gray-300 text-sm focus:border-blue-500 outline-none"
+                    />
+                  </div>
+
+                  {/* Emirates ID Section */}
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 space-y-2 md:col-span-2">
+                    <span className="text-[10px] font-bold text-emerald-600 uppercase flex items-center gap-1">
+                      <CreditCard className="w-3 h-3" /> Emirates ID
+                    </span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        value={formData.emiratesId}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            emiratesId: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-1.5 rounded border border-gray-300 text-sm focus:border-emerald-500 outline-none"
+                        placeholder="ID Number (784-...)"
+                      />
+                      <input
+                        type="date"
+                        value={formData.emiratesIdExpiry}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            emiratesIdExpiry: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-1.5 rounded border border-gray-300 text-sm focus:border-emerald-500 outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Uploads (Only in Edit Mode) */}
               {editData && (
-                <>
-                  <div className="pt-4 border-t border-gray-200">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-3">
-                      Document Uploads (PDF only)
-                    </h4>
+                <div className="pt-2">
+                  <h4 className="text-sm font-semibold text-gray-900 border-b border-gray-100 pb-2 mb-4">
+                    Cloud Document Storage (PDF)
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {["Passport", "Visa", "Emirates ID"].map((doc) => (
+                      <button
+                        key={doc}
+                        type="button"
+                        onClick={() => handleDocumentUpload(doc)}
+                        disabled={
+                          uploadingDoc[
+                            doc === "Passport"
+                              ? "passport"
+                              : doc === "Visa"
+                              ? "visa"
+                              : "emiratesId"
+                          ]
+                        }
+                        className="flex flex-col items-center justify-center p-3 rounded-lg border border-dashed border-gray-300 text-gray-500 hover:bg-gray-50 transition-all group"
+                      >
+                        {uploadingDoc[
+                          doc === "Passport"
+                            ? "passport"
+                            : doc === "Visa"
+                            ? "visa"
+                            : "emiratesId"
+                        ] ? (
+                          <Loader2 className="w-5 h-5 animate-spin mb-1 text-blue-500" />
+                        ) : (
+                          <Upload className="w-5 h-5 mb-1 group-hover:text-blue-500" />
+                        )}
+                        <span className="text-[10px] font-bold uppercase">
+                          {doc}
+                        </span>
+                      </button>
+                    ))}
                   </div>
-
-                  {/* Passport Document */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1 ml-1">
-                      Passport Document
-                    </label>
-                    {formData.passportDocument &&
-                      formData.passportDocument.filename && (
-                        <div className="mb-2 text-xs text-green-600 flex items-center gap-1">
-                          <FileText className="w-3 h-3" />
-                          <span className="font-medium">
-                            ✓ {formData.passportDocument.filename}
-                          </span>
-                        </div>
-                      )}
-                    <button
-                      type="button"
-                      onClick={() => handleDocumentUpload("Passport")}
-                      disabled={uploadingDoc.passport}
-                      className={`w-full px-4 py-3 rounded-md border-2 border-dashed flex items-center justify-center gap-2 text-sm font-medium transition-all ${
-                        formData.passportDocument &&
-                        formData.passportDocument.filename
-                          ? "border-green-300 bg-green-50 text-green-700 hover:bg-green-100"
-                          : "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                      }`}
-                    >
-                      {uploadingDoc.passport ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Uploading...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-4 h-4" />
-                          <span>
-                            {formData.passportDocument &&
-                            formData.passportDocument.filename
-                              ? "Replace Passport PDF"
-                              : "Upload Passport PDF"}
-                          </span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Visa Document */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1 ml-1">
-                      Visa Document
-                    </label>
-                    {formData.visaDocument &&
-                      formData.visaDocument.filename && (
-                        <div className="mb-2 text-xs text-green-600 flex items-center gap-1">
-                          <FileText className="w-3 h-3" />
-                          <span className="font-medium">
-                            ✓ {formData.visaDocument.filename}
-                          </span>
-                        </div>
-                      )}
-                    <button
-                      type="button"
-                      onClick={() => handleDocumentUpload("Visa")}
-                      disabled={uploadingDoc.visa}
-                      className={`w-full px-4 py-3 rounded-md border-2 border-dashed flex items-center justify-center gap-2 text-sm font-medium transition-all ${
-                        formData.visaDocument && formData.visaDocument.filename
-                          ? "border-green-300 bg-green-50 text-green-700 hover:bg-green-100"
-                          : "border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100"
-                      }`}
-                    >
-                      {uploadingDoc.visa ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Uploading...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-4 h-4" />
-                          <span>
-                            {formData.visaDocument &&
-                            formData.visaDocument.filename
-                              ? "Replace Visa PDF"
-                              : "Upload Visa PDF"}
-                          </span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Emirates ID Document */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1 ml-1">
-                      Emirates ID Document
-                    </label>
-                    {formData.emiratesIdDocument &&
-                      formData.emiratesIdDocument.filename && (
-                        <div className="mb-2 text-xs text-green-600 flex items-center gap-1">
-                          <FileText className="w-3 h-3" />
-                          <span className="font-medium">
-                            ✓ {formData.emiratesIdDocument.filename}
-                          </span>
-                        </div>
-                      )}
-                    <button
-                      type="button"
-                      onClick={() => handleDocumentUpload("Emirates ID")}
-                      disabled={uploadingDoc.emiratesId}
-                      className={`w-full px-4 py-3 rounded-md border-2 border-dashed flex items-center justify-center gap-2 text-sm font-medium transition-all ${
-                        formData.emiratesIdDocument &&
-                        formData.emiratesIdDocument.filename
-                          ? "border-green-300 bg-green-50 text-green-700 hover:bg-green-100"
-                          : "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                      }`}
-                    >
-                      {uploadingDoc.emiratesId ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Uploading...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-4 h-4" />
-                          <span>
-                            {formData.emiratesIdDocument &&
-                            formData.emiratesIdDocument.filename
-                              ? "Replace Emirates ID PDF"
-                              : "Upload Emirates ID PDF"}
-                          </span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </>
+                </div>
               )}
             </form>
           </div>
 
-          {/* Footer */}
-          <div className="p-5 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+          <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/50">
             <button
               onClick={onClose}
-              className="px-5 py-2.5 rounded-md border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
+              className="px-5 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors"
             >
               Cancel
             </button>
@@ -632,9 +549,9 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
               type="submit"
               form="staffForm"
               disabled={loading}
-              className="px-6 py-2.5 rounded-md bg-[#009ef7] hover:bg-[#0095e8] text-white text-sm font-bold shadow-sm flex items-center gap-2 transition-all disabled:opacity-60"
+              className="px-6 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold shadow-lg shadow-indigo-200 disabled:opacity-60 transition-all flex items-center"
             >
-              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+              {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               {editData ? "Save Changes" : "Create Staff"}
             </button>
           </div>

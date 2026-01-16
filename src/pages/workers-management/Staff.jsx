@@ -1,63 +1,59 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Plus,
   Edit2,
   Trash2,
   Hash,
-  Map,
+  MapPin,
   Download,
   UploadCloud,
   FileSpreadsheet,
   Search,
   Briefcase,
   Users,
-  Eye,
   Filter,
-  CreditCard,
-  FileText,
-  Globe,
   Loader2,
   CheckCircle,
   AlertCircle,
+  User,
+  Clock,
+  ArrowRight,
+  ShieldAlert,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import * as XLSX from "xlsx";
+
+// Components
 import DataTable from "../../components/DataTable";
 import StaffModal from "../../components/modals/StaffModal";
 import DeleteModal from "../../components/modals/DeleteModal";
-import DocumentViewModal from "../../components/modals/DocumentViewModal";
-import DocumentPreviewModal from "../../components/modals/DocumentPreviewModal";
-import ViewStaffModal from "../../components/modals/ViewStaffModal";
 import CustomDropdown from "../../components/ui/CustomDropdown";
+
+// API
 import { staffService } from "../../api/staffService";
 
 const Staff = () => {
+  const navigate = useNavigate();
   const fileInputRef = useRef(null);
+
+  // --- STATE ---
   const [loading, setLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const [data, setData] = useState([]);
 
-  // Filters
+  // Filters State
   const [currentSearch, setCurrentSearch] = useState("");
   const [selectedCompany, setSelectedCompany] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState("");
+  const [selectedSite, setSelectedSite] = useState("");
+  const [selectedExpiryRange, setSelectedExpiryRange] = useState("");
 
-  // Modals
+  // Modals State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
-  const [staffForDocuments, setStaffForDocuments] = useState(null);
-  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [staffToView, setStaffToView] = useState(null);
-
-  const [previewDocument, setPreviewDocument] = useState({
-    url: "",
-    title: "",
-  });
 
   const [pagination, setPagination] = useState({
     page: 1,
@@ -66,321 +62,338 @@ const Staff = () => {
     totalPages: 1,
   });
 
-  const safeString = (val) => (val ? String(val) : "-");
-  const isExpired = (dateVal) => dateVal && new Date(dateVal) < new Date();
+  // --- HELPERS ---
+  const getDaysDiff = (date) => {
+    if (!date) return null;
+    const diff = new Date(date) - new Date();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  };
 
-  const getStatus = (staff) => {
-    const hasExpired =
-      isExpired(staff.passportExpiry) ||
-      isExpired(staff.visaExpiry) ||
-      isExpired(staff.emiratesIdExpiry);
-    return hasExpired ? "Expired" : "Valid";
+  // ✅ NEW: Enhanced Compliance Logic to detect Expired and Upcoming
+  const getExpiryStatus = (staff) => {
+    const dates = [
+      { type: "Passport", val: staff.passportExpiry },
+      { type: "Visa", val: staff.visaExpiry },
+      { type: "EID", val: staff.emiratesIdExpiry },
+    ];
+
+    // Check for already expired first
+    const expired = dates.filter((d) => d.val && getDaysDiff(d.val) < 0);
+    if (expired.length > 0) {
+      return {
+        label: `EXPIRED (${expired.map((e) => e.type).join(", ")})`,
+        color: "red",
+      };
+    }
+
+    // Check for upcoming within 90 days
+    const upcoming = dates
+      .map((d) => ({ ...d, diff: getDaysDiff(d.val) }))
+      .filter((d) => d.diff !== null && d.diff >= 0 && d.diff <= 90)
+      .sort((a, b) => a.diff - b.diff)[0];
+
+    if (upcoming) {
+      return {
+        label:
+          upcoming.diff <= 30
+            ? `Critical: ${upcoming.diff} Days`
+            : `Expires in ${upcoming.diff} Days`,
+        color: "amber",
+      };
+    }
+
+    return { label: "All Valid", color: "emerald" };
   };
 
   const fetchData = async (page = 1, limit = 50, search = "") => {
     setLoading(true);
     try {
       const res = await staffService.list(page, limit, search);
-      // ✅ FIX: Show ALL backend data directly. No filtering/deduplication here.
-      const rawData = Array.isArray(res.data) ? res.data : [];
-
-      setData(rawData);
+      setData(res.data || []);
       setPagination({
         page,
         limit,
-        total: res.total || rawData.length,
-        totalPages: Math.ceil((res.total || rawData.length) / limit) || 1,
+        total: res.total || 0,
+        totalPages: Math.ceil((res.total || 0) / limit) || 1,
       });
     } catch (e) {
-      if (e.response?.status === 403) toast.error("Access Denied");
+      toast.error("Failed to load staff directory");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData(pagination.page, pagination.limit);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchData();
   }, []);
 
-  // --- FILTER LOGIC ---
-  const uniqueCompanies = useMemo(() => {
-    const companies = data.map((item) => item.companyName).filter(Boolean);
-    return [...new Set(companies)].sort();
+  // --- FILTER OPTIONS ---
+  const companyOptions = useMemo(() => {
+    const companies = [
+      ...new Set(data.map((item) => item.companyName).filter(Boolean)),
+    ].sort();
+    return [
+      { value: "", label: "All Companies" },
+      ...companies.map((c) => ({ value: c, label: c })),
+    ];
   }, [data]);
 
-  const companyOptions = useMemo(() => {
-    const options = [{ value: "", label: "All Companies" }];
-    uniqueCompanies.forEach((c) => options.push({ value: c, label: c }));
-    return options;
-  }, [uniqueCompanies]);
+  const siteOptions = useMemo(() => {
+    const sites = [
+      ...new Set(
+        data
+          .map((item) =>
+            typeof item.site === "string" ? item.site : item.site?.name
+          )
+          .filter(Boolean)
+      ),
+    ].sort();
+    return [
+      { value: "", label: "All Sites" },
+      ...sites.map((s) => ({ value: s, label: s })),
+    ];
+  }, [data]);
 
-  const statusOptions = [
-    { value: "", label: "All Status" },
-    { value: "Valid", label: "Valid" },
-    { value: "Expired", label: "Expired" },
+  const expiryRangeOptions = [
+    { value: "", label: "Any Validity" },
+    { value: "already_expired", label: "Already Expired" },
+    { value: "expired_month", label: "Expired This Month" },
+    { value: "15", label: "Within 15 Days" },
+    { value: "30", label: "Within 1 Month" },
+    { value: "90", label: "Within 3 Months" },
   ];
 
   const filteredData = useMemo(() => {
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
     return data.filter((item) => {
       if (selectedCompany && item.companyName !== selectedCompany) return false;
-      if (selectedStatus) {
-        const status = getStatus(item);
-        if (status !== selectedStatus) return false;
-      }
-      if (currentSearch) {
-        const lowerSearch = currentSearch.toLowerCase();
-        const name = (item.name || "").toLowerCase();
-        const code = (item.employeeCode || "").toLowerCase();
-        const comp = (item.companyName || "").toLowerCase();
-        const site = (item.site?.name || item.site || "").toLowerCase();
+      const siteName =
+        typeof item.site === "string" ? item.site : item.site?.name;
+      if (selectedSite && siteName !== selectedSite) return false;
 
+      if (selectedExpiryRange) {
+        const dates = [
+          item.passportExpiry,
+          item.visaExpiry,
+          item.emiratesIdExpiry,
+        ];
+        const diffs = dates.map((d) => getDaysDiff(d));
+
+        if (selectedExpiryRange === "already_expired") {
+          if (!diffs.some((d) => d !== null && d < 0)) return false;
+        } else if (selectedExpiryRange === "expired_month") {
+          const hasExpiredThisMonth = dates.some(
+            (d) => d && new Date(d) < today && new Date(d) >= startOfMonth
+          );
+          if (!hasExpiredThisMonth) return false;
+        } else {
+          const limit = parseInt(selectedExpiryRange);
+          const minUpcoming = Math.min(
+            ...diffs.filter((d) => d !== null && d >= 0)
+          );
+          if (minUpcoming > limit || minUpcoming === Infinity) return false;
+        }
+      }
+
+      if (currentSearch) {
+        const s = currentSearch.toLowerCase();
+        const siteName =
+          typeof item.site === "string" ? item.site : item.site?.name || "";
         return (
-          name.includes(lowerSearch) ||
-          code.includes(lowerSearch) ||
-          comp.includes(lowerSearch) ||
-          site.includes(lowerSearch)
+          item.name?.toLowerCase().includes(s) ||
+          item.employeeCode?.toLowerCase().includes(s) ||
+          item.companyName?.toLowerCase().includes(s) ||
+          siteName.toLowerCase().includes(s)
         );
       }
       return true;
     });
-  }, [data, selectedCompany, selectedStatus, currentSearch]);
+  }, [data, selectedCompany, selectedSite, selectedExpiryRange, currentSearch]);
 
-  // --- ACTIONS ---
-  const handleAdd = () => {
-    setSelectedStaff(null);
-    setIsModalOpen(true);
-  };
-  const handleEdit = (staff) => {
-    setSelectedStaff(staff);
-    setIsModalOpen(true);
-  };
-  const handleDeleteAction = (staff) => {
-    setStaffToDelete(staff);
-    setIsDeleteModalOpen(true);
-  };
-  const handleViewDetails = (staff) => {
-    setStaffToView(staff);
-    setIsViewModalOpen(true);
-  };
+  // ✅ NEW: Alert logic for the Scrolling Bar
+  const criticalAlerts = useMemo(() => {
+    return data.filter((item) => {
+      const dates = [
+        item.passportExpiry,
+        item.visaExpiry,
+        item.emiratesIdExpiry,
+      ];
+      const diffs = dates.map((d) => getDaysDiff(d)).filter((d) => d !== null);
+      if (diffs.length === 0) return false;
+      const minDiff = Math.min(...diffs);
+      // Logic: Show if already expired (minDiff < 0) or expiring within 30 days
+      return minDiff <= 30;
+    });
+  }, [data]);
 
-  const confirmDelete = async () => {
-    setDeleteLoading(true);
-    try {
-      await staffService.delete(staffToDelete._id);
-      toast.success("Deleted successfully");
-      setIsDeleteModalOpen(false);
-      fetchData(pagination.page, pagination.limit, "");
-    } catch (error) {
-      toast.error("Delete failed");
-    } finally {
-      setDeleteLoading(false);
-    }
-  };
-
-  const handleDownloadTemplate = () => {
-    const dummyData = [
-      {
-        "Employee Code": "EMP001",
-        Name: "John Doe",
-        Company: "Baba Car Wash",
-        Site: "Downtown Dubai",
-        "Joining Date (YYYY-MM-DD)": "2024-01-01",
-        "Passport Number": "A1234567",
-        "Passport Expiry (YYYY-MM-DD)": "2030-01-01",
-        "Passport Document URL": "",
-        "Visa Expiry (YYYY-MM-DD)": "2026-01-01",
-        "Visa Document URL": "",
-        "Emirates ID": "784-1234-1234567-1",
-        "Emirates ID Expiry (YYYY-MM-DD)": "2026-01-01",
-        "Emirates ID Document URL": "",
-      },
-    ];
-    const worksheet = XLSX.utils.json_to_sheet(dummyData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
-    XLSX.writeFile(workbook, "Staff_Import_Template.xlsx");
-    toast.success("Template Downloaded");
-  };
-
-  const handleExportServerSide = async () => {
-    const toastId = toast.loading("Exporting...");
+  // --- HANDLERS ---
+  const handleExportData = async () => {
+    const toastId = toast.loading("Preparing Export...");
     try {
       const blob = await staffService.exportData();
       const url = window.URL.createObjectURL(new Blob([blob]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `staff_export_${Date.now()}.xlsx`);
+      link.setAttribute(
+        "download",
+        `Staff_Export_${new Date().toISOString().slice(0, 10)}.xlsx`
+      );
       document.body.appendChild(link);
       link.click();
       link.remove();
       toast.success("Done", { id: toastId });
     } catch {
-      toast.error("Export Failed", { id: toastId });
+      toast.error("Export failed", { id: toastId });
     }
+  };
+
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        "Employee Code": "EMP101",
+        Name: "John Doe",
+        Mobile: "971501234567",
+        Email: "john@mail.com",
+        Company: "Baba Wash",
+        Site: "Dubai",
+        "Joining Date": "2024-01-01",
+        "Passport Number": "P123",
+        "Passport Expiry": "2030-01-01",
+        "Visa Number": "V123",
+        "Visa Expiry": "2026-01-01",
+        "Emirates ID": "E123",
+        "Emirates ID Expiry": "2026-01-01",
+      },
+    ];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Staff");
+    XLSX.writeFile(wb, "Staff_Template.xlsx");
   };
 
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     e.target.value = null;
+    const toastId = toast.loading("Processing upload...");
     setImportLoading(true);
-    const toastId = toast.loading("Importing...");
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const res = await staffService.importData(formData);
-      const successCount = res.results?.success || 0;
-      toast.success(`Imported ${successCount} records`, { id: toastId });
+      await staffService.importData(formData);
+      toast.success("Success", { id: toastId });
       fetchData(1, pagination.limit);
     } catch {
-      toast.error("Import Failed", { id: toastId });
+      toast.error("Failed", { id: toastId });
     } finally {
       setImportLoading(false);
     }
   };
 
-  const handleDocumentView = (id, type, name) => {
-    const url = staffService.getDocumentUrl(id, type);
-    setPreviewDocument({ url, title: `${name} - ${type}` });
-    setIsPreviewModalOpen(true);
-  };
-
-  const handleViewAllDocuments = (staff) => {
-    setStaffForDocuments(staff);
-    setIsDocumentModalOpen(true);
+  const confirmDelete = async () => {
+    if (!staffToDelete) return;
+    setDeleteLoading(true);
+    try {
+      await staffService.delete(staffToDelete._id);
+      toast.success("Deleted");
+      setIsDeleteModalOpen(false);
+      fetchData();
+    } catch {
+      toast.error("Failed");
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const columns = [
     {
-      header: "#",
-      render: (r, i) => (pagination.page - 1) * pagination.limit + i + 1,
-      className: "text-center w-12 text-gray-500 font-bold",
-    },
-    {
-      header: "Company",
-      accessor: "companyName",
+      header: "Staff Member",
+      className: "min-w-[280px]",
       render: (r) => (
-        <div className="flex items-center gap-2">
-          <Briefcase className="w-4 h-4 text-blue-500" />
-          <span className="font-semibold text-sm">
-            {safeString(r.companyName)}
-          </span>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs">
+            {r.name?.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <div className="font-bold text-slate-700 text-sm leading-tight mb-1">
+              {r.name}
+            </div>
+            <div className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-tighter w-fit">
+              {r.employeeCode}
+            </div>
+          </div>
         </div>
       ),
     },
     {
-      header: "Employee",
+      header: "Company",
       render: (r) => (
-        <div>
-          <div className="font-bold text-sm text-gray-900">{r.name}</div>
-          <div className="text-xs text-gray-500 flex items-center gap-1">
-            <Hash className="w-3 h-3" />
-            {r.employeeCode || "-"}
-          </div>
-        </div>
+        <span className="text-sm font-medium text-slate-600">
+          {r.companyName}
+        </span>
       ),
     },
     {
       header: "Site",
       render: (r) => (
-        <div className="flex items-center gap-2">
-          <Map className="w-3.5 h-3.5 text-purple-600" />
-          <span className="text-xs text-gray-700 font-medium">
-            {r.site?.name || r.site || "-"}
-          </span>
-        </div>
+        <span className="text-sm font-medium text-slate-600">
+          {typeof r.site === "string" ? r.site : r.site?.name || "Unassigned"}
+        </span>
       ),
     },
     {
-      header: "Documents",
-      render: (r) => (
-        <div className="flex items-center gap-2">
-          <div
-            className={`flex items-center gap-1 px-2 py-1 rounded-md border text-[10px] font-bold ${
-              r.passportDocument?.filename
-                ? "bg-green-50 border-green-100 text-green-700"
-                : "bg-gray-50 border-gray-100 text-gray-400"
-            }`}
-          >
-            <Globe className="w-3 h-3" />
-            {r.passportDocument?.filename ? "PP" : "-"}
-          </div>
-          <div
-            className={`flex items-center gap-1 px-2 py-1 rounded-md border text-[10px] font-bold ${
-              r.visaDocument?.filename
-                ? "bg-blue-50 border-blue-100 text-blue-700"
-                : "bg-gray-50 border-gray-100 text-gray-400"
-            }`}
-          >
-            <FileText className="w-3 h-3" />
-            {r.visaDocument?.filename ? "VISA" : "-"}
-          </div>
-          <div
-            className={`flex items-center gap-1 px-2 py-1 rounded-md border text-[10px] font-bold ${
-              r.emiratesIdDocument?.filename
-                ? "bg-purple-50 border-purple-100 text-purple-700"
-                : "bg-gray-50 border-gray-100 text-gray-400"
-            }`}
-          >
-            <CreditCard className="w-3 h-3" />
-            {r.emiratesIdDocument?.filename ? "EID" : "-"}
-          </div>
-        </div>
-      ),
-    },
-    {
-      header: "Expiry Status",
+      header: "Compliance",
       render: (r) => {
-        const pExp = isExpired(r.passportExpiry);
-        const vExp = isExpired(r.visaExpiry);
-        const eExp = isExpired(r.emiratesIdExpiry);
-        if (pExp || vExp || eExp)
-          return (
-            <div className="flex items-center gap-1 text-red-600 font-bold text-xs bg-red-50 px-2 py-1 rounded-full w-fit">
-              <AlertCircle className="w-3 h-3" /> Expired
-            </div>
-          );
+        const info = getExpiryStatus(r);
+        const styles = {
+          red: "text-red-600 bg-red-50 border-red-100 shadow-sm",
+          amber: "text-amber-600 bg-amber-50 border-amber-100",
+          emerald: "text-emerald-600 bg-emerald-50 border-emerald-100",
+        };
         return (
-          <div className="flex items-center gap-1 text-emerald-600 font-bold text-xs bg-emerald-50 px-2 py-1 rounded-full w-fit">
-            <CheckCircle className="w-3 h-3" /> Valid
-          </div>
+          <span
+            className={`px-2.5 py-1 rounded-lg border text-[10px] font-black uppercase flex items-center gap-1.5 w-fit ${
+              styles[info.color]
+            }`}
+          >
+            {info.color === "red" && <ShieldAlert className="w-3 h-3" />}
+            {info.label}
+          </span>
         );
       },
     },
     {
       header: "Actions",
-      className:
-        "text-right sticky right-0 bg-white shadow-[-10px_0_10px_-10px_rgba(0,0,0,0.1)] min-w-[140px]",
+      className: "text-right",
       render: (r) => (
-        <div className="flex justify-end gap-1.5 pr-2">
+        <div className="flex justify-end gap-2 pr-2">
           <button
-            onClick={() => handleViewDetails(r)}
-            className="p-2 hover:bg-teal-50 text-teal-600 rounded-lg transition-all"
-            title="View Details"
+            onClick={() => navigate(`/workers/staff/${r._id}`)}
+            className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors"
           >
-            <Eye className="w-4 h-4" />
+            <ArrowRight className="w-4 h-4" />
           </button>
           <button
-            onClick={() => handleViewAllDocuments(r)}
-            className="p-2 hover:bg-indigo-50 text-indigo-600 rounded-lg transition-all"
-            title="Manage Documents"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedStaff(r);
+              setIsModalOpen(true);
+            }}
+            className="p-1.5 bg-slate-50 text-slate-400 hover:text-amber-600 rounded-lg"
           >
-            <UploadCloud className="w-4 h-4" />
+            <Edit2 className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={() => handleEdit(r)}
-            className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg transition-all"
-            title="Edit"
+            onClick={(e) => {
+              e.stopPropagation();
+              setStaffToDelete(r);
+              setIsDeleteModalOpen(true);
+            }}
+            className="p-1.5 bg-slate-50 text-slate-400 hover:text-red-600 rounded-lg"
           >
-            <Edit2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleDeleteAction(r)}
-            className="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-all"
-            title="Delete"
-          >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       ),
@@ -388,122 +401,168 @@ const Staff = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 font-sans">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4 lg:p-6 font-sans">
       <input
         type="file"
-        accept=".xlsx"
         ref={fileInputRef}
         onChange={handleFileChange}
         className="hidden"
       />
 
-      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 mb-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200">
-                <Users className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-800 to-indigo-800 bg-clip-text text-transparent">
-                  Staff Management
-                </h1>
-                <p className="text-sm text-slate-500 font-medium">
-                  Manage records
-                </p>
-              </div>
+      {/* --- HEADER --- */}
+      <div className="mb-6 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200">
+            <Users className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-800 to-indigo-800 bg-clip-text text-transparent uppercase tracking-tight">
+              Staff Master
+            </h1>
+            <p className="text-sm text-slate-500 font-medium">
+              {pagination.total} Registered Personnel
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleExportData}
+            className="h-10 px-4 bg-white border border-slate-200 hover:bg-emerald-50 hover:text-emerald-600 text-slate-600 rounded-xl font-bold text-xs shadow-sm transition-all flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" /> Export
+          </button>
+          <button
+            onClick={handleDownloadTemplate}
+            className="h-10 px-4 bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 text-slate-600 rounded-xl font-bold text-xs shadow-sm transition-all flex items-center gap-2"
+          >
+            <FileSpreadsheet className="w-4 h-4" /> Template
+          </button>
+          <button
+            onClick={() => fileInputRef.current.click()}
+            className="h-10 px-4 bg-white border border-slate-200 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 rounded-xl font-bold text-xs shadow-sm transition-all flex items-center gap-2"
+          >
+            {importLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <UploadCloud className="w-4 h-4" />
+            )}{" "}
+            Import
+          </button>
+          <button
+            onClick={() => {
+              setSelectedStaff(null);
+              setIsModalOpen(true);
+            }}
+            className="h-10 px-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" /> Add Staff
+          </button>
+        </div>
+      </div>
+
+      {/* --- FILTERS --- */}
+      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 relative z-20 flex flex-col mb-6">
+        <div className="p-4 border-b border-gray-100 bg-slate-50/50 flex flex-col xl:flex-row gap-4 items-end">
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block ml-1 tracking-widest">
+                Company
+              </span>
+              <CustomDropdown
+                value={selectedCompany}
+                onChange={setSelectedCompany}
+                options={companyOptions}
+                icon={Briefcase}
+                placeholder="All Companies"
+              />
             </div>
-            <div className="flex flex-col md:flex-row gap-4 items-end w-full max-w-4xl">
-              <div className="relative flex-1 w-full">
-                <span className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
-                  Search
-                </span>
-                <div className="relative h-11">
-                  <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Name, Code, Site..."
-                    value={currentSearch}
-                    onChange={(e) => setCurrentSearch(e.target.value)}
-                    className="w-full h-full pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 font-medium transition-all"
-                  />
-                </div>
-              </div>
-              <div className="w-full md:w-64">
-                <CustomDropdown
-                  label="Company"
-                  value={selectedCompany}
-                  onChange={setSelectedCompany}
-                  options={companyOptions}
-                  icon={Briefcase}
-                  placeholder="All Companies"
-                />
-              </div>
-              <div className="w-full md:w-48">
-                <CustomDropdown
-                  label="Status"
-                  value={selectedStatus}
-                  onChange={setSelectedStatus}
-                  options={statusOptions}
-                  icon={Filter}
-                  placeholder="All Status"
-                />
-              </div>
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block ml-1 tracking-widest">
+                Site
+              </span>
+              <CustomDropdown
+                value={selectedSite}
+                onChange={setSelectedSite}
+                options={siteOptions}
+                icon={MapPin}
+                placeholder="All Sites"
+              />
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block ml-1 tracking-widest">
+                Expiry Range
+              </span>
+              <CustomDropdown
+                value={selectedExpiryRange}
+                onChange={setSelectedExpiryRange}
+                options={expiryRangeOptions}
+                icon={Clock}
+                placeholder="Any Validity"
+              />
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 justify-end self-start lg:self-center">
-            <button
-              onClick={handleDownloadTemplate}
-              className="h-11 px-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm transition-all"
-            >
-              <FileSpreadsheet className="w-4 h-4 text-green-600" /> Template
-            </button>
-            <button
-              onClick={handleExportServerSide}
-              className="h-11 px-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm transition-all"
-            >
-              <Download className="w-4 h-4 text-slate-500" /> Export
-            </button>
-            <button
-              onClick={() => fileInputRef.current.click()}
-              disabled={importLoading}
-              className="h-11 px-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm transition-all disabled:opacity-60"
-            >
-              {importLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <UploadCloud className="w-4 h-4 text-blue-500" />
-              )}{" "}
-              Import
-            </button>
-            <button
-              onClick={handleAdd}
-              className="h-11 px-5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transition-all active:scale-95 flex items-center gap-2"
-            >
-              <Plus className="w-5 h-5" /> Add Staff
-            </button>
+          <div className="flex-1 w-full xl:max-w-[350px]">
+            <span className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block ml-1 tracking-widest">
+              Search
+            </span>
+            <div className="relative h-[42px]">
+              <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search..."
+                value={currentSearch}
+                onChange={(e) => setCurrentSearch(e.target.value)}
+                className="w-full h-full pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 shadow-inner"
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-        {/* ✅ FIXED: No more double header manually added here. */}
+      {/* ✅ NEW: FLOATING MARQUEE ALERT BAR ADDED ABOVE TABLE */}
+      {criticalAlerts.length > 0 && (
+        <div className="mb-4 bg-white/60 backdrop-blur-xl border border-rose-100 py-3 rounded-2xl overflow-hidden relative shadow-sm mx-1 ring-1 ring-rose-50/50">
+          <div className="flex whitespace-nowrap animate-marquee items-center gap-20">
+            <div className="flex items-center gap-2 bg-rose-600 text-white px-4 py-1.5 rounded-full ml-6 font-black text-[9px] uppercase tracking-widest shadow-lg">
+              <ShieldAlert className="w-3.5 h-3.5" /> CRITICAL COMPLIANCE ALERT
+            </div>
+            {criticalAlerts.map((staff) => (
+              <div
+                key={staff._id}
+                className="flex items-center gap-3 text-slate-700"
+              >
+                <span className="text-[12px] font-black">{staff.name}</span>
+                <span className="bg-slate-200 text-slate-500 text-[9px] px-2 py-0.5 rounded font-bold">
+                  {staff.employeeCode}
+                </span>
+                <span className="text-[10px] font-bold text-rose-600 uppercase italic">
+                  Check Expiry Status
+                </span>
+                <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
+      {/* --- TABLE CONTAINER --- */}
+      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden relative z-10">
         <DataTable
           columns={columns}
           data={filteredData}
           loading={loading}
-          pagination={{ ...pagination, total: filteredData.length }}
+          pagination={pagination}
           onPageChange={(p) => fetchData(p, pagination.limit, currentSearch)}
-          onLimitChange={(l) => fetchData(1, l, currentSearch)}
           hideSearch={true}
         />
       </div>
 
+      {/* MODALS */}
       <StaffModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={() => fetchData(pagination.page, pagination.limit, "")}
+        onSuccess={() => fetchData()}
         editData={selectedStaff}
       />
       <DeleteModal
@@ -512,27 +571,16 @@ const Staff = () => {
         onConfirm={confirmDelete}
         loading={deleteLoading}
         title="Delete Staff"
-        message={`Delete ${staffToDelete?.name}?`}
+        message={`Are you sure you want to delete ${staffToDelete?.name}?`}
       />
-      <DocumentViewModal
-        isOpen={isDocumentModalOpen}
-        onClose={() => setIsDocumentModalOpen(false)}
-        staff={staffForDocuments}
-        getDocumentUrl={staffService.getDocumentUrl}
-        onViewDocument={handleDocumentView}
-        onSuccess={() => fetchData(pagination.page, pagination.limit, "")}
-      />
-      <DocumentPreviewModal
-        isOpen={isPreviewModalOpen}
-        onClose={() => setIsPreviewModalOpen(false)}
-        documentUrl={previewDocument.url}
-        title={previewDocument.title}
-      />
-      <ViewStaffModal
-        isOpen={isViewModalOpen}
-        onClose={() => setIsViewModalOpen(false)}
-        staff={staffToView}
-      />
+
+      <style>{`
+        @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+        .animate-marquee { animation: marquee 35s linear infinite; }
+        .animate-marquee:hover { animation-play-state: paused; }
+        .DataTable th { font-weight: 800; color: #64748b; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; padding: 18px 24px !important; border-bottom: 1px solid #f1f5f9; }
+        .DataTable td { padding: 14px 24px !important; border-bottom: 1px solid #f1f5f9; }
+      `}</style>
     </div>
   );
 };

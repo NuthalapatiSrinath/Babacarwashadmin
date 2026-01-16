@@ -14,10 +14,11 @@ import {
   Calendar,
   Building,
   Home,
+  Phone,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import * as XLSX from "xlsx"; // Keep for Import/Template
+import * as XLSX from "xlsx";
 
 // Components
 import DataTable from "../../components/DataTable";
@@ -25,7 +26,7 @@ import CustomerModal from "../../components/modals/CustomerModal";
 
 // API
 import { customerService } from "../../api/customerService";
-import api from "../../api/axiosInstance"; // ✅ Import API instance directly to handle Blob
+import api from "../../api/axiosInstance";
 
 const Customers = () => {
   const navigate = useNavigate();
@@ -54,7 +55,10 @@ const Customers = () => {
   const fetchData = async (page = 1, limit = 50, search = "", status = 1) => {
     setLoading(true);
     try {
-      const res = await customerService.list(page, limit, search, status);
+      // ✅ FIX: Trim search term to ignore trailing spaces (e.g., "John " becomes "John")
+      const cleanSearch = typeof search === "string" ? search.trim() : search;
+
+      const res = await customerService.list(page, limit, cleanSearch, status);
       setServerData(res.data || []);
       setPagination({
         page: Number(page),
@@ -80,9 +84,11 @@ const Customers = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, searchTerm]);
 
-  // --- Flatten Data for Table ---
+  // --- Flatten Data & Search Logic ---
   const flattenedData = useMemo(() => {
     if (!serverData) return [];
+
+    // 1. Flatten Data (Customer -> Vehicles)
     const rows = [];
     serverData.forEach((customer) => {
       if (customer.vehicles && customer.vehicles.length > 0) {
@@ -102,8 +108,39 @@ const Customers = () => {
         });
       }
     });
-    return rows;
-  }, [serverData]);
+
+    // 2. Client-Side Search Backup (For immediate feedback on visible data)
+    if (!searchTerm) return rows;
+
+    const lowerSearch = searchTerm.toLowerCase().trim();
+
+    return rows.filter((row) => {
+      const c = row.customer || {};
+
+      // ✅ 1. Name Search
+      const fullName = `${c.firstName || ""} ${c.lastName || ""} ${
+        c.name || ""
+      }`.toLowerCase();
+
+      // ✅ 2. Mobile Search
+      const mobile = String(c.mobile || "");
+
+      // ✅ 3. Vehicle Search
+      const vehicle = String(row.registration_no || "").toLowerCase();
+
+      // ✅ 4. Building Search
+      const building = String(
+        c.building?.name || c.building || ""
+      ).toLowerCase();
+
+      return (
+        fullName.includes(lowerSearch) ||
+        mobile.includes(lowerSearch) ||
+        vehicle.includes(lowerSearch) ||
+        building.includes(lowerSearch)
+      );
+    });
+  }, [serverData, searchTerm]);
 
   // --- Handlers ---
   const handleTabChange = (status) => {
@@ -158,35 +195,29 @@ const Customers = () => {
     }
   };
 
-  // --- EXPORT HANDLER (Direct Blob Download) ---
+  // --- EXPORT HANDLER ---
   const handleExport = async () => {
     setExporting(true);
     const toastId = toast.loading("Downloading file...");
     try {
-      // ✅ FIX: Call API directly with responseType: 'blob'
-      // We bypass customerService.exportData because it doesn't handle blobs correctly
       const response = await api.get("/customers/export/list", {
-        params: { status: activeTab },
-        responseType: "blob", // Critical for binary files
+        params: { status: activeTab, search: searchTerm },
+        responseType: "blob",
       });
 
-      // Create a URL for the blob
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
 
-      // Set filename
       const dateStr = new Date().toISOString().split("T")[0];
       const fileName = `Customers_Export_${
         activeTab === 1 ? "Active" : "Inactive"
       }_${dateStr}.xlsx`;
       link.setAttribute("download", fileName);
 
-      // Trigger download
       document.body.appendChild(link);
       link.click();
 
-      // Cleanup
       link.parentNode.removeChild(link);
       window.URL.revokeObjectURL(url);
 
@@ -230,7 +261,7 @@ const Customers = () => {
   // --- IMPORT HANDLERS ---
   const handleImportClick = () => {
     if (fileInputRef.current) {
-      fileInputRef.current.value = null; // Clear prev file
+      fileInputRef.current.value = null;
       fileInputRef.current.click();
     }
   };
@@ -262,7 +293,6 @@ const Customers = () => {
           });
         }
 
-        // Refresh table
         fetchData(1, pagination.limit, searchTerm, activeTab);
       } else {
         toast.error(res.message || "Import failed", { id: toastId });
@@ -385,6 +415,7 @@ const Customers = () => {
         </div>
       ),
     },
+    // ✅ COMBINED COLUMN (Name Top, Mobile Bottom)
     {
       header: "Customer",
       accessor: "customer.mobile",
@@ -399,7 +430,7 @@ const Customers = () => {
               {row.customer.firstName} {row.customer.lastName}
             </span>
             <span className="text-xs text-slate-500 font-mono flex items-center gap-1">
-              {row.customer.mobile}
+              <Phone className="w-3 h-3" /> {row.customer.mobile}
             </span>
           </div>
         </div>
@@ -526,11 +557,11 @@ const Customers = () => {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-              {/* Instant Search - No Button */}
+              {/* Instant Search */}
               <div className="relative w-full max-w-md">
                 <input
                   type="text"
-                  placeholder="Search customers..."
+                  placeholder="Search Name, Mobile, Vehicle, Building..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full h-11 bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-xl pl-11 pr-4 text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 transition-all"
@@ -564,7 +595,6 @@ const Customers = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 justify-end">
-            {/* Download Template Button */}
             <button
               onClick={handleDownloadTemplate}
               className="h-10 px-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
@@ -573,7 +603,6 @@ const Customers = () => {
               <span className="hidden xl:inline">Template</span>
             </button>
 
-            {/* Export All Button */}
             <button
               onClick={handleExport}
               disabled={exporting}
@@ -587,7 +616,6 @@ const Customers = () => {
               <span className="hidden sm:inline">Export</span>
             </button>
 
-            {/* Import Button */}
             <button
               onClick={handleImportClick}
               disabled={importLoading}
@@ -601,7 +629,6 @@ const Customers = () => {
               <span className="hidden sm:inline">Import</span>
             </button>
 
-            {/* Add Customer Button */}
             <button
               onClick={handleCreate}
               className="h-10 px-5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg hover:shadow-xl transition-all active:scale-95"
@@ -641,14 +668,14 @@ const Customers = () => {
           key={activeTab}
           columns={columns}
           data={flattenedData}
-          loading={loading}
+          loading={loading} // ✅ Animation active
           pagination={pagination}
           onPageChange={(p) =>
             fetchData(p, pagination.limit, searchTerm, activeTab)
           }
           onLimitChange={(l) => fetchData(1, l, searchTerm, activeTab)}
           renderExpandedRow={renderExpandedRow}
-          hideSearch={true} // ✅ Table search hidden
+          hideSearch={true}
         />
       </div>
 
