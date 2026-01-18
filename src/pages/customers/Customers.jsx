@@ -130,7 +130,7 @@ const Customers = () => {
 
       // ✅ 4. Building Search
       const building = String(
-        c.building?.name || c.building || ""
+        c.building?.name || c.building || "",
       ).toLowerCase();
 
       return (
@@ -542,7 +542,7 @@ const Customers = () => {
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div className="flex-1">
-            <div className="flex items-center gap-3 mb-4">
+            {/* <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
                 <Users className="w-6 h-6 text-white" />
               </div>
@@ -554,7 +554,7 @@ const Customers = () => {
                   Manage customers, vehicles and subscriptions
                 </p>
               </div>
-            </div>
+            </div> */}
 
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
               {/* Instant Search */}

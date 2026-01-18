@@ -25,10 +25,10 @@ const CollectionSheet = () => {
 
   // Redux State
   const { buildings, loading: buildingsLoading } = useSelector(
-    (state) => state.building
+    (state) => state.building,
   );
   const { workers, loading: workersLoading } = useSelector(
-    (state) => state.worker
+    (state) => state.worker,
   );
   const { downloading } = useSelector((state) => state.collectionSheet);
 
@@ -138,7 +138,7 @@ const CollectionSheet = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 font-sans">
       {/* --- HEADER --- */}
-      <div className="max-w-7xl mx-auto mb-8">
+      {/* <div className="max-w-7xl mx-auto mb-8">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-200">
             <FileSpreadsheet className="w-7 h-7 text-white" />
@@ -152,7 +152,7 @@ const CollectionSheet = () => {
             </p>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* --- FILTER CARD --- */}
       <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-xl border border-slate-100 relative">

@@ -96,7 +96,7 @@ const WorkRecords = () => {
   // Safety Effect: If current selected month becomes invalid (hidden), reset it
   useEffect(() => {
     const isCurrentMonthValid = availableMonths.some(
-      (m) => m.value === Number(filters.month)
+      (m) => m.value === Number(filters.month),
     );
 
     if (!isCurrentMonthValid && availableMonths.length > 0) {
@@ -109,7 +109,7 @@ const WorkRecords = () => {
 
   const handleDownload = async () => {
     const toastId = toast.loading(
-      `Generating ${filters.serviceType} report...`
+      `Generating ${filters.serviceType} report...`,
     );
 
     try {
@@ -118,7 +118,7 @@ const WorkRecords = () => {
           serviceType: filters.serviceType,
           month: filters.month,
           year: filters.year,
-        })
+        }),
       ).unwrap();
       const blob = result.blob;
 
@@ -148,7 +148,7 @@ const WorkRecords = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 font-sans">
       {/* --- HEADER --- */}
-      <div className="max-w-7xl mx-auto mb-8">
+      {/* <div className="max-w-7xl mx-auto mb-8">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg shadow-indigo-200">
             <FileSpreadsheet className="w-7 h-7 text-white" />
@@ -162,7 +162,7 @@ const WorkRecords = () => {
             </p>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* --- FILTER CARD --- */}
       <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-xl border border-slate-100 relative">

@@ -279,13 +279,13 @@ const Settings = () => {
       // Save Graph Data to LocalStorage
       localStorage.setItem(
         "admin_graph_colors",
-        JSON.stringify(formData.graphs)
+        JSON.stringify(formData.graphs),
       );
 
       // Save Theme Config to LocalStorage (New V2 Key)
       localStorage.setItem(
         "themeConfigV2",
-        JSON.stringify(formData.themeConfig)
+        JSON.stringify(formData.themeConfig),
       );
 
       // ✅ Save Currency to LocalStorage
@@ -320,12 +320,12 @@ const Settings = () => {
 
   return (
     <div className="p-6 w-full min-h-screen bg-[#f8f9fa] font-sans pb-20">
-      <div className="mb-8">
+      {/* <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-800">System Settings</h1>
         <p className="text-slate-500 text-sm mt-1">
           Manage configurations and dashboard appearance
         </p>
-      </div>
+      </div> */}
 
       <form onSubmit={handleSubmit} className="max-w-6xl grid gap-8">
         {/* --- 1. GENERAL SETTINGS --- */}
@@ -442,7 +442,7 @@ const Settings = () => {
                       handleGraphColorChange(
                         activeGraphTab,
                         type,
-                        e.target.value
+                        e.target.value,
                       )
                     }
                     className="w-12 h-12 rounded cursor-pointer border-0 p-0"
@@ -454,7 +454,7 @@ const Settings = () => {
                       handleGraphColorChange(
                         activeGraphTab,
                         type,
-                        e.target.value
+                        e.target.value,
                       )
                     }
                     className="w-24 px-2 py-1 text-xs border rounded bg-white font-mono uppercase"

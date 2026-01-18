@@ -27,7 +27,7 @@ import Supervisors from "./pages/supervisors/Supervisors";
 import Workers from "./pages/workers-management/Workers";
 import Staff from "./pages/workers-management/Staff";
 import Attendance from "./pages/workers-management/Attendance";
-import PlaceholderPage from "./pages/overview/PlaceholderPage";
+
 import Settings from "./pages/support/Settings";
 import ImportLogs from "./pages/support/ImportLogs";
 import Bookings from "./pages/support/Bookings";

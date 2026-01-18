@@ -14,7 +14,7 @@ import toast from "react-hot-toast";
 // Components
 import DataTable from "../../components/DataTable";
 import RichDateRangePicker from "../../components/inputs/RichDateRangePicker";
-import CustomDropdown from "../../components/ui/CustomDropdown"; // ✅ Import CustomDropdown
+import CustomDropdown from "../../components/ui/CustomDropdown";
 
 // APIs
 import { attendanceService } from "../../api/attendanceService";
@@ -89,7 +89,6 @@ const Attendance = () => {
       }
     };
     loadOptions();
-    // Also trigger initial data fetch
     fetchRecords();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -130,7 +129,6 @@ const Attendance = () => {
       const response = await attendanceService.list(params);
       const fullList = Array.isArray(response.data) ? response.data : [];
 
-      // Sort Newest First
       fullList.sort((a, b) => new Date(b.date) - new Date(a.date));
 
       setAllData(fullList);
@@ -179,13 +177,11 @@ const Attendance = () => {
     });
   }, [allData, searchTerm]);
 
-  // Slice for current page
   const displayedData = useMemo(() => {
     const startIndex = (pagination.page - 1) * pagination.limit;
     return filteredData.slice(startIndex, startIndex + pagination.limit);
   }, [filteredData, pagination.page, pagination.limit]);
 
-  // Update total counts
   useEffect(() => {
     setPagination((prev) => ({
       ...prev,
@@ -215,11 +211,10 @@ const Attendance = () => {
     const isPresent = statusType === "P";
     if (row.present === isPresent) return;
 
-    // Optimistic Update
     const updatedList = allData.map((item) =>
       item._id === row._id
         ? { ...item, present: isPresent, type: isPresent ? "" : "AB" }
-        : item
+        : item,
     );
     setAllData(updatedList);
 
@@ -298,7 +293,7 @@ const Attendance = () => {
         label: `${emp.name} (${emp.mobile || emp.employeeCode})`,
       })),
     ],
-    [employees]
+    [employees],
   );
 
   const mallOptions = useMemo(
@@ -306,7 +301,7 @@ const Attendance = () => {
       { value: "", label: "All Malls" },
       ...malls.map((m) => ({ value: m._id, label: m.name })),
     ],
-    [malls]
+    [malls],
   );
 
   const siteOptions = useMemo(
@@ -314,7 +309,7 @@ const Attendance = () => {
       { value: "", label: "All Sites" },
       ...sites.map((s) => ({ value: s._id, label: s.name })),
     ],
-    [sites]
+    [sites],
   );
 
   const buildingOptions = useMemo(
@@ -322,7 +317,7 @@ const Attendance = () => {
       { value: "", label: "All Buildings" },
       ...buildings.map((b) => ({ value: b._id, label: b.name })),
     ],
-    [buildings]
+    [buildings],
   );
 
   // --- COLUMNS ---
@@ -422,33 +417,11 @@ const Attendance = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 font-sans">
       {/* --- HEADER --- */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200">
-            <CheckCircle className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-800 to-indigo-800 bg-clip-text text-transparent">
-              Attendance
-            </h1>
-            <p className="text-sm text-slate-500 font-medium">
-              Manage daily logs
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={handleExport}
-          className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm transition-all active:scale-95"
-        >
-          <Download className="w-4 h-4 text-emerald-600" />
-          <span>Export Excel</span>
-        </button>
-      </div>
 
       {/* --- FILTERS --- */}
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden flex flex-col">
         <div className="p-5 border-b border-gray-100 bg-slate-50/50 space-y-5">
+          {/* TOP ROW: TABS AND DATE */}
           <div className="flex flex-col xl:flex-row gap-5 justify-between items-start xl:items-end">
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-bold text-slate-500 uppercase ml-1">
@@ -476,6 +449,13 @@ const Attendance = () => {
                 ))}
               </div>
             </div>
+            <button
+              onClick={handleExport}
+              className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm transition-all active:scale-95"
+            >
+              <Download className="w-4 h-4 text-emerald-600" />
+              <span>Export Excel</span>
+            </button>
 
             <div className="w-full xl:w-auto">
               <span className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
@@ -489,8 +469,8 @@ const Attendance = () => {
             </div>
           </div>
 
+          {/* BOTTOM ROW: DROPDOWNS */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 border-t border-slate-200/60">
-            {/* Employee Dropdown - Using CustomDropdown */}
             <div className="relative">
               <CustomDropdown
                 value={selectedEmployee}
@@ -502,7 +482,6 @@ const Attendance = () => {
               />
             </div>
 
-            {/* Dynamic Dropdowns - Using CustomDropdown */}
             <div className="relative col-span-1 md:col-span-2">
               {activePremise === "mall" && (
                 <CustomDropdown
@@ -553,7 +532,6 @@ const Attendance = () => {
           onLimitChange={(limit) =>
             setPagination((prev) => ({ ...prev, limit, page: 1 }))
           }
-          // Enabling the DataTable's built-in search bar
           onSearch={(term) => {
             setSearchTerm(term);
             setPagination((prev) => ({ ...prev, page: 1 }));

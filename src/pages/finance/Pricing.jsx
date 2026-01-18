@@ -226,31 +226,30 @@ const Pricing = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 font-sans">
       {/* HEADER SECTION */}
-      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg shadow-indigo-200">
-              <Tag className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-800 to-indigo-800 bg-clip-text text-transparent">
-                Service Pricing
-              </h1>
-              <p className="text-sm text-slate-500 font-medium mt-0.5">
-                Manage wash rates for different vehicle types
-              </p>
-            </div>
+      {/* <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6"> */}
+      {/* <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg shadow-indigo-200">
+            <Tag className="w-6 h-6 text-white" />
           </div>
-
-          <button
-            onClick={handleCreate}
-            className="h-11 px-6 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl font-bold text-sm flex items-center gap-2 shadow-md hover:shadow-xl transition-all active:scale-95"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Add New Price</span>
-          </button>
+          <div>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-800 to-indigo-800 bg-clip-text text-transparent">
+              Service Pricing
+            </h1>
+            <p className="text-sm text-slate-500 font-medium mt-0.5">
+              Manage wash rates for different vehicle types
+            </p>
+          </div>
         </div>
-      </div>
+      </div> */}
+      <button
+        onClick={handleCreate}
+        className="h-11 px-6 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl font-bold text-sm flex items-center gap-2 shadow-md hover:shadow-xl transition-all active:scale-95"
+      >
+        <Plus className="w-5 h-5" />
+        <span>Add New Price</span>
+      </button>
+      {/* </div> */}
 
       {/* TABLE SECTION */}
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">

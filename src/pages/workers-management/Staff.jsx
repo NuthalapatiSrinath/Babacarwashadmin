@@ -4,7 +4,6 @@ import {
   Plus,
   Edit2,
   Trash2,
-  Hash,
   MapPin,
   Download,
   UploadCloud,
@@ -12,7 +11,6 @@ import {
   Search,
   Briefcase,
   Users,
-  Filter,
   Loader2,
   CheckCircle,
   AlertCircle,
@@ -20,6 +18,8 @@ import {
   Clock,
   ArrowRight,
   ShieldAlert,
+  Building2,
+  Map,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import * as XLSX from "xlsx";
@@ -69,42 +69,44 @@ const Staff = () => {
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   };
 
-  // ✅ NEW: Enhanced Compliance Logic to detect Expired and Upcoming
-  const getExpiryStatus = (staff) => {
-    const dates = [
-      { type: "Passport", val: staff.passportExpiry },
-      { type: "Visa", val: staff.visaExpiry },
-      { type: "EID", val: staff.emiratesIdExpiry },
-    ];
-
-    // Check for already expired first
-    const expired = dates.filter((d) => d.val && getDaysDiff(d.val) < 0);
-    if (expired.length > 0) {
+  const getDocStatusStyle = (date) => {
+    if (!date)
       return {
-        label: `EXPIRED (${expired.map((e) => e.type).join(", ")})`,
-        color: "red",
+        bg: "bg-slate-50",
+        text: "text-slate-400",
+        border: "border-slate-100",
+        label: "N/A",
+      };
+    const diff = getDaysDiff(date);
+    const dateStr = new Date(date).toLocaleDateString("en-GB");
+
+    if (diff < 0) {
+      return {
+        bg: "bg-red-50",
+        text: "text-red-700",
+        border: "border-red-200",
+        label: `Expired (${dateStr})`,
+        icon: <ShieldAlert className="w-3 h-3 text-red-500" />,
+      };
+    } else if (diff <= 30) {
+      return {
+        bg: "bg-amber-50",
+        text: "text-amber-700",
+        border: "border-amber-200",
+        label: `Exp: ${dateStr}`,
+        icon: <AlertCircle className="w-3 h-3 text-amber-500" />,
       };
     }
-
-    // Check for upcoming within 90 days
-    const upcoming = dates
-      .map((d) => ({ ...d, diff: getDaysDiff(d.val) }))
-      .filter((d) => d.diff !== null && d.diff >= 0 && d.diff <= 90)
-      .sort((a, b) => a.diff - b.diff)[0];
-
-    if (upcoming) {
-      return {
-        label:
-          upcoming.diff <= 30
-            ? `Critical: ${upcoming.diff} Days`
-            : `Expires in ${upcoming.diff} Days`,
-        color: "amber",
-      };
-    }
-
-    return { label: "All Valid", color: "emerald" };
+    return {
+      bg: "bg-emerald-50",
+      text: "text-emerald-700",
+      border: "border-emerald-200",
+      label: dateStr,
+      icon: <CheckCircle className="w-3 h-3 text-emerald-500" />,
+    };
   };
 
+  // --- FETCH DATA ---
   const fetchData = async (page = 1, limit = 50, search = "") => {
     setLoading(true);
     try {
@@ -127,7 +129,7 @@ const Staff = () => {
     fetchData();
   }, []);
 
-  // --- FILTER OPTIONS ---
+  // --- FILTER LOGIC ---
   const companyOptions = useMemo(() => {
     const companies = [
       ...new Set(data.map((item) => item.companyName).filter(Boolean)),
@@ -143,9 +145,9 @@ const Staff = () => {
       ...new Set(
         data
           .map((item) =>
-            typeof item.site === "string" ? item.site : item.site?.name
+            typeof item.site === "string" ? item.site : item.site?.name,
           )
-          .filter(Boolean)
+          .filter(Boolean),
       ),
     ].sort();
     return [
@@ -185,13 +187,13 @@ const Staff = () => {
           if (!diffs.some((d) => d !== null && d < 0)) return false;
         } else if (selectedExpiryRange === "expired_month") {
           const hasExpiredThisMonth = dates.some(
-            (d) => d && new Date(d) < today && new Date(d) >= startOfMonth
+            (d) => d && new Date(d) < today && new Date(d) >= startOfMonth,
           );
           if (!hasExpiredThisMonth) return false;
         } else {
           const limit = parseInt(selectedExpiryRange);
           const minUpcoming = Math.min(
-            ...diffs.filter((d) => d !== null && d >= 0)
+            ...diffs.filter((d) => d !== null && d >= 0),
           );
           if (minUpcoming > limit || minUpcoming === Infinity) return false;
         }
@@ -199,20 +201,15 @@ const Staff = () => {
 
       if (currentSearch) {
         const s = currentSearch.toLowerCase();
-        const siteName =
-          typeof item.site === "string" ? item.site : item.site?.name || "";
         return (
           item.name?.toLowerCase().includes(s) ||
-          item.employeeCode?.toLowerCase().includes(s) ||
-          item.companyName?.toLowerCase().includes(s) ||
-          siteName.toLowerCase().includes(s)
+          item.employeeCode?.toLowerCase().includes(s)
         );
       }
       return true;
     });
   }, [data, selectedCompany, selectedSite, selectedExpiryRange, currentSearch]);
 
-  // ✅ NEW: Alert logic for the Scrolling Bar
   const criticalAlerts = useMemo(() => {
     return data.filter((item) => {
       const dates = [
@@ -223,12 +220,11 @@ const Staff = () => {
       const diffs = dates.map((d) => getDaysDiff(d)).filter((d) => d !== null);
       if (diffs.length === 0) return false;
       const minDiff = Math.min(...diffs);
-      // Logic: Show if already expired (minDiff < 0) or expiring within 30 days
       return minDiff <= 30;
     });
   }, [data]);
 
-  // --- HANDLERS ---
+  // --- ACTIONS ---
   const handleExportData = async () => {
     const toastId = toast.loading("Preparing Export...");
     try {
@@ -238,7 +234,7 @@ const Staff = () => {
       link.href = url;
       link.setAttribute(
         "download",
-        `Staff_Export_${new Date().toISOString().slice(0, 10)}.xlsx`
+        `Staff_Export_${new Date().toISOString().slice(0, 10)}.xlsx`,
       );
       document.body.appendChild(link);
       link.click();
@@ -310,18 +306,34 @@ const Staff = () => {
   const columns = [
     {
       header: "Staff Member",
-      className: "min-w-[280px]",
+      className: "min-w-[300px]",
       render: (r) => (
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs">
-            {r.name?.charAt(0).toUpperCase()}
-          </div>
-          <div>
-            <div className="font-bold text-slate-700 text-sm leading-tight mb-1">
-              {r.name}
+        <div
+          className="flex items-center gap-5 py-2 group cursor-pointer"
+          onClick={() => navigate(`/workers/staff/${r._id}`)}
+        >
+          <div className="relative">
+            <div className="w-16 h-16 rounded-[20px] bg-white p-1 shadow-md ring-1 ring-slate-100 transition-transform group-hover:scale-105">
+              <div className="w-full h-full rounded-[16px] overflow-hidden bg-slate-50 flex items-center justify-center">
+                {r.profileImage?.url ? (
+                  <img
+                    src={r.profileImage.url}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <User className="text-slate-300 w-8 h-8" />
+                )}
+              </div>
             </div>
-            <div className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-tighter w-fit">
-              {r.employeeCode}
+          </div>
+          <div className="flex flex-col">
+            <h3 className="font-extrabold text-slate-800 text-[16px] leading-tight mb-1 group-hover:text-indigo-600 transition-colors">
+              {r.name}
+            </h3>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200 uppercase tracking-wider">
+                {r.employeeCode}
+              </span>
             </div>
           </div>
         </div>
@@ -330,37 +342,60 @@ const Staff = () => {
     {
       header: "Company",
       render: (r) => (
-        <span className="text-sm font-medium text-slate-600">
-          {r.companyName}
-        </span>
-      ),
-    },
-    {
-      header: "Site",
-      render: (r) => (
-        <span className="text-sm font-medium text-slate-600">
-          {typeof r.site === "string" ? r.site : r.site?.name || "Unassigned"}
-        </span>
-      ),
-    },
-    {
-      header: "Compliance",
-      render: (r) => {
-        const info = getExpiryStatus(r);
-        const styles = {
-          red: "text-red-600 bg-red-50 border-red-100 shadow-sm",
-          amber: "text-amber-600 bg-amber-50 border-amber-100",
-          emerald: "text-emerald-600 bg-emerald-50 border-emerald-100",
-        };
-        return (
-          <span
-            className={`px-2.5 py-1 rounded-lg border text-[10px] font-black uppercase flex items-center gap-1.5 w-fit ${
-              styles[info.color]
-            }`}
-          >
-            {info.color === "red" && <ShieldAlert className="w-3 h-3" />}
-            {info.label}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
+            <Building2 className="w-5 h-5" />
+          </div>
+          <span className="text-sm font-bold text-slate-700">
+            {r.companyName}
           </span>
+        </div>
+      ),
+    },
+    {
+      header: "Site Location",
+      render: (r) => (
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shadow-sm">
+            <Map className="w-5 h-5" />
+          </div>
+          <span className="text-sm font-bold text-slate-700">
+            {typeof r.site === "string" ? r.site : r.site?.name || "Unassigned"}
+          </span>
+        </div>
+      ),
+    },
+    {
+      header: "Compliance Status",
+      className: "min-w-[200px]",
+      render: (r) => {
+        const ppt = getDocStatusStyle(r.passportExpiry);
+        const visa = getDocStatusStyle(r.visaExpiry);
+        const eid = getDocStatusStyle(r.emiratesIdExpiry);
+
+        return (
+          <div className="flex flex-col gap-2 py-1 w-full max-w-[200px]">
+            {[
+              { name: "PPT", ...ppt },
+              { name: "VISA", ...visa },
+              { name: "EID", ...eid },
+            ].map((doc, idx) => (
+              <div
+                key={idx}
+                className={`flex items-center justify-between px-3 py-1.5 rounded-lg border ${doc.bg} ${doc.border} shadow-sm transition-transform hover:scale-[1.02]`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 w-8">
+                    {doc.name}
+                  </span>
+                  {doc.icon}
+                </div>
+                <span className={`text-[10px] font-bold ${doc.text}`}>
+                  {doc.label}
+                </span>
+              </div>
+            ))}
+          </div>
         );
       },
     },
@@ -368,10 +403,10 @@ const Staff = () => {
       header: "Actions",
       className: "text-right",
       render: (r) => (
-        <div className="flex justify-end gap-2 pr-2">
+        <div className="flex justify-end gap-2 pr-2 items-center h-full">
           <button
             onClick={() => navigate(`/workers/staff/${r._id}`)}
-            className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors"
+            className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200 rounded-xl transition-all shadow-sm"
           >
             <ArrowRight className="w-4 h-4" />
           </button>
@@ -381,9 +416,9 @@ const Staff = () => {
               setSelectedStaff(r);
               setIsModalOpen(true);
             }}
-            className="p-1.5 bg-slate-50 text-slate-400 hover:text-amber-600 rounded-lg"
+            className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-amber-600 hover:border-amber-200 rounded-xl transition-all shadow-sm"
           >
-            <Edit2 className="w-3.5 h-3.5" />
+            <Edit2 className="w-4 h-4" />
           </button>
           <button
             onClick={(e) => {
@@ -391,9 +426,9 @@ const Staff = () => {
               setStaffToDelete(r);
               setIsDeleteModalOpen(true);
             }}
-            className="p-1.5 bg-slate-50 text-slate-400 hover:text-red-600 rounded-lg"
+            className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200 rounded-xl transition-all shadow-sm"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       ),
@@ -401,7 +436,7 @@ const Staff = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4 lg:p-6 font-sans">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 font-sans">
       <input
         type="file"
         ref={fileInputRef}
@@ -409,137 +444,139 @@ const Staff = () => {
         className="hidden"
       />
 
-      {/* --- HEADER --- */}
-      <div className="mb-6 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200">
-            <Users className="w-6 h-6 text-white" />
+      {/* --- UNIFIED CONTROL PANEL (Replaces Header & Filter Box) --- */}
+      <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 mb-6 relative z-20">
+        {/* ROW 1: SEARCH & ACTIONS */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+          {/* Quick Search */}
+          <div className="relative w-full lg:w-96 group">
+            <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+            <input
+              type="text"
+              placeholder="Search Name, Code or Mobile..."
+              value={currentSearch}
+              onChange={(e) => setCurrentSearch(e.target.value)}
+              className="w-full h-12 pl-12 pr-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all shadow-inner"
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
+            <div className="flex bg-slate-50 p-1 rounded-2xl border border-slate-100">
+              <button
+                onClick={handleExportData}
+                className="h-10 px-4 text-slate-600 hover:text-blue-600 rounded-xl text-[11px] font-black uppercase tracking-tighter flex items-center gap-2 transition-all hover:bg-white hover:shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5" />{" "}
+                <span className="hidden sm:inline">Export</span>
+              </button>
+              <button
+                onClick={handleDownloadTemplate}
+                className="h-10 px-4 text-slate-600 hover:text-emerald-600 rounded-xl text-[11px] font-black uppercase tracking-tighter flex items-center gap-2 transition-all hover:bg-white hover:shadow-sm"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />{" "}
+                <span className="hidden sm:inline">Template</span>
+              </button>
+              <button
+                onClick={() => fileInputRef.current.click()}
+                className="h-10 px-4 text-slate-600 hover:text-indigo-600 rounded-xl text-[11px] font-black uppercase tracking-tighter flex items-center gap-2 transition-all hover:bg-white hover:shadow-sm"
+              >
+                {importLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <UploadCloud className="w-3.5 h-3.5" />
+                )}{" "}
+                <span className="hidden sm:inline">Import</span>
+              </button>
+            </div>
+            <button
+              onClick={() => {
+                setSelectedStaff(null);
+                setIsModalOpen(true);
+              }}
+              className="h-12 px-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-200 active:scale-95 transition-all"
+            >
+              <Plus className="w-4 h-4" /> Add Staff
+            </button>
+          </div>
+        </div>
+
+        {/* ROW 2: DROPDOWN FILTERS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <span className="text-[10px] font-black text-slate-400 uppercase mb-2 block ml-1 tracking-widest">
+              Company Filter
+            </span>
+            <CustomDropdown
+              value={selectedCompany}
+              onChange={setSelectedCompany}
+              options={companyOptions}
+              icon={Briefcase}
+              placeholder="All Companies"
+            />
           </div>
           <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-800 to-indigo-800 bg-clip-text text-transparent uppercase tracking-tight">
-              Staff Master
-            </h1>
-            <p className="text-sm text-slate-500 font-medium">
-              {pagination.total} Registered Personnel
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={handleExportData}
-            className="h-10 px-4 bg-white border border-slate-200 hover:bg-emerald-50 hover:text-emerald-600 text-slate-600 rounded-xl font-bold text-xs shadow-sm transition-all flex items-center gap-2"
-          >
-            <Download className="w-4 h-4" /> Export
-          </button>
-          <button
-            onClick={handleDownloadTemplate}
-            className="h-10 px-4 bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 text-slate-600 rounded-xl font-bold text-xs shadow-sm transition-all flex items-center gap-2"
-          >
-            <FileSpreadsheet className="w-4 h-4" /> Template
-          </button>
-          <button
-            onClick={() => fileInputRef.current.click()}
-            className="h-10 px-4 bg-white border border-slate-200 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 rounded-xl font-bold text-xs shadow-sm transition-all flex items-center gap-2"
-          >
-            {importLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <UploadCloud className="w-4 h-4" />
-            )}{" "}
-            Import
-          </button>
-          <button
-            onClick={() => {
-              setSelectedStaff(null);
-              setIsModalOpen(true);
-            }}
-            className="h-10 px-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" /> Add Staff
-          </button>
-        </div>
-      </div>
-
-      {/* --- FILTERS --- */}
-      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 relative z-20 flex flex-col mb-6">
-        <div className="p-4 border-b border-gray-100 bg-slate-50/50 flex flex-col xl:flex-row gap-4 items-end">
-          <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block ml-1 tracking-widest">
-                Company
-              </span>
-              <CustomDropdown
-                value={selectedCompany}
-                onChange={setSelectedCompany}
-                options={companyOptions}
-                icon={Briefcase}
-                placeholder="All Companies"
-              />
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block ml-1 tracking-widest">
-                Site
-              </span>
-              <CustomDropdown
-                value={selectedSite}
-                onChange={setSelectedSite}
-                options={siteOptions}
-                icon={MapPin}
-                placeholder="All Sites"
-              />
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block ml-1 tracking-widest">
-                Expiry Range
-              </span>
-              <CustomDropdown
-                value={selectedExpiryRange}
-                onChange={setSelectedExpiryRange}
-                options={expiryRangeOptions}
-                icon={Clock}
-                placeholder="Any Validity"
-              />
-            </div>
-          </div>
-          <div className="flex-1 w-full xl:max-w-[350px]">
-            <span className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block ml-1 tracking-widest">
-              Search
+            <span className="text-[10px] font-black text-slate-400 uppercase mb-2 block ml-1 tracking-widest">
+              Location Filter
             </span>
-            <div className="relative h-[42px]">
-              <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search..."
-                value={currentSearch}
-                onChange={(e) => setCurrentSearch(e.target.value)}
-                className="w-full h-full pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 shadow-inner"
-              />
-            </div>
+            <CustomDropdown
+              value={selectedSite}
+              onChange={setSelectedSite}
+              options={siteOptions}
+              icon={MapPin}
+              placeholder="All Sites"
+            />
+          </div>
+          <div>
+            <span className="text-[10px] font-black text-slate-400 uppercase mb-2 block ml-1 tracking-widest">
+              Compliance Status
+            </span>
+            <CustomDropdown
+              value={selectedExpiryRange}
+              onChange={setSelectedExpiryRange}
+              options={expiryRangeOptions}
+              icon={Clock}
+              placeholder="Any Validity"
+            />
           </div>
         </div>
       </div>
 
-      {/* ✅ NEW: FLOATING MARQUEE ALERT BAR ADDED ABOVE TABLE */}
+      {/* ✅ MARQUEE ALERT BAR */}
       {criticalAlerts.length > 0 && (
-        <div className="mb-4 bg-white/60 backdrop-blur-xl border border-rose-100 py-3 rounded-2xl overflow-hidden relative shadow-sm mx-1 ring-1 ring-rose-50/50">
-          <div className="flex whitespace-nowrap animate-marquee items-center gap-20">
-            <div className="flex items-center gap-2 bg-rose-600 text-white px-4 py-1.5 rounded-full ml-6 font-black text-[9px] uppercase tracking-widest shadow-lg">
-              <ShieldAlert className="w-3.5 h-3.5" /> CRITICAL COMPLIANCE ALERT
+        <div className="mb-6 bg-white/80 backdrop-blur-md border border-rose-100 py-3 rounded-2xl overflow-hidden relative shadow-lg mx-1 ring-1 ring-rose-50">
+          <div className="flex whitespace-nowrap animate-marquee items-center gap-24">
+            <div className="flex items-center gap-2.5 bg-rose-600 text-white px-5 py-1.5 rounded-full ml-6 font-black text-[10px] uppercase tracking-widest shadow-md">
+              <ShieldAlert className="w-4 h-4" /> Action Required
             </div>
             {criticalAlerts.map((staff) => (
               <div
                 key={staff._id}
-                className="flex items-center gap-3 text-slate-700"
+                className="flex items-center gap-4 group cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => navigate(`/workers/staff/${staff._id}`)}
               >
-                <span className="text-[12px] font-black">{staff.name}</span>
-                <span className="bg-slate-200 text-slate-500 text-[9px] px-2 py-0.5 rounded font-bold">
-                  {staff.employeeCode}
-                </span>
-                <span className="text-[10px] font-bold text-rose-600 uppercase italic">
-                  Check Expiry Status
-                </span>
-                <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></div>
+                <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-white shadow-sm">
+                  {staff.profileImage?.url ? (
+                    <img
+                      src={staff.profileImage.url}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User className="p-1.5 text-slate-400" />
+                  )}
+                </div>
+                <div className="flex flex-col leading-none">
+                  <span className="text-[13px] font-black text-slate-700">
+                    {staff.name}
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-400">
+                    {staff.employeeCode}
+                  </span>
+                </div>
+                <div className="px-2 py-0.5 bg-rose-100 text-rose-700 rounded text-[10px] font-bold border border-rose-200">
+                  Check Expiry
+                </div>
+                <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-ping"></div>
               </div>
             ))}
           </div>
@@ -547,7 +584,7 @@ const Staff = () => {
       )}
 
       {/* --- TABLE CONTAINER --- */}
-      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden relative z-10">
+      <div className="bg-white rounded-[32px] shadow-2xl shadow-slate-200/50 border border-slate-100/60 overflow-hidden relative z-10">
         <DataTable
           columns={columns}
           data={filteredData}
@@ -576,10 +613,11 @@ const Staff = () => {
 
       <style>{`
         @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
-        .animate-marquee { animation: marquee 35s linear infinite; }
+        .animate-marquee { animation: marquee 45s linear infinite; }
         .animate-marquee:hover { animation-play-state: paused; }
-        .DataTable th { font-weight: 800; color: #64748b; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; padding: 18px 24px !important; border-bottom: 1px solid #f1f5f9; }
-        .DataTable td { padding: 14px 24px !important; border-bottom: 1px solid #f1f5f9; }
+        .DataTable th { font-weight: 900; color: #94a3b8; text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em; padding: 24px 32px !important; border-bottom: 2px solid #f8fafc; background: #fff; }
+        .DataTable td { padding: 20px 32px !important; border-bottom: 1px solid #f8fafc; vertical-align: middle; background: #fff; }
+        .DataTable tr:hover td { background: #fdfdfd; }
       `}</style>
     </div>
   );

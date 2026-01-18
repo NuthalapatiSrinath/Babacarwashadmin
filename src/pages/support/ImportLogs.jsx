@@ -153,12 +153,12 @@ const ImportLogs = () => {
 
   return (
     <div className="p-3 w-full">
-      <div className="mb-8">
+      {/* <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-800">Import Logs</h1>
         <p className="text-slate-500 mt-1">
           Track history of bulk data imports
         </p>
-      </div>
+      </div> */}
 
       <DataTable
         title="History"
