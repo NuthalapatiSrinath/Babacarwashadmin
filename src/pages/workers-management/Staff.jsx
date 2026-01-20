@@ -20,6 +20,9 @@ import {
   ShieldAlert,
   Building2,
   Map,
+  Eye,
+  Save,
+  Phone,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import * as XLSX from "xlsx";
@@ -76,7 +79,9 @@ const Staff = () => {
         text: "text-slate-400",
         border: "border-slate-100",
         label: "N/A",
+        icon: <Clock className="w-3 h-3" />,
       };
+
     const diff = getDaysDiff(date);
     const dateStr = new Date(date).toLocaleDateString("en-GB");
 
@@ -85,16 +90,16 @@ const Staff = () => {
         bg: "bg-red-50",
         text: "text-red-700",
         border: "border-red-200",
-        label: `Expired (${dateStr})`,
-        icon: <ShieldAlert className="w-3 h-3 text-red-500" />,
+        label: `${dateStr} (Exp)`,
+        icon: <ShieldAlert className="w-3 h-3" />,
       };
     } else if (diff <= 30) {
       return {
         bg: "bg-amber-50",
         text: "text-amber-700",
         border: "border-amber-200",
-        label: `Exp: ${dateStr}`,
-        icon: <AlertCircle className="w-3 h-3 text-amber-500" />,
+        label: `${dateStr} (${diff}d)`,
+        icon: <AlertCircle className="w-3 h-3" />,
       };
     }
     return {
@@ -102,8 +107,27 @@ const Staff = () => {
       text: "text-emerald-700",
       border: "border-emerald-200",
       label: dateStr,
-      icon: <CheckCircle className="w-3 h-3 text-emerald-500" />,
+      icon: <CheckCircle className="w-3 h-3" />,
     };
+  };
+
+  const handleDownloadImage = async (e, url, name) => {
+    e.stopPropagation();
+    if (!url) return toast.error("No image to download");
+
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `${name.replace(/\s+/g, "_")}_profile.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      toast.error("Download failed");
+    }
   };
 
   // --- FETCH DATA ---
@@ -306,95 +330,125 @@ const Staff = () => {
   const columns = [
     {
       header: "Staff Member",
-      className: "min-w-[300px]",
+      className: "min-w-[280px]",
       render: (r) => (
         <div
-          className="flex items-center gap-5 py-2 group cursor-pointer"
+          className="flex items-center gap-4 py-2 group cursor-pointer"
           onClick={() => navigate(`/workers/staff/${r._id}`)}
         >
-          <div className="relative">
-            <div className="w-16 h-16 rounded-[20px] bg-white p-1 shadow-md ring-1 ring-slate-100 transition-transform group-hover:scale-105">
-              <div className="w-full h-full rounded-[16px] overflow-hidden bg-slate-50 flex items-center justify-center">
+          <div className="relative group/img">
+            <div className="w-14 h-14 rounded-2xl bg-white p-1 shadow-md ring-1 ring-slate-100">
+              <div className="w-full h-full rounded-[12px] overflow-hidden bg-slate-50 flex items-center justify-center">
                 {r.profileImage?.url ? (
                   <img
                     src={r.profileImage.url}
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <User className="text-slate-300 w-8 h-8" />
+                  <User className="text-slate-300 w-6 h-6" />
                 )}
               </div>
             </div>
+            {r.profileImage?.url && (
+              <button
+                onClick={(e) =>
+                  handleDownloadImage(e, r.profileImage.url, r.name)
+                }
+                className="absolute -bottom-2 -right-2 p-1.5 bg-white text-slate-600 rounded-full shadow-md border border-slate-100 hover:text-blue-600 hover:bg-blue-50 transition-all opacity-0 group-hover/img:opacity-100"
+                title="Download Photo"
+              >
+                <Save className="w-3 h-3" />
+              </button>
+            )}
           </div>
           <div className="flex flex-col">
-            <h3 className="font-extrabold text-slate-800 text-[16px] leading-tight mb-1 group-hover:text-indigo-600 transition-colors">
+            <h3 className="font-extrabold text-slate-800 text-[15px] leading-tight mb-1 group-hover:text-indigo-600 transition-colors">
               {r.name}
             </h3>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200 uppercase tracking-wider">
-                {r.employeeCode}
-              </span>
-            </div>
+            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 uppercase tracking-wider w-fit">
+              {r.employeeCode}
+            </span>
           </div>
         </div>
       ),
     },
+    // ✅ MOBILE NUMBER ONLY (No Icon, Monospaced)
+    {
+      header: "Mobile",
+      render: (r) => (
+        <span className="text-sm font-bold text-slate-600 font-mono tracking-tight">
+          {r.mobile || "-"}
+        </span>
+      ),
+    },
+    // ✅ COMPANY (Wraps to new line)
     {
       header: "Company",
       render: (r) => (
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
-            <Building2 className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm flex-shrink-0">
+            <Briefcase className="w-4 h-4" />
           </div>
-          <span className="text-sm font-bold text-slate-700">
-            {r.companyName}
+          {/* Constrained width + whitespace-normal to force wrapping */}
+          <span className="text-sm font-bold text-slate-700 leading-tight whitespace-normal max-w-[180px] break-words">
+            {r.companyName || "N/A"}
           </span>
         </div>
       ),
     },
+    // ✅ SITE LOCATION (Wraps to new line)
     {
       header: "Site Location",
       render: (r) => (
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shadow-sm">
-            <Map className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shadow-sm flex-shrink-0">
+            <MapPin className="w-4 h-4" />
           </div>
-          <span className="text-sm font-bold text-slate-700">
+          {/* Constrained width + whitespace-normal to force wrapping */}
+          <span className="text-sm font-bold text-slate-700 leading-tight whitespace-normal max-w-[180px] break-words">
             {typeof r.site === "string" ? r.site : r.site?.name || "Unassigned"}
           </span>
         </div>
       ),
     },
     {
-      header: "Compliance Status",
-      className: "min-w-[200px]",
+      header: "Passport Expiry",
       render: (r) => {
-        const ppt = getDocStatusStyle(r.passportExpiry);
-        const visa = getDocStatusStyle(r.visaExpiry);
-        const eid = getDocStatusStyle(r.emiratesIdExpiry);
-
+        const style = getDocStatusStyle(r.passportExpiry);
         return (
-          <div className="flex flex-col gap-2 py-1 w-full max-w-[200px]">
-            {[
-              { name: "PPT", ...ppt },
-              { name: "VISA", ...visa },
-              { name: "EID", ...eid },
-            ].map((doc, idx) => (
-              <div
-                key={idx}
-                className={`flex items-center justify-between px-3 py-1.5 rounded-lg border ${doc.bg} ${doc.border} shadow-sm transition-transform hover:scale-[1.02]`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 w-8">
-                    {doc.name}
-                  </span>
-                  {doc.icon}
-                </div>
-                <span className={`text-[10px] font-bold ${doc.text}`}>
-                  {doc.label}
-                </span>
-              </div>
-            ))}
+          <div
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border w-fit ${style.bg} ${style.border} ${style.text}`}
+          >
+            {style.icon}
+            <span className="text-[11px] font-bold">{style.label}</span>
+          </div>
+        );
+      },
+    },
+    {
+      header: "Visa Expiry",
+      render: (r) => {
+        const style = getDocStatusStyle(r.visaExpiry);
+        return (
+          <div
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border w-fit ${style.bg} ${style.border} ${style.text}`}
+          >
+            {style.icon}
+            <span className="text-[11px] font-bold">{style.label}</span>
+          </div>
+        );
+      },
+    },
+    {
+      header: "EID Expiry",
+      render: (r) => {
+        const style = getDocStatusStyle(r.emiratesIdExpiry);
+        return (
+          <div
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border w-fit ${style.bg} ${style.border} ${style.text}`}
+          >
+            {style.icon}
+            <span className="text-[11px] font-bold">{style.label}</span>
           </div>
         );
       },
@@ -406,10 +460,12 @@ const Staff = () => {
         <div className="flex justify-end gap-2 pr-2 items-center h-full">
           <button
             onClick={() => navigate(`/workers/staff/${r._id}`)}
-            className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200 rounded-xl transition-all shadow-sm"
+            className="p-2 bg-indigo-50 border border-indigo-100 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl transition-all shadow-sm"
+            title="View Profile"
           >
-            <ArrowRight className="w-4 h-4" />
+            <Eye className="w-4 h-4" />
           </button>
+
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -417,6 +473,7 @@ const Staff = () => {
               setIsModalOpen(true);
             }}
             className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-amber-600 hover:border-amber-200 rounded-xl transition-all shadow-sm"
+            title="Edit"
           >
             <Edit2 className="w-4 h-4" />
           </button>
@@ -427,6 +484,7 @@ const Staff = () => {
               setIsDeleteModalOpen(true);
             }}
             className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200 rounded-xl transition-all shadow-sm"
+            title="Delete"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -444,11 +502,10 @@ const Staff = () => {
         className="hidden"
       />
 
-      {/* --- UNIFIED CONTROL PANEL (Replaces Header & Filter Box) --- */}
+      {/* --- UNIFIED CONTROL PANEL --- */}
       <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 mb-6 relative z-20">
         {/* ROW 1: SEARCH & ACTIONS */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
-          {/* Quick Search */}
           <div className="relative w-full lg:w-96 group">
             <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
             <input
@@ -460,7 +517,6 @@ const Staff = () => {
             />
           </div>
 
-          {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
             <div className="flex bg-slate-50 p-1 rounded-2xl border border-slate-100">
               <button
