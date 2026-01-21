@@ -17,6 +17,8 @@ import {
   AlertCircle,
   Briefcase,
   ShoppingBag,
+  Truck, // ✅ Added Truck for Mobile
+  Map, // ✅ Added Map for Site
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { workerService } from "../../api/workerService";
@@ -106,8 +108,10 @@ const WorkerProfile = () => {
   const formatDate = (date) =>
     date ? new Date(date).toLocaleDateString("en-GB") : "N/A";
 
-  // Helper to display Location Name nicely
+  // ✅ Updated Location Display Logic
   const getLocationDisplay = () => {
+    if (worker.service_type === "mobile") return "Mobile - No Fixed Location";
+
     if (worker.service_type === "mall" && worker.malls?.length > 0) {
       return worker.malls
         .map((m) => (typeof m === "object" ? m.name : "Mall Assigned"))
@@ -116,6 +120,11 @@ const WorkerProfile = () => {
     if (worker.service_type === "residence" && worker.buildings?.length > 0) {
       return worker.buildings
         .map((b) => (typeof b === "object" ? b.name : "Building Assigned"))
+        .join(", ");
+    }
+    if (worker.service_type === "site" && worker.sites?.length > 0) {
+      return worker.sites
+        .map((s) => (typeof s === "object" ? s.name : "Site Assigned"))
         .join(", ");
     }
     return "Unassigned";
@@ -265,14 +274,28 @@ const WorkerProfile = () => {
                     </div>
 
                     <div className="flex items-center gap-3">
+                      {/* ✅ DYNAMIC ICON for Location */}
                       <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 flex-shrink-0">
-                        <MapPin className="w-4 h-4" />
+                        {worker.service_type === "mobile" ? (
+                          <Truck className="w-4 h-4" />
+                        ) : worker.service_type === "site" ? (
+                          <Map className="w-4 h-4" />
+                        ) : worker.service_type === "mall" ? (
+                          <ShoppingBag className="w-4 h-4" />
+                        ) : (
+                          <Building className="w-4 h-4" /> // Default for Residence/Unassigned
+                        )}
                       </div>
                       <div className="min-w-0">
                         <span className="block text-[10px] text-slate-400 uppercase font-bold">
-                          {worker.service_type === "mall"
-                            ? "Mall"
-                            : "Residence"}
+                          {/* ✅ DYNAMIC LABEL */}
+                          {worker.service_type === "mobile"
+                            ? "Service Type"
+                            : worker.service_type === "site"
+                              ? "Assigned Sites"
+                              : worker.service_type === "mall"
+                                ? "Assigned Malls"
+                                : "Assigned Buildings"}
                         </span>
                         <span className="text-sm font-medium text-white truncate block whitespace-normal">
                           {getLocationDisplay()}
