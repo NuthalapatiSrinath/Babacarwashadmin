@@ -5,7 +5,6 @@ import {
   Hash,
   Map,
   Loader2,
-  ChevronDown,
   Briefcase,
   Calendar,
   CreditCard,
@@ -14,16 +13,21 @@ import {
   Upload,
   Phone,
   Mail,
+  Building2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import { staffService } from "../../api/staffService";
 import { siteService } from "../../api/siteService";
+import { mallService } from "../../api/mallService"; // Ensure you have this
+import CustomDropdown from "../ui/CustomDropdown"; // Your Custom Dropdown
 
 const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
   const [loading, setLoading] = useState(false);
-  const [fetchingSites, setFetchingSites] = useState(false);
+
+  // Data Options
   const [sites, setSites] = useState([]);
+  const [malls, setMalls] = useState([]);
 
   // Document upload states
   const [uploadingDoc, setUploadingDoc] = useState({
@@ -38,13 +42,14 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
     employeeCode: "",
     companyName: "",
     joiningDate: "",
-    site: "",
+    site: "", // Site ID
+    mall: "", // Mall ID
     mobile: "",
     email: "",
     passportNumber: "",
     passportExpiry: "",
     passportDocument: "",
-    visaNumber: "", // ✅ Added
+    visaNumber: "",
     visaExpiry: "",
     visaDocument: "",
     emiratesId: "",
@@ -52,21 +57,27 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
     emiratesIdDocument: "",
   });
 
-  // Load Sites & Populate Data
+  // Load Sites & Malls on Open
   useEffect(() => {
     if (isOpen) {
-      const loadSites = async () => {
-        setFetchingSites(true);
+      const loadLocations = async () => {
         try {
-          const response = await siteService.list(1, 1000);
-          setSites(response.data || []);
+          const [siteRes, mallRes] = await Promise.all([
+            siteService.list(1, 1000),
+            mallService.list(1, 1000),
+          ]);
+
+          setSites(
+            siteRes.data?.map((s) => ({ value: s._id, label: s.name })) || [],
+          );
+          setMalls(
+            mallRes.data?.map((m) => ({ value: m._id, label: m.name })) || [],
+          );
         } catch (error) {
-          console.error("Failed to load sites", error);
-        } finally {
-          setFetchingSites(false);
+          console.error("Failed to load locations", error);
         }
       };
-      loadSites();
+      loadLocations();
 
       if (editData) {
         setFormData({
@@ -76,22 +87,27 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
           joiningDate: editData.joiningDate
             ? editData.joiningDate.split("T")[0]
             : "",
-          site:
-            editData.site && typeof editData.site === "object"
-              ? editData.site._id
-              : editData.site || "",
+
+          // Handle Site (Object or ID)
+          site: editData.site?._id || editData.site || "",
+          // Handle Mall (Object or ID)
+          mall: editData.mall?._id || editData.mall || "",
+
           mobile: editData.mobile || "",
           email: editData.email || "",
+
           passportNumber: editData.passportNumber || "",
           passportExpiry: editData.passportExpiry
             ? editData.passportExpiry.split("T")[0]
             : "",
           passportDocument: editData.passportDocument || "",
-          visaNumber: editData.visaNumber || "", // ✅ Populates from editData
+
+          visaNumber: editData.visaNumber || "",
           visaExpiry: editData.visaExpiry
             ? editData.visaExpiry.split("T")[0]
             : "",
           visaDocument: editData.visaDocument || "",
+
           emiratesId: editData.emiratesId || "",
           emiratesIdExpiry: editData.emiratesIdExpiry
             ? editData.emiratesIdExpiry.split("T")[0]
@@ -99,12 +115,14 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
           emiratesIdDocument: editData.emiratesIdDocument || "",
         });
       } else {
+        // Reset form for new entry
         setFormData({
           name: "",
           employeeCode: "",
           companyName: "",
           joiningDate: "",
           site: "",
+          mall: "",
           mobile: "",
           email: "",
           passportNumber: "",
@@ -124,13 +142,8 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (
-      !formData.name ||
-      !formData.employeeCode ||
-      !formData.companyName ||
-      !formData.site
-    ) {
-      toast.error("Name, Employee Code, Company Name and Site are required");
+    if (!formData.name || !formData.employeeCode || !formData.companyName) {
+      toast.error("Name, Employee Code, and Company Name are required");
       return;
     }
 
@@ -158,7 +171,7 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
   const handleDocumentUpload = async (docType) => {
     if (!editData?._id) {
       toast.error(
-        "Please save the staff details first before uploading documents."
+        "Please save the staff details first before uploading documents.",
       );
       return;
     }
@@ -176,23 +189,23 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
         docType === "Passport"
           ? "passport"
           : docType === "Visa"
-          ? "visa"
-          : "emiratesId";
+            ? "visa"
+            : "emiratesId";
       setUploadingDoc((prev) => ({ ...prev, [docKey]: true }));
       const toastId = toast.loading(`Uploading ${docType}...`);
       try {
         const response = await staffService.uploadDocument(
           editData._id,
           file,
-          docType
+          docType,
         );
         toast.success(`${docType} uploaded successfully!`, { id: toastId });
         const fieldName =
           docType === "Passport"
             ? "passportDocument"
             : docType === "Visa"
-            ? "visaDocument"
-            : "emiratesIdDocument";
+              ? "visaDocument"
+              : "emiratesIdDocument";
         setFormData((prev) => ({
           ...prev,
           [fieldName]: { filename: response.fileName },
@@ -222,8 +235,9 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          className="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden relative z-10 flex flex-col max-h-[90vh]"
+          className="bg-white w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden relative z-10 flex flex-col max-h-[90vh]"
         >
+          {/* Header */}
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
             <div>
               <h3 className="text-lg font-bold text-gray-800">
@@ -244,13 +258,14 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
 
           <div className="p-6 overflow-y-auto custom-scrollbar">
             <form id="staffForm" onSubmit={handleSubmit} className="space-y-6">
-              {/* Personal & Job Information */}
+              {/* --- Personal & Job Information --- */}
               <div className="space-y-4">
                 <h4 className="text-sm font-semibold text-gray-900 border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
                   <User className="w-4 h-4 text-blue-500" /> Personal & Job
                   Information
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Company Name */}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Company Name <span className="text-red-500">*</span>
@@ -271,6 +286,7 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
                       />
                     </div>
                   </div>
+                  {/* Full Name */}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Full Name <span className="text-red-500">*</span>
@@ -288,6 +304,7 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
                       />
                     </div>
                   </div>
+                  {/* Employee Code */}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Employee Code <span className="text-red-500">*</span>
@@ -308,31 +325,8 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
                       />
                     </div>
                   </div>
+                  {/* Joining Date */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Assigned Site <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <Map className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                      <select
-                        value={formData.site}
-                        onChange={(e) =>
-                          setFormData({ ...formData, site: e.target.value })
-                        }
-                        disabled={fetchingSites}
-                        className="w-full pl-9 pr-8 py-2 rounded-lg border border-gray-300 text-sm focus:border-blue-500 outline-none bg-white appearance-none transition-all"
-                      >
-                        <option value="">Select Site</option>
-                        {sites.map((site) => (
-                          <option key={site._id} value={site._id}>
-                            {site.name}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="absolute right-3 top-3 h-4 w-4 text-gray-400 pointer-events-none" />
-                    </div>
-                  </div>
-                  <div className="md:col-span-2">
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Joining Date
                     </label>
@@ -354,7 +348,47 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
                 </div>
               </div>
 
-              {/* Contact Information */}
+              {/* --- Locations (Site & Mall) --- */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold text-gray-900 border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
+                  <Map className="w-4 h-4 text-purple-500" /> Assigned Locations
+                  (Select at least one)
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Site Dropdown */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Assigned Site
+                    </label>
+                    <CustomDropdown
+                      options={sites}
+                      value={formData.site}
+                      onChange={(val) =>
+                        setFormData({ ...formData, site: val })
+                      }
+                      placeholder="Select Site"
+                      icon={Map}
+                    />
+                  </div>
+                  {/* Mall Dropdown */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Assigned Mall
+                    </label>
+                    <CustomDropdown
+                      options={malls}
+                      value={formData.mall}
+                      onChange={(val) =>
+                        setFormData({ ...formData, mall: val })
+                      }
+                      placeholder="Select Mall"
+                      icon={Building2}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* --- Contact Information --- */}
               <div className="space-y-4">
                 <h4 className="text-sm font-semibold text-gray-900 border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
                   <Phone className="w-4 h-4 text-emerald-500" /> Contact
@@ -398,14 +432,14 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
                 </div>
               </div>
 
-              {/* Official Documents */}
+              {/* --- Official Documents --- */}
               <div className="space-y-4">
                 <h4 className="text-sm font-semibold text-gray-900 border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
                   <FileText className="w-4 h-4 text-indigo-500" /> Official
                   Documents
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Passport Section */}
+                  {/* Passport */}
                   <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 space-y-2">
                     <span className="text-[10px] font-bold text-indigo-600 uppercase flex items-center gap-1">
                       <Globe className="w-3 h-3" /> Passport
@@ -434,8 +468,7 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
                       className="w-full px-3 py-1.5 rounded border border-gray-300 text-sm focus:border-indigo-500 outline-none"
                     />
                   </div>
-
-                  {/* Visa Section */}
+                  {/* Visa */}
                   <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 space-y-2">
                     <span className="text-[10px] font-bold text-blue-600 uppercase flex items-center gap-1">
                       <FileText className="w-3 h-3" /> Visa
@@ -458,8 +491,7 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
                       className="w-full px-3 py-1.5 rounded border border-gray-300 text-sm focus:border-blue-500 outline-none"
                     />
                   </div>
-
-                  {/* Emirates ID Section */}
+                  {/* Emirates ID */}
                   <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 space-y-2 md:col-span-2">
                     <span className="text-[10px] font-bold text-emerald-600 uppercase flex items-center gap-1">
                       <CreditCard className="w-3 h-3" /> Emirates ID
@@ -493,7 +525,7 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
                 </div>
               </div>
 
-              {/* Uploads (Only in Edit Mode) */}
+              {/* --- Uploads (Edit Only) --- */}
               {editData && (
                 <div className="pt-2">
                   <h4 className="text-sm font-semibold text-gray-900 border-b border-gray-100 pb-2 mb-4">
@@ -510,8 +542,8 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
                             doc === "Passport"
                               ? "passport"
                               : doc === "Visa"
-                              ? "visa"
-                              : "emiratesId"
+                                ? "visa"
+                                : "emiratesId"
                           ]
                         }
                         className="flex flex-col items-center justify-center p-3 rounded-lg border border-dashed border-gray-300 text-gray-500 hover:bg-gray-50 transition-all group"
@@ -520,8 +552,8 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
                           doc === "Passport"
                             ? "passport"
                             : doc === "Visa"
-                            ? "visa"
-                            : "emiratesId"
+                              ? "visa"
+                              : "emiratesId"
                         ] ? (
                           <Loader2 className="w-5 h-5 animate-spin mb-1 text-blue-500" />
                         ) : (
@@ -551,7 +583,7 @@ const StaffModal = ({ isOpen, onClose, onSuccess, editData }) => {
               disabled={loading}
               className="px-6 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold shadow-lg shadow-indigo-200 disabled:opacity-60 transition-all flex items-center"
             >
-              {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}{" "}
               {editData ? "Save Changes" : "Create Staff"}
             </button>
           </div>

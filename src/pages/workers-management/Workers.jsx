@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -10,23 +10,46 @@ import {
   Eye,
   Calendar,
   User,
+  Download,
+  UploadCloud,
+  FileSpreadsheet,
+  Search,
+  MapPin,
+  Clock,
+  ShieldAlert,
+  AlertCircle,
+  CheckCircle,
+  Save,
+  Loader2, // ✅ Added Loader2 here
 } from "lucide-react";
 import toast from "react-hot-toast";
+import * as XLSX from "xlsx";
 
 // Components
 import DataTable from "../../components/DataTable";
 import WorkerModal from "../../components/modals/WorkerModal";
 import DeleteModal from "../../components/modals/DeleteModal";
+import CustomDropdown from "../../components/ui/CustomDropdown";
 
 // API
 import { workerService } from "../../api/workerService";
 
 const Workers = () => {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
+
+  // --- STATE ---
   const [loading, setLoading] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
   const [data, setData] = useState([]);
-  const [activeTab, setActiveTab] = useState("active"); // "active" or "inactive"
-  const [currency, setCurrency] = useState("AED"); // Default currency
+  const [activeTab, setActiveTab] = useState("active");
+  const [currency, setCurrency] = useState("AED");
+
+  // Filters State
+  const [currentSearch, setCurrentSearch] = useState("");
+  const [selectedCompany, setSelectedCompany] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState("");
+  const [selectedExpiryRange, setSelectedExpiryRange] = useState("");
 
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,8 +58,6 @@ const Workers = () => {
   const [workerToDelete, setWorkerToDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Pagination & Search State
-  const [currentSearch, setCurrentSearch] = useState("");
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 50,
@@ -44,44 +65,102 @@ const Workers = () => {
     totalPages: 1,
   });
 
-  // --- Load Currency from Settings ---
+  // --- Load Currency ---
   useEffect(() => {
     const savedCurrency = localStorage.getItem("app_currency");
-    if (savedCurrency) {
-      setCurrency(savedCurrency);
-    }
+    if (savedCurrency) setCurrency(savedCurrency);
   }, []);
 
-  // --- Fetch Data ---
+  // --- HELPERS ---
+  const getDaysDiff = (date) => {
+    if (!date) return null;
+    const diff = new Date(date) - new Date();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  };
+
+  const getDocStatusStyle = (date) => {
+    if (!date)
+      return {
+        bg: "bg-slate-50",
+        text: "text-slate-400",
+        border: "border-slate-100",
+        label: "N/A",
+        icon: <Clock className="w-3 h-3" />,
+      };
+    const diff = getDaysDiff(date);
+    const dateStr = new Date(date).toLocaleDateString("en-GB");
+    if (diff < 0)
+      return {
+        bg: "bg-red-50",
+        text: "text-red-700",
+        border: "border-red-200",
+        label: `${dateStr} (Exp)`,
+        icon: <ShieldAlert className="w-3 h-3" />,
+      };
+    if (diff <= 30)
+      return {
+        bg: "bg-amber-50",
+        text: "text-amber-700",
+        border: "border-amber-200",
+        label: `${dateStr} (${diff}d)`,
+        icon: <AlertCircle className="w-3 h-3" />,
+      };
+    return {
+      bg: "bg-emerald-50",
+      text: "text-emerald-700",
+      border: "border-emerald-200",
+      label: dateStr,
+      icon: <CheckCircle className="w-3 h-3" />,
+    };
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "-";
+    return new Date(dateStr).toLocaleDateString("en-GB");
+  };
+
+  const handleDownloadImage = async (e, url, name) => {
+    e.stopPropagation();
+    if (!url) return toast.error("No image to download");
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `${name.replace(/\s+/g, "_")}_profile.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      toast.error("Download failed");
+    }
+  };
+
+  // --- FETCH DATA ---
   const fetchData = async (
     page = 1,
-    limit = 10,
+    limit = 50,
     search = "",
-    status = undefined
+    status = undefined,
   ) => {
     setLoading(true);
     setCurrentSearch(search);
     try {
-      // Use status from activeTab if not provided
       const fetchStatus =
         status !== undefined ? status : activeTab === "active" ? 1 : 2;
-
       const response = await workerService.list(
         page,
         limit,
         search,
-        fetchStatus
+        fetchStatus,
       );
-
-      const records = response.data || [];
-      const totalRecords = response.total || 0;
-
-      setData(records);
+      setData(response.data || []);
       setPagination({
         page,
         limit,
-        total: totalRecords,
-        totalPages: Math.ceil(totalRecords / limit) || 1,
+        total: response.total || 0,
+        totalPages: Math.ceil((response.total || 0) / limit) || 1,
       });
     } catch (error) {
       console.error("❌ [WORKERS] Error:", error);
@@ -91,39 +170,205 @@ const Workers = () => {
     }
   };
 
-  // Initial Load
   useEffect(() => {
     const status = activeTab === "active" ? 1 : 2;
     fetchData(pagination.page, pagination.limit, currentSearch, status);
   }, [activeTab]);
 
-  // --- Handlers ---
-  const handleAdd = () => {
-    setSelectedWorker(null);
-    setIsModalOpen(true);
+  // --- FILTER LOGIC ---
+  const companyOptions = useMemo(() => {
+    const companies = [
+      ...new Set(data.map((i) => i.companyName).filter(Boolean)),
+    ].sort();
+    return [
+      { value: "", label: "All Companies" },
+      ...companies.map((c) => ({ value: c, label: c })),
+    ];
+  }, [data]);
+
+  const locationOptions = useMemo(() => {
+    const locs = new Set();
+    data.forEach((w) => {
+      w.malls?.forEach((m) => locs.add(typeof m === "object" ? m.name : m));
+      w.buildings?.forEach((b) => locs.add(typeof b === "object" ? b.name : b));
+    });
+    return [
+      { value: "", label: "All Locations" },
+      ...[...locs].sort().map((l) => ({ value: l, label: l })),
+    ];
+  }, [data]);
+
+  const expiryRangeOptions = [
+    { value: "", label: "Any Validity" },
+    { value: "already_expired", label: "Already Expired" },
+    { value: "30", label: "Within 1 Month" },
+  ];
+
+  const filteredData = useMemo(() => {
+    return data.filter((item) => {
+      if (selectedCompany && item.companyName !== selectedCompany) return false;
+
+      if (selectedLocation) {
+        const locations = [
+          ...(item.malls || []),
+          ...(item.buildings || []),
+        ].map((l) => (typeof l === "object" ? l.name : l));
+        if (!locations.includes(selectedLocation)) return false;
+      }
+
+      if (selectedExpiryRange) {
+        const dates = [
+          item.passportExpiry,
+          item.visaExpiry,
+          item.emiratesIdExpiry,
+        ];
+        const diffs = dates.map((d) => getDaysDiff(d));
+        if (selectedExpiryRange === "already_expired") {
+          if (!diffs.some((d) => d !== null && d < 0)) return false;
+        } else {
+          const limit = parseInt(selectedExpiryRange);
+          const min = Math.min(...diffs.filter((d) => d !== null && d >= 0));
+          if (min > limit || min === Infinity) return false;
+        }
+      }
+
+      if (currentSearch) {
+        const s = currentSearch.toLowerCase();
+        return (
+          item.name?.toLowerCase().includes(s) ||
+          item.employeeCode?.toLowerCase().includes(s) ||
+          item.mobile?.toLowerCase().includes(s)
+        );
+      }
+
+      return true;
+    });
+  }, [
+    data,
+    selectedCompany,
+    selectedLocation,
+    selectedExpiryRange,
+    currentSearch,
+  ]);
+
+  const criticalAlerts = useMemo(() => {
+    return data.filter((item) => {
+      const dates = [
+        item.passportExpiry,
+        item.visaExpiry,
+        item.emiratesIdExpiry,
+      ];
+      const diffs = dates.map((d) => getDaysDiff(d)).filter((d) => d !== null);
+      if (diffs.length === 0) return false;
+      return Math.min(...diffs) <= 30;
+    });
+  }, [data]);
+
+  // --- ACTIONS ---
+  // --- ACTIONS ---
+  const handleExportData = async () => {
+    const toastId = toast.loading("Exporting...");
+    try {
+      // ✅ CALCULATE STATUS BASED ON ACTIVE TAB
+      const status = activeTab === "active" ? 1 : 2;
+
+      // ✅ PASS STATUS TO SERVICE
+      const blob = await workerService.exportData(status);
+
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute(
+        "download",
+        `Workers_Export_${activeTab}_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success("Done", { id: toastId });
+    } catch {
+      toast.error("Export failed", { id: toastId });
+    }
   };
 
-  const handleEdit = (w) => {
-    setSelectedWorker(w);
-    setIsModalOpen(true);
+  const handleDownloadTemplate = () => {
+    const toastId = toast.loading("Generating Template...");
+    try {
+      // Define Template Headers and Dummy Data
+      const templateData = [
+        {
+          Name: "John Doe (Sample)",
+          Mobile: "971501234567",
+          "Employee Code": "EMP001",
+          Company: "Best Car Wash",
+          "Joining Date (DD/MM/YYYY)": "01/01/2024",
+          "Passport No.": "N123456",
+          "Passport Expiry (DD/MM/YYYY)": "01/01/2030",
+          "Visa No.": "V987654",
+          "Visa Expiry (DD/MM/YYYY)": "01/01/2026",
+          "EID No.": "784-1234-1234567-1",
+          "EID Expiry (DD/MM/YYYY)": "01/01/2026",
+        },
+      ];
+
+      const ws = XLSX.utils.json_to_sheet(templateData);
+
+      // Optional: Set column widths for better readability
+      ws["!cols"] = [
+        { wch: 25 }, // Name
+        { wch: 15 }, // Mobile
+        { wch: 15 }, // Employee Code
+        { wch: 20 }, // Company
+        { wch: 25 }, // Joining Date
+        { wch: 15 }, // Passport No
+        { wch: 25 }, // Passport Expiry
+        { wch: 15 }, // Visa No
+        { wch: 25 }, // Visa Expiry
+        { wch: 20 }, // EID No
+        { wch: 25 }, // EID Expiry
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Workers Template");
+
+      XLSX.writeFile(wb, "Workers_Import_Template.xlsx");
+
+      toast.success("Template Downloaded", { id: toastId });
+    } catch (error) {
+      console.error("Template generation error:", error);
+      toast.error("Template failed", { id: toastId });
+    }
   };
 
-  const handleDeleteAction = (w) => {
-    setWorkerToDelete(w);
-    setIsDeleteModalOpen(true);
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = null;
+    const toastId = toast.loading("Uploading...");
+    setImportLoading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      await workerService.importData(formData);
+      toast.success("Success", { id: toastId });
+      fetchData(1, pagination.limit);
+    } catch {
+      toast.error("Failed", { id: toastId });
+    } finally {
+      setImportLoading(false);
+    }
   };
 
   const confirmDelete = async () => {
     setDeleteLoading(true);
     try {
       await workerService.delete(workerToDelete._id);
-      toast.success("Deleted successfully");
+      toast.success("Deleted");
       setIsDeleteModalOpen(false);
       const status = activeTab === "active" ? 1 : 2;
       fetchData(pagination.page, pagination.limit, currentSearch, status);
     } catch (error) {
-      const msg = error.response?.data?.message || "Delete failed";
-      toast.error(msg);
+      toast.error(error.response?.data?.message || "Failed");
     } finally {
       setDeleteLoading(false);
     }
@@ -136,95 +381,146 @@ const Workers = () => {
       toast.success(`Worker ${newStatus === 1 ? "Activated" : "Deactivated"}`);
       const status = activeTab === "active" ? 1 : 2;
       fetchData(pagination.page, pagination.limit, currentSearch, status);
-    } catch (error) {
+    } catch {
       toast.error("Status update failed");
     }
   };
 
-  // Navigation handlers
-  const handleViewPayments = (worker) => {
-    navigate(`/workers/${worker._id}/payments`, { state: { worker } });
-  };
-
-  const handleViewHistory = (worker) => {
-    navigate(`/workers/${worker._id}/history`, { state: { worker } });
-  };
-
-  // Format date helper
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "-";
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("en-GB");
-  };
-
-  // --- Columns (Rich CSS) ---
+  // --- COLUMNS ---
   const columns = [
     {
-      header: "#",
-      accessor: "id",
-      className: "w-16 text-center",
-      render: (row, idx) => (
-        <div className="flex justify-center">
-          <span className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs font-mono border border-indigo-100">
-            {row.id || (pagination.page - 1) * pagination.limit + idx + 1}
-          </span>
-        </div>
-      ),
-    },
-    {
-      header: "Name",
-      accessor: "name",
-      render: (row) => (
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-sm text-white font-bold text-sm">
-            {row.name?.charAt(0).toUpperCase() || <User className="w-4 h-4" />}
+      header: "Worker",
+      className: "min-w-[240px]", // Reduced slightly to encourage wrapping if needed
+      render: (r) => (
+        <div
+          className="flex items-center gap-4 py-2 group cursor-pointer"
+          onClick={() => navigate(`/workers/${r._id}`)}
+        >
+          {/* Avatar Section */}
+          <div className="relative group/img flex-shrink-0">
+            <div className="w-14 h-14 rounded-2xl bg-white p-1 shadow-md ring-1 ring-slate-100">
+              <div className="w-full h-full rounded-[12px] overflow-hidden bg-slate-50 flex items-center justify-center">
+                {r.profileImage?.url ? (
+                  <img
+                    src={r.profileImage.url}
+                    className="w-full h-full object-cover"
+                    alt={r.name}
+                  />
+                ) : (
+                  <User className="text-slate-300 w-6 h-6" />
+                )}
+              </div>
+            </div>
+            {r.profileImage?.url && (
+              <button
+                onClick={(e) =>
+                  handleDownloadImage(e, r.profileImage.url, r.name)
+                }
+                className="absolute -bottom-2 -right-2 p-1.5 bg-white text-slate-600 rounded-full shadow-md border border-slate-100 hover:text-blue-600 hover:bg-blue-50 transition-all opacity-0 group-hover/img:opacity-100"
+                title="Download Photo"
+              >
+                <Save className="w-3 h-3" />
+              </button>
+            )}
           </div>
-          <span className="font-bold text-slate-700 text-sm">{row.name}</span>
+
+          {/* Name & ID Section */}
+          <div className="flex flex-col">
+            <h3 className="font-extrabold text-slate-800 text-[15px] leading-snug mb-1 group-hover:text-indigo-600 transition-colors whitespace-normal break-words max-w-[200px]">
+              {r.name}
+            </h3>
+            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 uppercase tracking-wider w-fit">
+              {r.employeeCode || `#${r.id}`}
+            </span>
+          </div>
         </div>
       ),
     },
     {
       header: "Mobile",
-      accessor: "mobile",
-      render: (row) => (
+      render: (r) => (
         <div className="flex items-center gap-2 text-slate-600 text-sm font-medium">
           <div className="p-1.5 rounded-lg bg-slate-100 text-slate-500">
             <Phone className="w-3.5 h-3.5" />
           </div>
-          {row.mobile || (
-            <span className="text-slate-400 italic">No Number</span>
-          )}
+          {r.mobile || <span className="text-slate-400 italic">No Number</span>}
         </div>
       ),
     },
     {
-      header: "Start Date",
-      accessor: "createdAt",
-      render: (row) => (
-        <div className="flex items-center gap-2 text-slate-600 text-sm font-medium">
-          <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-          {formatDate(row.createdAt)}
+      header: "Company",
+      render: (r) => (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm flex-shrink-0">
+            <Briefcase className="w-4 h-4" />
+          </div>
+          <span className="text-sm font-bold text-slate-700 leading-tight whitespace-normal max-w-[150px] break-words">
+            {r.companyName || "N/A"}
+          </span>
         </div>
       ),
+    },
+    {
+      header: "Passport Expiry",
+      render: (r) => {
+        const style = getDocStatusStyle(r.passportExpiry);
+        return (
+          <div
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border w-fit ${style.bg} ${style.border} ${style.text}`}
+          >
+            {style.icon}
+            <span className="text-[11px] font-bold">{style.label}</span>
+          </div>
+        );
+      },
+    },
+    {
+      header: "Visa Expiry",
+      render: (r) => {
+        const style = getDocStatusStyle(r.visaExpiry);
+        return (
+          <div
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border w-fit ${style.bg} ${style.border} ${style.text}`}
+          >
+            {style.icon}
+            <span className="text-[11px] font-bold">{style.label}</span>
+          </div>
+        );
+      },
+    },
+    {
+      header: "EID Expiry",
+      render: (r) => {
+        const style = getDocStatusStyle(r.emiratesIdExpiry);
+        return (
+          <div
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border w-fit ${style.bg} ${style.border} ${style.text}`}
+          >
+            {style.icon}
+            <span className="text-[11px] font-bold">{style.label}</span>
+          </div>
+        );
+      },
     },
     {
       header: "Quick Links",
-      className: "text-center min-w-[120px]",
-      render: (row) => (
+      className: "text-center",
+      render: (r) => (
         <div className="flex items-center justify-center gap-2">
-          {/* Only Payments & History */}
           <button
-            onClick={() => handleViewPayments(row)}
-            className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 hover:text-green-700 transition-colors shadow-sm border border-green-100"
+            onClick={() =>
+              navigate(`/workers/${r._id}/payments`, { state: { worker: r } })
+            }
+            className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 border border-green-100"
             title="Payments"
           >
-            {/* ✅ DYNAMIC CURRENCY SYMBOL */}
             <span className="text-[10px] font-bold px-1">{currency}</span>
           </button>
-
           <button
-            onClick={() => handleViewHistory(row)}
-            className="p-1.5 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 hover:text-purple-700 transition-colors shadow-sm border border-purple-100"
+            onClick={() =>
+              navigate(`/workers/${r._id}/history`, { state: { worker: r } })
+            }
+            className="p-1.5 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 border border-purple-100"
             title="History"
           >
             <Calendar className="w-3.5 h-3.5" />
@@ -259,18 +555,31 @@ const Workers = () => {
     {
       header: "Actions",
       className:
-        "text-right w-24 sticky right-0 bg-white shadow-[-5px_0_10px_-5px_rgba(0,0,0,0.05)]",
+        "text-right w-36 sticky right-0 bg-white shadow-[-5px_0_10px_-5px_rgba(0,0,0,0.05)]",
       render: (row) => (
         <div className="flex justify-end gap-1.5 pr-2">
           <button
-            onClick={() => handleEdit(row)}
+            onClick={() => navigate(`/workers/${row._id}`)}
+            className="p-2 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-lg transition-all"
+            title="View Profile"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => {
+              setSelectedWorker(row);
+              setIsModalOpen(true);
+            }}
             className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg transition-all"
             title="Edit"
           >
             <Edit2 className="w-4 h-4" />
           </button>
           <button
-            onClick={() => handleDeleteAction(row)}
+            onClick={() => {
+              setWorkerToDelete(row);
+              setIsDeleteModalOpen(true);
+            }}
             className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-all"
             title="Delete"
           >
@@ -281,21 +590,17 @@ const Workers = () => {
     },
   ];
 
-  // --- Expanded Row Content (Assignments) ---
   const renderDetailsRow = (row) => {
     const buildings = row.buildings || [];
     const malls = row.malls || [];
-    const hasAssignments = buildings.length > 0 || malls.length > 0;
-
     return (
       <div className="flex items-start gap-4 text-sm py-2 px-4 bg-slate-50/50 rounded-lg border border-slate-100 mt-2 mx-4 mb-2">
         <div className="flex items-center gap-2 text-slate-500 font-bold mt-1.5 min-w-[100px]">
           <Briefcase className="w-4 h-4 text-indigo-500" />
           <span>Assigned To:</span>
         </div>
-
         <div className="flex flex-wrap gap-2">
-          {hasAssignments ? (
+          {buildings.length > 0 || malls.length > 0 ? (
             <>
               {malls.map((m, i) => (
                 <span
@@ -328,76 +633,200 @@ const Workers = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 font-sans">
-      {/* --- TABLE SECTION --- */}
-      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-        {/* Custom Tabs Header within the Card */}
-        <div className="flex border-b border-gray-100 bg-slate-50/50">
-          <button
-            onClick={() => setActiveTab("active")}
-            className={`px-6 py-4 text-sm font-bold transition-all relative ${
-              activeTab === "active"
-                ? "text-indigo-600 bg-white border-t-2 border-t-indigo-600 shadow-sm z-10"
-                : "text-slate-500 hover:text-slate-700 hover:bg-slate-100/50"
-            }`}
-          >
-            Active Workers
-          </button>
-          <button
-            onClick={() => setActiveTab("inactive")}
-            className={`px-6 py-4 text-sm font-bold transition-all relative ${
-              activeTab === "inactive"
-                ? "text-indigo-600 bg-white border-t-2 border-t-indigo-600 shadow-sm z-10"
-                : "text-slate-500 hover:text-slate-700 hover:bg-slate-100/50"
-            }`}
-          >
-            Inactive Workers
-          </button>
-        </div>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+      />
 
+      {/* HEADER & FILTERS */}
+      <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 mb-6 relative z-20">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+          <div className="flex gap-4 items-center">
+            {/* ✅ NEW PILL TOGGLE STYLE */}
+            <div className="bg-slate-100 p-1 rounded-xl inline-flex relative">
+              <div
+                className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-lg shadow-sm transition-all duration-300 ease-in-out z-0`}
+                style={{
+                  left: activeTab === "active" ? "4px" : "calc(50%)",
+                }}
+              />
+              <button
+                onClick={() => setActiveTab("active")}
+                className={`relative z-10 px-6 py-2 text-sm font-bold transition-colors duration-300 ${
+                  activeTab === "active"
+                    ? "text-indigo-600"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Active
+              </button>
+              <button
+                onClick={() => setActiveTab("inactive")}
+                className={`relative z-10 px-6 py-2 text-sm font-bold transition-colors duration-300 ${
+                  activeTab === "inactive"
+                    ? "text-indigo-600"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Inactive
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
+            <div className="relative w-full lg:w-64 group mr-2">
+              <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+              <input
+                type="text"
+                placeholder="Search..."
+                value={currentSearch}
+                onChange={(e) => setCurrentSearch(e.target.value)}
+                className="w-full h-12 pl-12 pr-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all shadow-inner"
+              />
+            </div>
+            <div className="flex bg-slate-50 p-1 rounded-2xl border border-slate-100">
+              <button
+                onClick={handleExportData}
+                className="h-10 px-4 text-slate-600 hover:text-blue-600 rounded-xl text-[11px] font-black uppercase tracking-tighter flex items-center gap-2 transition-all hover:bg-white hover:shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5" />{" "}
+                <span className="hidden sm:inline">Export</span>
+              </button>
+              <button
+                onClick={handleDownloadTemplate}
+                className="h-10 px-4 text-slate-600 hover:text-emerald-600 rounded-xl text-[11px] font-black uppercase tracking-tighter flex items-center gap-2 transition-all hover:bg-white hover:shadow-sm"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />{" "}
+                <span className="hidden sm:inline">Template</span>
+              </button>
+              <button
+                onClick={() => fileInputRef.current.click()}
+                className="h-10 px-4 text-slate-600 hover:text-indigo-600 rounded-xl text-[11px] font-black uppercase tracking-tighter flex items-center gap-2 transition-all hover:bg-white hover:shadow-sm"
+              >
+                {importLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <UploadCloud className="w-3.5 h-3.5" />
+                )}{" "}
+                <span className="hidden sm:inline">Import</span>
+              </button>
+            </div>
+            <button
+              onClick={() => {
+                setSelectedWorker(null);
+                setIsModalOpen(true);
+              }}
+              className="h-12 px-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-200 active:scale-95 transition-all"
+            >
+              <Plus className="w-4 h-4" /> Add Worker
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-gray-100 pt-6 mt-2">
+          <div>
+            <span className="text-[10px] font-black text-slate-400 uppercase mb-2 block ml-1 tracking-widest">
+              Company Filter
+            </span>
+            <CustomDropdown
+              value={selectedCompany}
+              onChange={setSelectedCompany}
+              options={companyOptions}
+              icon={Briefcase}
+              placeholder="All Companies"
+            />
+          </div>
+          <div>
+            <span className="text-[10px] font-black text-slate-400 uppercase mb-2 block ml-1 tracking-widest">
+              Location Filter
+            </span>
+            <CustomDropdown
+              value={selectedLocation}
+              onChange={setSelectedLocation}
+              options={locationOptions}
+              icon={MapPin}
+              placeholder="All Locations"
+            />
+          </div>
+          <div>
+            <span className="text-[10px] font-black text-slate-400 uppercase mb-2 block ml-1 tracking-widest">
+              Compliance Status
+            </span>
+            <CustomDropdown
+              value={selectedExpiryRange}
+              onChange={setSelectedExpiryRange}
+              options={expiryRangeOptions}
+              icon={Clock}
+              placeholder="Any Validity"
+            />
+          </div>
+        </div>
+      </div>
+
+      {criticalAlerts.length > 0 && (
+        <div className="mb-6 bg-white/80 backdrop-blur-md border border-rose-100 py-3 rounded-2xl overflow-hidden relative shadow-lg mx-1 ring-1 ring-rose-50">
+          <div className="flex whitespace-nowrap animate-marquee items-center gap-24">
+            <div className="flex items-center gap-2.5 bg-rose-600 text-white px-5 py-1.5 rounded-full ml-6 font-black text-[10px] uppercase tracking-widest shadow-md">
+              <ShieldAlert className="w-4 h-4" /> Action Required
+            </div>
+            {criticalAlerts.map((w) => (
+              <div
+                key={w._id}
+                className="flex items-center gap-4 group cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => navigate(`/workers/${w._id}`)}
+              >
+                <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-white shadow-sm">
+                  {w.profileImage?.url ? (
+                    <img
+                      src={w.profileImage.url}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User className="p-1.5 text-slate-400" />
+                  )}
+                </div>
+                <div className="flex flex-col leading-none">
+                  <span className="text-[13px] font-black text-slate-700">
+                    {w.name}
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-400">
+                    {w.employeeCode}
+                  </span>
+                </div>
+                <div className="px-2 py-0.5 bg-rose-100 text-rose-700 rounded text-[10px] font-bold border border-rose-200">
+                  Check Expiry
+                </div>
+                <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-ping"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-3xl shadow-2xl shadow-slate-200/50 border border-slate-100/60 overflow-hidden relative z-10">
         <DataTable
           columns={columns}
-          data={data}
+          data={filteredData}
           loading={loading}
-          // Pagination props
           pagination={pagination}
-          onPageChange={(p) => {
-            const status = activeTab === "active" ? 1 : 2;
-            fetchData(p, pagination.limit, currentSearch, status);
-          }}
-          onLimitChange={(l) => {
-            const status = activeTab === "active" ? 1 : 2;
-            fetchData(1, l, currentSearch, status);
-          }}
-          // Search & Action
-          onSearch={(term) => {
-            const status = activeTab === "active" ? 1 : 2;
-            fetchData(1, pagination.limit, term, status);
-          }}
-          actionButton={
-            <button
-              onClick={handleAdd}
-              className="h-10 px-5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all active:scale-95 whitespace-nowrap"
-            >
-              <Plus className="w-4 h-4" />
-              Add Worker
-            </button>
-          }
-          // Expanded Row
+          onPageChange={(p) => fetchData(p, pagination.limit, currentSearch)}
+          onLimitChange={(l) => fetchData(1, l, currentSearch)}
+          onSearch={(t) => fetchData(1, pagination.limit, t)}
+          hideSearch={true}
+          // ✅ 2. REMOVED DUPLICATE BUTTON FROM TABLE ACTIONS
           renderExpandedRow={renderDetailsRow}
         />
       </div>
 
-      {/* --- MODALS --- */}
       <WorkerModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={() => {
-          const status = activeTab === "active" ? 1 : 2;
-          fetchData(pagination.page, pagination.limit, currentSearch, status);
-        }}
+        onSuccess={() =>
+          fetchData(pagination.page, pagination.limit, currentSearch)
+        }
         editData={selectedWorker}
       />
-
       <DeleteModal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
@@ -406,6 +835,15 @@ const Workers = () => {
         title="Delete Worker"
         message={`Are you sure you want to delete "${workerToDelete?.name}"?`}
       />
+
+      <style>{`
+        @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+        .animate-marquee { animation: marquee 45s linear infinite; }
+        .animate-marquee:hover { animation-play-state: paused; }
+        .DataTable th { font-weight: 900; color: #94a3b8; text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em; padding: 24px 32px !important; border-bottom: 2px solid #f8fafc; background: #fff; }
+        .DataTable td { padding: 20px 32px !important; border-bottom: 1px solid #f8fafc; vertical-align: middle; background: #fff; }
+        .DataTable tr:hover td { background: #fdfdfd; }
+      `}</style>
     </div>
   );
 };

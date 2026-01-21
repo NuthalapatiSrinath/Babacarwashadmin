@@ -1,10 +1,14 @@
 import api from "./axiosInstance";
 
 export const workerService = {
+  // ==========================================
+  // 🟢 EXISTING WORKER METHODS (PRESERVED)
+  // ==========================================
+
   // List
   list: async (page = 1, limit = 10, search = "", status = 1) => {
     console.log(
-      `👷 [WorkerService] Fetching list: page=${page}, limit=${limit}, search="${search}", status=${status}`
+      `👷 [WorkerService] Fetching list: page=${page}, limit=${limit}, search="${search}", status=${status}`,
     );
     try {
       // Backend expects 'pageNo' (starts at 0) and 'pageSize'
@@ -14,7 +18,6 @@ export const workerService = {
         search,
         status,
       };
-
       const response = await api.get("/workers", { params });
       console.log("✅ [WorkerService] List success:", response.data);
       return response.data;
@@ -63,6 +66,19 @@ export const workerService = {
     }
   },
 
+  // Info
+  info: async (id) => {
+    console.log(`📋 [WorkerService] Fetching worker info for ${id}`);
+    try {
+      const response = await api.get(`/workers/${id}`);
+      console.log("✅ [WorkerService] Info success:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ [WorkerService] Info error:", error);
+      throw error;
+    }
+  },
+
   // Deactivate
   deactivate: async (id, payload) => {
     console.log(`⏸️ [WorkerService] Deactivating worker ${id}:`, payload);
@@ -89,19 +105,6 @@ export const workerService = {
     }
   },
 
-  // Get Worker Info
-  info: async (id) => {
-    console.log(`📋 [WorkerService] Fetching worker info for ${id}`);
-    try {
-      const response = await api.get(`/workers/${id}`);
-      console.log("✅ [WorkerService] Info success:", response.data);
-      return response.data;
-    } catch (error) {
-      console.error("❌ [WorkerService] Info error:", error);
-      throw error;
-    }
-  },
-
   // Undo Delete
   undoDelete: async (id) => {
     console.log(`♻️ [WorkerService] Undoing delete for worker ${id}`);
@@ -115,7 +118,7 @@ export const workerService = {
     }
   },
 
-  // Get Worker's Customers
+  // Customers List
   customers: async (id) => {
     console.log(`👥 [WorkerService] Fetching customers for worker ${id}`);
     try {
@@ -128,11 +131,11 @@ export const workerService = {
     }
   },
 
-  // Get Worker's Payment History
+  // Payment History (Washes List)
   payments: async (id, params = {}) => {
     console.log(
       `💰 [WorkerService] Fetching payments for worker ${id}:`,
-      params
+      params,
     );
     try {
       const response = await api.get(`/workers/${id}/history`, { params });
@@ -140,6 +143,130 @@ export const workerService = {
       return response.data;
     } catch (error) {
       console.error("❌ [WorkerService] Payments error:", error);
+      throw error;
+    }
+  },
+
+  // ==========================================
+  // 🔵 NEW METHODS (MERGED FROM STAFF)
+  // ==========================================
+
+  // Upload Document
+  uploadDocument: async (id, file, documentType) => {
+    console.log(
+      `📄 [WorkerService] Uploading ${documentType} for worker ${id}`,
+    );
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("documentType", documentType);
+
+      const response = await api.post(
+        `/workers/${id}/upload-document`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } },
+      );
+      console.log("✅ [WorkerService] Document upload success");
+      return response.data;
+    } catch (error) {
+      console.error("❌ [WorkerService] Document upload error:", error);
+      throw error;
+    }
+  },
+
+  // Upload Profile Image
+  uploadProfileImage: async (id, file) => {
+    console.log(`📸 [WorkerService] Uploading profile image for worker ${id}`);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await api.post(
+        `/workers/${id}/profile-image`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } },
+      );
+      console.log("✅ [WorkerService] Profile image success");
+      return response.data;
+    } catch (error) {
+      console.error("❌ [WorkerService] Profile image error:", error);
+      throw error;
+    }
+  },
+
+  // Delete Document
+  deleteDocument: async (id, documentType) => {
+    console.log(`🗑️ [WorkerService] Deleting ${documentType} for worker ${id}`);
+    try {
+      const response = await api.delete(`/workers/${id}/document`, {
+        data: { documentType },
+      });
+      console.log("✅ [WorkerService] Document delete success");
+      return response.data;
+    } catch (error) {
+      console.error("❌ [WorkerService] Document delete error:", error);
+      throw error;
+    }
+  },
+
+  // Export Data (Excel)
+  // Export Data (Excel)
+  exportData: async (status) => {
+    // ✅ Accept status param
+    console.log(
+      `📥 [WorkerService] Exporting worker data for status: ${status}...`,
+    );
+    try {
+      const response = await api.get("/workers/export", {
+        params: { status }, // ✅ Send as query param
+        responseType: "blob",
+      });
+      console.log("✅ [WorkerService] Export success");
+      return response.data;
+    } catch (error) {
+      console.error("❌ [WorkerService] Export error:", error);
+      throw error;
+    }
+  },
+  // Generate Template
+  generateTemplate: async () => {
+    console.log(`📋 [WorkerService] Generating import template...`);
+    try {
+      const response = await api.get("/workers/template", {
+        responseType: "blob",
+      });
+      console.log("✅ [WorkerService] Template success");
+      return response.data;
+    } catch (error) {
+      console.error("❌ [WorkerService] Template error:", error);
+      throw error;
+    }
+  },
+
+  // Import Data (Excel)
+  importData: async (formData) => {
+    console.log(`📤 [WorkerService] Importing worker data...`);
+    try {
+      const response = await api.post("/workers/import", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      console.log("✅ [WorkerService] Import success:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ [WorkerService] Import error:", error);
+      throw error;
+    }
+  },
+
+  // Get Expiring Documents
+  getExpiringDocuments: async () => {
+    console.log(`⚠️ [WorkerService] Fetching expiring documents...`);
+    try {
+      const response = await api.get("/workers/expiring");
+      console.log("✅ [WorkerService] Expiring docs success:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ [WorkerService] Expiring docs error:", error);
       throw error;
     }
   },

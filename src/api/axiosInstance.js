@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 // HARDCODED BASE URL
 // This forces the request to be relative (e.g., https://your-site.scom/api/...)
 // It relies entirely on your proxy configuration (vercel.json or vite.config.js)
-const baseURL = "https://api.babacarwash.com/api";
+const baseURL = "http://localhost:3002/api";
 
 const api = axios.create({
   baseURL: baseURL,
@@ -44,7 +44,7 @@ api.interceptors.request.use(
   (error) => {
     console.error("[❌ Request Error]", error);
     return Promise.reject(error);
-  }
+  },
 );
 
 // --- RESPONSE INTERCEPTOR ---
@@ -93,7 +93,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;

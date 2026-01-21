@@ -48,6 +48,7 @@ import WorkerPayments from "./pages/workers-management/WorkerPayments";
 import WorkerWashedCars from "./pages/workers-management/WorkerWashedCars";
 import WorkerHistory from "./pages/workers-management/WorkerHistory";
 import StaffProfile from "./pages/workers-management/StaffProfile";
+import WorkerProfile from "./pages/workers-management/WorkerProfile";
 
 export const routes = [
   // --- OVERVIEW ---
@@ -82,6 +83,11 @@ export const routes = [
     title: "Workers",
     component: <Workers />,
     icon: UserCheck,
+  },
+  {
+    path: "/workers/:id",
+    title: "Worker Profile",
+    component: <WorkerProfile />,
   },
   // Hidden Worker Detail Routes
   {

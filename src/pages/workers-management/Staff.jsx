@@ -51,7 +51,7 @@ const Staff = () => {
   const [selectedSite, setSelectedSite] = useState("");
   const [selectedExpiryRange, setSelectedExpiryRange] = useState("");
 
-  // Modals State
+  // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -81,11 +81,9 @@ const Staff = () => {
         label: "N/A",
         icon: <Clock className="w-3 h-3" />,
       };
-
     const diff = getDaysDiff(date);
     const dateStr = new Date(date).toLocaleDateString("en-GB");
-
-    if (diff < 0) {
+    if (diff < 0)
       return {
         bg: "bg-red-50",
         text: "text-red-700",
@@ -93,7 +91,7 @@ const Staff = () => {
         label: `${dateStr} (Exp)`,
         icon: <ShieldAlert className="w-3 h-3" />,
       };
-    } else if (diff <= 30) {
+    if (diff <= 30)
       return {
         bg: "bg-amber-50",
         text: "text-amber-700",
@@ -101,7 +99,6 @@ const Staff = () => {
         label: `${dateStr} (${diff}d)`,
         icon: <AlertCircle className="w-3 h-3" />,
       };
-    }
     return {
       bg: "bg-emerald-50",
       text: "text-emerald-700",
@@ -114,7 +111,6 @@ const Staff = () => {
   const handleDownloadImage = async (e, url, name) => {
     e.stopPropagation();
     if (!url) return toast.error("No image to download");
-
     try {
       const response = await fetch(url);
       const blob = await response.blob();
@@ -169,7 +165,7 @@ const Staff = () => {
       ...new Set(
         data
           .map((item) =>
-            typeof item.site === "string" ? item.site : item.site?.name,
+            typeof item.site === "object" ? item.site?.name : item.site,
           )
           .filter(Boolean),
       ),
@@ -196,7 +192,7 @@ const Staff = () => {
     return data.filter((item) => {
       if (selectedCompany && item.companyName !== selectedCompany) return false;
       const siteName =
-        typeof item.site === "string" ? item.site : item.site?.name;
+        typeof item.site === "object" ? item.site?.name : item.site;
       if (selectedSite && siteName !== selectedSite) return false;
 
       if (selectedExpiryRange) {
@@ -206,20 +202,17 @@ const Staff = () => {
           item.emiratesIdExpiry,
         ];
         const diffs = dates.map((d) => getDaysDiff(d));
-
         if (selectedExpiryRange === "already_expired") {
           if (!diffs.some((d) => d !== null && d < 0)) return false;
         } else if (selectedExpiryRange === "expired_month") {
-          const hasExpiredThisMonth = dates.some(
+          const hasExpired = dates.some(
             (d) => d && new Date(d) < today && new Date(d) >= startOfMonth,
           );
-          if (!hasExpiredThisMonth) return false;
+          if (!hasExpired) return false;
         } else {
           const limit = parseInt(selectedExpiryRange);
-          const minUpcoming = Math.min(
-            ...diffs.filter((d) => d !== null && d >= 0),
-          );
-          if (minUpcoming > limit || minUpcoming === Infinity) return false;
+          const min = Math.min(...diffs.filter((d) => d !== null && d >= 0));
+          if (min > limit || min === Infinity) return false;
         }
       }
 
@@ -250,7 +243,7 @@ const Staff = () => {
 
   // --- ACTIONS ---
   const handleExportData = async () => {
-    const toastId = toast.loading("Preparing Export...");
+    const toastId = toast.loading("Exporting...");
     try {
       const blob = await staffService.exportData();
       const url = window.URL.createObjectURL(new Blob([blob]));
@@ -277,14 +270,13 @@ const Staff = () => {
         Mobile: "971501234567",
         Email: "john@mail.com",
         Company: "Baba Wash",
-        Site: "Dubai",
-        "Joining Date": "2024-01-01",
+        "Joining Date": "01/01/2024",
         "Passport Number": "P123",
-        "Passport Expiry": "2030-01-01",
+        "Passport Expiry": "01/01/2030",
         "Visa Number": "V123",
-        "Visa Expiry": "2026-01-01",
+        "Visa Expiry": "01/01/2026",
         "Emirates ID": "E123",
-        "Emirates ID Expiry": "2026-01-01",
+        "Emirates ID Expiry": "01/01/2026",
       },
     ];
     const ws = XLSX.utils.json_to_sheet(templateData);
@@ -297,7 +289,7 @@ const Staff = () => {
     const file = e.target.files[0];
     if (!file) return;
     e.target.value = null;
-    const toastId = toast.loading("Processing upload...");
+    const toastId = toast.loading("Uploading...");
     setImportLoading(true);
     const formData = new FormData();
     formData.append("file", file);
@@ -372,7 +364,6 @@ const Staff = () => {
         </div>
       ),
     },
-    // ✅ MOBILE NUMBER ONLY (No Icon, Monospaced)
     {
       header: "Mobile",
       render: (r) => (
@@ -381,7 +372,6 @@ const Staff = () => {
         </span>
       ),
     },
-    // ✅ COMPANY (Wraps to new line)
     {
       header: "Company",
       render: (r) => (
@@ -389,25 +379,42 @@ const Staff = () => {
           <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm flex-shrink-0">
             <Briefcase className="w-4 h-4" />
           </div>
-          {/* Constrained width + whitespace-normal to force wrapping */}
-          <span className="text-sm font-bold text-slate-700 leading-tight whitespace-normal max-w-[180px] break-words">
+          <span className="text-sm font-bold text-slate-700 leading-tight whitespace-normal max-w-[150px] break-words">
             {r.companyName || "N/A"}
           </span>
         </div>
       ),
     },
-    // ✅ SITE LOCATION (Wraps to new line)
+    // ✅ NEW: Assigned Locations (Site & Mall)
     {
-      header: "Site Location",
+      header: "Assigned Locations",
       render: (r) => (
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shadow-sm flex-shrink-0">
-            <MapPin className="w-4 h-4" />
-          </div>
-          {/* Constrained width + whitespace-normal to force wrapping */}
-          <span className="text-sm font-bold text-slate-700 leading-tight whitespace-normal max-w-[180px] break-words">
-            {typeof r.site === "string" ? r.site : r.site?.name || "Unassigned"}
-          </span>
+        <div className="flex flex-col gap-1.5">
+          {r.site && (
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-md bg-purple-50 flex items-center justify-center text-purple-600 border border-purple-100 flex-shrink-0">
+                <MapPin className="w-3.5 h-3.5" />
+              </div>
+              <span className="text-xs font-bold text-slate-700 leading-tight whitespace-normal max-w-[150px]">
+                {typeof r.site === "object" ? r.site.name : r.site}
+              </span>
+            </div>
+          )}
+          {r.mall && (
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-md bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-100 flex-shrink-0">
+                <Building2 className="w-3.5 h-3.5" />
+              </div>
+              <span className="text-xs font-bold text-slate-700 leading-tight whitespace-normal max-w-[150px]">
+                {typeof r.mall === "object" ? r.mall.name : r.mall}
+              </span>
+            </div>
+          )}
+          {!r.site && !r.mall && (
+            <span className="text-[11px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100 w-fit">
+              Unassigned
+            </span>
+          )}
         </div>
       ),
     },
@@ -461,11 +468,9 @@ const Staff = () => {
           <button
             onClick={() => navigate(`/workers/staff/${r._id}`)}
             className="p-2 bg-indigo-50 border border-indigo-100 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl transition-all shadow-sm"
-            title="View Profile"
           >
             <Eye className="w-4 h-4" />
           </button>
-
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -473,7 +478,6 @@ const Staff = () => {
               setIsModalOpen(true);
             }}
             className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-amber-600 hover:border-amber-200 rounded-xl transition-all shadow-sm"
-            title="Edit"
           >
             <Edit2 className="w-4 h-4" />
           </button>
@@ -484,7 +488,6 @@ const Staff = () => {
               setIsDeleteModalOpen(true);
             }}
             className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200 rounded-xl transition-all shadow-sm"
-            title="Delete"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -501,10 +504,7 @@ const Staff = () => {
         onChange={handleFileChange}
         className="hidden"
       />
-
-      {/* --- UNIFIED CONTROL PANEL --- */}
       <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 mb-6 relative z-20">
-        {/* ROW 1: SEARCH & ACTIONS */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
           <div className="relative w-full lg:w-96 group">
             <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
@@ -516,7 +516,6 @@ const Staff = () => {
               className="w-full h-12 pl-12 pr-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all shadow-inner"
             />
           </div>
-
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
             <div className="flex bg-slate-50 p-1 rounded-2xl border border-slate-100">
               <button
@@ -556,8 +555,6 @@ const Staff = () => {
             </button>
           </div>
         </div>
-
-        {/* ROW 2: DROPDOWN FILTERS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <span className="text-[10px] font-black text-slate-400 uppercase mb-2 block ml-1 tracking-widest">
@@ -597,8 +594,6 @@ const Staff = () => {
           </div>
         </div>
       </div>
-
-      {/* ✅ MARQUEE ALERT BAR */}
       {criticalAlerts.length > 0 && (
         <div className="mb-6 bg-white/80 backdrop-blur-md border border-rose-100 py-3 rounded-2xl overflow-hidden relative shadow-lg mx-1 ring-1 ring-rose-50">
           <div className="flex whitespace-nowrap animate-marquee items-center gap-24">
@@ -638,8 +633,6 @@ const Staff = () => {
           </div>
         </div>
       )}
-
-      {/* --- TABLE CONTAINER --- */}
       <div className="bg-white rounded-[32px] shadow-2xl shadow-slate-200/50 border border-slate-100/60 overflow-hidden relative z-10">
         <DataTable
           columns={columns}
@@ -650,8 +643,6 @@ const Staff = () => {
           hideSearch={true}
         />
       </div>
-
-      {/* MODALS */}
       <StaffModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -666,7 +657,6 @@ const Staff = () => {
         title="Delete Staff"
         message={`Are you sure you want to delete ${staffToDelete?.name}?`}
       />
-
       <style>{`
         @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
         .animate-marquee { animation: marquee 45s linear infinite; }
