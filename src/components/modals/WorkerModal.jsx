@@ -87,6 +87,26 @@ const WorkerModal = ({ isOpen, onClose, onSuccess, editData }) => {
     { value: "mobile", label: "Mobile", icon: Truck },
   ];
 
+  // ✅ PREDEFINED COMPANY LIST
+  const companyOptions = [
+    {
+      value: "BABA CAR WASHING AND CLEANING L.L.C.",
+      label: "BABA CAR WASHING AND CLEANING L.L.C.",
+    },
+    {
+      value: "NEW SAI TECHNICAL SERVICES L.L.C.",
+      label: "NEW SAI TECHNICAL SERVICES L.L.C.",
+    },
+    {
+      value: "SAI BABA CLEANING SERVICES L.L.C.",
+      label: "SAI BABA CLEANING SERVICES L.L.C.",
+    },
+    {
+      value: "B C W PARKING CAR WASH L.L.C.",
+      label: "B C W PARKING CAR WASH L.L.C.",
+    },
+  ];
+
   // --- 1. Load Data ---
   useEffect(() => {
     if (isOpen) {
@@ -462,17 +482,16 @@ const WorkerModal = ({ isOpen, onClose, onSuccess, editData }) => {
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Company
-                </label>
-                <input
-                  type="text"
+                {/* ✅ REPLACED INPUT WITH DROPDOWN FOR COMPANY */}
+                <CustomDropdown
+                  label="Company"
                   value={formData.companyName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, companyName: e.target.value })
+                  onChange={(val) =>
+                    setFormData({ ...formData, companyName: val })
                   }
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                  placeholder="Company Name"
+                  options={companyOptions}
+                  icon={Briefcase}
+                  placeholder="Select Company"
                 />
               </div>
               <div className="space-y-1.5">
@@ -783,7 +802,7 @@ const WorkerModal = ({ isOpen, onClose, onSuccess, editData }) => {
             )}
           </div>
 
-          {/* --- SECTION 4: DOCUMENTS --- */}
+          {/* --- SECTION 4: DOCUMENTS (Same as before) --- */}
           <div className="space-y-4 pb-4">
             <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-2">
               <div className="p-1.5 bg-indigo-50 rounded-lg text-indigo-600">
@@ -866,7 +885,7 @@ const WorkerModal = ({ isOpen, onClose, onSuccess, editData }) => {
             </div>
           </div>
 
-          {/* --- SECTION 5: UPLOADS --- */}
+          {/* --- SECTION 5: UPLOADS (Same as before) --- */}
           {editData && (
             <div className="pt-4 border-t border-dashed border-slate-200">
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">

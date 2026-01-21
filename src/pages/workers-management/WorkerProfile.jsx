@@ -19,6 +19,7 @@ import {
   ShoppingBag,
   Truck, // ✅ Added Truck for Mobile
   Map, // ✅ Added Map for Site
+  Building, // ✅ FIXED: Added Building for Residence
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { workerService } from "../../api/workerService";

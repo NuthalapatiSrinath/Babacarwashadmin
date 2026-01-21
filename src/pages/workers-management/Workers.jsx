@@ -145,15 +145,20 @@ const Workers = () => {
   }, [activeTab]);
 
   // --- FILTER LOGIC ---
+
+  // ✅ FIXED: Using Predefined Company List instead of dynamic loading
   const companyOptions = useMemo(() => {
     const companies = [
-      ...new Set(data.map((i) => i.companyName).filter(Boolean)),
-    ].sort();
+      "BABA CAR WASHING AND CLEANING L.L.C.",
+      "NEW SAI TECHNICAL SERVICES L.L.C.",
+      "SAI BABA CLEANING SERVICES L.L.C.",
+      "B C W PARKING CAR WASH L.L.C.",
+    ];
     return [
       { value: "", label: "All Companies" },
       ...companies.map((c) => ({ value: c, label: c })),
     ];
-  }, [data]);
+  }, []);
 
   const expiryRangeOptions = [
     { value: "", label: "Any Validity" },
@@ -302,20 +307,110 @@ const Workers = () => {
     }
   };
 
+  // ✅ UPDATED TEMPLATE: Removed Company Column
   const handleDownloadTemplate = () => {
-    /* ... existing code ... */
+    const toastId = toast.loading("Generating Template...");
+    try {
+      const templateData = [
+        {
+          Name: "John Doe (Sample)",
+          Mobile: "971501234567",
+          "Employee Code": "EMP001",
+          // Company removed
+          "Joining Date (DD/MM/YYYY)": "01/01/2024",
+          "Passport No.": "N123456",
+          "Passport Expiry (DD/MM/YYYY)": "01/01/2030",
+          "Visa No.": "V987654",
+          "Visa Expiry (DD/MM/YYYY)": "01/01/2026",
+          "EID No.": "784-1234-1234567-1",
+          "EID Expiry (DD/MM/YYYY)": "01/01/2026",
+        },
+      ];
+      const ws = XLSX.utils.json_to_sheet(templateData);
+      ws["!cols"] = [
+        { wch: 25 },
+        { wch: 15 },
+        { wch: 15 },
+        // Company removed
+        { wch: 20 }, // Joining Date
+        { wch: 15 },
+        { wch: 25 },
+        { wch: 15 },
+        { wch: 25 },
+        { wch: 20 },
+        { wch: 25 },
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Workers Template");
+      XLSX.writeFile(wb, "Workers_Import_Template.xlsx");
+      toast.success("Template Downloaded", { id: toastId });
+    } catch {
+      toast.error("Template failed", { id: toastId });
+    }
   };
+
   const handleFileChange = async (e) => {
-    /* ... existing code ... */
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = null;
+    const toastId = toast.loading("Uploading...");
+    setImportLoading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      await workerService.importData(formData);
+      toast.success("Success", { id: toastId });
+      fetchData(1, pagination.limit);
+    } catch {
+      toast.error("Failed", { id: toastId });
+    } finally {
+      setImportLoading(false);
+    }
   };
+
   const confirmDelete = async () => {
-    /* ... existing code ... */
+    setDeleteLoading(true);
+    try {
+      await workerService.delete(workerToDelete._id);
+      toast.success("Deleted");
+      setIsDeleteModalOpen(false);
+      const status = activeTab === "active" ? 1 : 2;
+      fetchData(pagination.page, pagination.limit, currentSearch, status);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed");
+    } finally {
+      setDeleteLoading(false);
+    }
   };
+
   const toggleStatus = async (worker) => {
-    /* ... existing code ... */
+    try {
+      const newStatus = worker.status === 1 ? 2 : 1;
+      await workerService.update(worker._id, { status: newStatus });
+      toast.success(`Worker ${newStatus === 1 ? "Activated" : "Deactivated"}`);
+      const status = activeTab === "active" ? 1 : 2;
+      fetchData(pagination.page, pagination.limit, currentSearch, status);
+    } catch {
+      toast.error("Status update failed");
+    }
   };
+
   const handleDownloadImage = async (e, url, name) => {
-    /* ... existing code ... */
+    e.stopPropagation();
+    if (!url) return toast.error("No image to download");
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `${name.replace(/\s+/g, "_")}_profile.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      toast.error("Download failed");
+    }
   };
 
   // --- COLUMNS ---
