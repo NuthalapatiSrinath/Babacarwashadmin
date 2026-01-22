@@ -7,7 +7,7 @@ import DataTable from "../../components/DataTable";
 import LocationModal from "../../components/modals/LocationModal";
 import DeleteModal from "../../components/modals/DeleteModal";
 
-// API
+// APId
 import { locationService } from "../../api/locationService";
 
 const Locations = () => {
@@ -51,7 +51,7 @@ const Locations = () => {
         resultData = resultData.filter(
           (item) =>
             item.name?.toLowerCase().includes(search.toLowerCase()) ||
-            item.address?.toLowerCase().includes(search.toLowerCase())
+            item.address?.toLowerCase().includes(search.toLowerCase()),
         );
         totalRecords = resultData.length;
       }

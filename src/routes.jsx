@@ -15,6 +15,7 @@ import {
   Users,
   ClipboardCheck,
   UserCheck,
+  BarChart2,
 } from "lucide-react";
 
 // Page Imports
@@ -49,6 +50,8 @@ import WorkerWashedCars from "./pages/workers-management/WorkerWashedCars";
 import WorkerHistory from "./pages/workers-management/WorkerHistory";
 import StaffProfile from "./pages/workers-management/StaffProfile";
 import WorkerProfile from "./pages/workers-management/WorkerProfile";
+import MonthlyRecords from "./pages/workers-management/MonthlyRecords";
+import YearlyRecords from "./pages/workers-management/YearlyRecords";
 
 export const routes = [
   // --- OVERVIEW ---
@@ -83,6 +86,18 @@ export const routes = [
     title: "Workers",
     component: <Workers />,
     icon: UserCheck,
+  },
+  {
+    path: "/workers/monthly",
+    title: "Monthly Records",
+    component: <MonthlyRecords />,
+    icon: UserCheck,
+  },
+  {
+    path: "/workers/yearly",
+    title: "Yearly Records",
+    component: <YearlyRecords />,
+    icon: BarChart2, // Make sure to import this
   },
   {
     path: "/workers/:id",

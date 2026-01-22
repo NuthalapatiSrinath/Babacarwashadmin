@@ -23,6 +23,7 @@ import {
   X,
   ClipboardCheck,
   Settings,
+  BarChart2,
 } from "lucide-react";
 
 const Sidebar = ({ isOpen, isMobile, onClose }) => {
@@ -200,11 +201,11 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
                   label="Workers"
                   onClick={handleLinkClick}
                 />
-                <SubNavItem
+                {/* <SubNavItem
                   to="/workers/staff"
                   label="Staff"
                   onClick={handleLinkClick}
-                />
+                /> */}
                 <SubNavItem
                   to="/workers/attendance"
                   label="Attendance"
@@ -287,6 +288,13 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
                 />
               </SubMenu>
             </li>
+            <NavItem
+              to="/workers/yearly" // ✅ Link to the new page
+              icon={BarChart2} // Import BarChart2 from lucide-react
+              label="Worker Yearly Records"
+              onClick={handleLinkClick}
+              isMobile={isMobile}
+            />
 
             <NavItem
               to="/work-records"

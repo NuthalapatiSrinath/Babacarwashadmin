@@ -24,6 +24,7 @@ import {
   Truck,
   Building,
   Map,
+  FileText, // ✅ Added FileText Icon
 } from "lucide-react";
 import toast from "react-hot-toast";
 import * as XLSX from "xlsx";
@@ -145,8 +146,6 @@ const Workers = () => {
   }, [activeTab]);
 
   // --- FILTER LOGIC ---
-
-  // ✅ FIXED: Using Predefined Company List instead of dynamic loading
   const companyOptions = useMemo(() => {
     const companies = [
       "BABA CAR WASHING AND CLEANING L.L.C.",
@@ -234,11 +233,8 @@ const Workers = () => {
         }
       }
 
-      // ✅ ENHANCED SEARCH LOGIC
       if (currentSearch) {
         const s = currentSearch.toLowerCase();
-
-        // Prepare a string of all assigned location names for searching
         const assignmentNames = [
           ...(item.malls || []).map((m) =>
             typeof m === "object" ? m.name : m,
@@ -257,8 +253,8 @@ const Workers = () => {
           item.name?.toLowerCase().includes(s) ||
           item.employeeCode?.toLowerCase().includes(s) ||
           item.mobile?.toLowerCase().includes(s) ||
-          item.companyName?.toLowerCase().includes(s) || // ✅ Search by Company
-          assignmentNames.includes(s) // ✅ Search by Assigned Location
+          item.companyName?.toLowerCase().includes(s) ||
+          assignmentNames.includes(s)
         );
       }
       return true;
@@ -285,7 +281,6 @@ const Workers = () => {
     });
   }, [data]);
 
-  // --- ACTIONS ---
   const handleExportData = async () => {
     const toastId = toast.loading("Exporting...");
     try {
@@ -307,7 +302,6 @@ const Workers = () => {
     }
   };
 
-  // ✅ UPDATED TEMPLATE: Removed Company Column
   const handleDownloadTemplate = () => {
     const toastId = toast.loading("Generating Template...");
     try {
@@ -316,7 +310,6 @@ const Workers = () => {
           Name: "John Doe (Sample)",
           Mobile: "971501234567",
           "Employee Code": "EMP001",
-          // Company removed
           "Joining Date (DD/MM/YYYY)": "01/01/2024",
           "Passport No.": "N123456",
           "Passport Expiry (DD/MM/YYYY)": "01/01/2030",
@@ -331,8 +324,7 @@ const Workers = () => {
         { wch: 25 },
         { wch: 15 },
         { wch: 15 },
-        // Company removed
-        { wch: 20 }, // Joining Date
+        { wch: 20 },
         { wch: 15 },
         { wch: 25 },
         { wch: 15 },
@@ -413,7 +405,6 @@ const Workers = () => {
     }
   };
 
-  // --- COLUMNS ---
   const columns = [
     {
       header: "Worker",
@@ -508,17 +499,13 @@ const Workers = () => {
         </div>
       ),
     },
-
-    // ✅ NEW "ASSIGNMENTS" COLUMN (Replaces the expanded row)
     {
       header: "Assignments",
-      className: "min-w-[250px] max-w-[450px]", // Constraint width to force wrapping
+      className: "min-w-[250px] max-w-[450px]",
       render: (r) => {
         const buildings = r.buildings || [];
         const malls = r.malls || [];
         const sites = r.sites || [];
-
-        // Collect all assignments into a uniform list to check if empty
         const hasAssignments =
           buildings.length > 0 || malls.length > 0 || sites.length > 0;
 
@@ -561,7 +548,6 @@ const Workers = () => {
         );
       },
     },
-
     {
       header: "Quick Links",
       className: "text-center",
@@ -619,6 +605,23 @@ const Workers = () => {
           >
             <Eye className="w-4 h-4" />
           </button>
+
+          <button
+            onClick={() =>
+              navigate("/workers/monthly", {
+                // ✅ PASS FULL WORKER OBJECT + ID
+                state: {
+                  workerId: row._id,
+                  worker: row, // Pass full row to populate header immediately
+                },
+              })
+            }
+            className="p-2 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 rounded-lg transition-all"
+            title="Monthly Records"
+          >
+            <FileText className="w-4 h-4" />
+          </button>
+
           <button
             onClick={() => {
               setSelectedWorker(row);
@@ -644,7 +647,6 @@ const Workers = () => {
     },
   ];
 
-  // Determine if client-side filtering is happening (i.e. viewing a subset of the fetched page)
   const isClientFiltered =
     selectedCompany ||
     filterServiceType !== "all" ||

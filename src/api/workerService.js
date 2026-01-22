@@ -4,7 +4,20 @@ export const workerService = {
   // ==========================================
   // 🟢 EXISTING WORKER METHODS (PRESERVED)
   // ==========================================
-
+  getMonthlyRecords: async (year, month, workerId = "") => {
+    // ✅ Pass workerId query param
+    const response = await api.get(
+      `/workers/monthly-records?year=${year}&month=${month}&workerId=${workerId}`,
+    );
+    return response.data;
+  },
+  getYearlyRecords: async (mode, year, workerId) => {
+    // mode: 'year' | 'last6'
+    const response = await api.get(
+      `/workers/yearly-records?mode=${mode}&year=${year}&workerId=${workerId}`,
+    );
+    return response.data;
+  },
   // List
   list: async (page = 1, limit = 10, search = "", status = 1) => {
     console.log(
