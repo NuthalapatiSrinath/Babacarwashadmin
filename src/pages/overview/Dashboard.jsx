@@ -54,10 +54,14 @@ const Dashboard = () => {
   useEffect(() => {
     const loadDashboard = async () => {
       try {
-        // 1. Load Graph Colors from Local Storage
+        // 1. Load Graph Colors from Local Storage (Safely)
         const savedStyles = localStorage.getItem("admin_graph_colors");
         if (savedStyles) {
-          setGraphStyles({ ...DEFAULT_STYLES, ...JSON.parse(savedStyles) });
+          try {
+            setGraphStyles({ ...DEFAULT_STYLES, ...JSON.parse(savedStyles) });
+          } catch (err) {
+            console.warn("Failed to parse graph styles", err);
+          }
         }
 
         // 2. Fetch Data (Stats + Charts)
@@ -202,6 +206,16 @@ const GraphWidget = ({ title, data, type, colors, id }) => {
   const gradComp = `gradComp-${id}`;
   const gradPend = `gradPend-${id}`;
 
+  // ✅ FIX: Robust URL resolution for production environments
+  // This ensures the gradient works even if <base> tags or complex routing are present
+  const getGradientUrl = (gradientId) => {
+    if (typeof window !== "undefined") {
+      const url = window.location.href.split("#")[0];
+      return `url(${url}#${gradientId})`;
+    }
+    return `url(#${gradientId})`;
+  };
+
   return (
     <div className="bg-white p-4 rounded shadow-sm border border-slate-200 h-[400px] flex flex-col relative">
       {/* CUSTOM LEGEND */}
@@ -299,8 +313,9 @@ const GraphWidget = ({ title, data, type, colors, id }) => {
               type="monotone"
               dataKey="Completed"
               stroke={colors.completed}
-              fill={`url(#${gradComp})`}
+              fill={getGradientUrl(gradComp)} // ✅ Using Safe URL Fix
               strokeWidth={3}
+              isAnimationActive={false} // ✅ Disable animation to prevent glitches
               dot={{
                 r: 4,
                 stroke: colors.completed,
@@ -315,8 +330,9 @@ const GraphWidget = ({ title, data, type, colors, id }) => {
               type="monotone"
               dataKey="Pending"
               stroke={colors.pending}
-              fill={`url(#${gradPend})`}
+              fill={getGradientUrl(gradPend)} // ✅ Using Safe URL Fix
               strokeWidth={3}
+              isAnimationActive={false} // ✅ Disable animation
               dot={{
                 r: 4,
                 stroke: colors.pending,

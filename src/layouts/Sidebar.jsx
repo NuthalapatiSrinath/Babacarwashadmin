@@ -24,6 +24,7 @@ import {
   ClipboardCheck,
   Settings,
   BarChart2,
+  Clock,
 } from "lucide-react";
 
 const Sidebar = ({ isOpen, isMobile, onClose }) => {
@@ -292,6 +293,14 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
               to="/workers/yearly" // ✅ Link to the new page
               icon={BarChart2} // Import BarChart2 from lucide-react
               label="Worker Yearly Records"
+              onClick={handleLinkClick}
+              isMobile={isMobile}
+            />
+            {/* ✅ NEW: PENDING PAYMENTS TAB */}
+            <NavItem
+              to="/pending-payments"
+              icon={Clock}
+              label="Pending Payments"
               onClick={handleLinkClick}
               isMobile={isMobile}
             />

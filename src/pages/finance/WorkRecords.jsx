@@ -7,31 +7,24 @@ import {
   Layers,
   Calendar,
   Filter,
+  FileText,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { downloadWorkRecordsStatement } from "../../redux/slices/workRecordsSlice";
+import { workRecordsService } from "../../api/workRecordsService";
 import CustomDropdown from "../../components/ui/CustomDropdown";
 
 const WorkRecords = () => {
   const dispatch = useDispatch();
-
-  // Redux State
   const { downloading } = useSelector((state) => state.workRecords);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
-  // --- DYNAMIC DATE LOGIC ---
   const today = new Date();
-  const currentMonth = today.getMonth() + 1; // 1-12 (January is 1)
+  const currentMonth = today.getMonth() + 1;
   const currentYear = today.getFullYear();
-
-  // 1. Calculate the latest year that has completed data.
-  // If we are in January (1), the current year has NO completed months yet.
-  // So the latest valid year is the previous year (2025).
-  // If we are in Feb (2) or later, the current year (2026) has at least Jan completed.
   const maxValidYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-
-  // 2. Initial State Logic
-  // If maxValidYear is previous year (e.g. 2025), default to December.
-  // If maxValidYear is current year (e.g. 2026), default to last completed month (currentMonth - 1).
   const initialYear = maxValidYear;
   const initialMonth = maxValidYear < currentYear ? 12 : currentMonth - 1;
 
@@ -41,24 +34,20 @@ const WorkRecords = () => {
     year: initialYear,
   });
 
-  // --- DROPDOWN OPTIONS ---
-
   const serviceTypeOptions = [
     { value: "residence", label: "Residence", icon: Layers },
     { value: "onewash", label: "Onewash", icon: Filter },
   ];
 
-  // Generate Year Options dynamically up to maxValidYear
   const yearOptions = useMemo(() => {
-    const startYear = 2024; // Base year
+    const startYear = 2024;
     const years = [];
     for (let y = startYear; y <= maxValidYear; y++) {
       years.push({ value: y, label: y.toString() });
     }
-    return years.reverse(); // Show newest year first (e.g., 2025, 2024)
+    return years.reverse();
   }, [maxValidYear]);
 
-  // --- MONTH LOGIC ---
   const availableMonths = useMemo(() => {
     const allMonths = [
       { value: 1, label: "January" },
@@ -74,31 +63,20 @@ const WorkRecords = () => {
       { value: 11, label: "November" },
       { value: 12, label: "December" },
     ];
-
     const selectedYear = Number(filters.year);
-
     return allMonths.filter((m) => {
-      // 1. If selected year is purely in the past (e.g. 2024 when we are in 2025/2026)
-      // All months are valid/completed.
       if (selectedYear < currentYear) return true;
-
-      // 2. If selected year IS the current year (e.g. 2026)
-      // We only show months strictly LESS than current month.
-      // (e.g. if Today is Feb 15, currentMonth=2. We show Jan (1). 1 < 2 is True).
       if (selectedYear === currentYear) {
         return m.value < currentMonth;
       }
-
-      return false; // Should not happen given yearOptions logic, but safe fallback
+      return false;
     });
   }, [filters.year, currentMonth, currentYear]);
 
-  // Safety Effect: If current selected month becomes invalid (hidden), reset it
   useEffect(() => {
     const isCurrentMonthValid = availableMonths.some(
       (m) => m.value === Number(filters.month),
     );
-
     if (!isCurrentMonthValid && availableMonths.length > 0) {
       setFilters((prev) => ({
         ...prev,
@@ -107,11 +85,17 @@ const WorkRecords = () => {
     }
   }, [availableMonths, filters.month]);
 
-  const handleDownload = async () => {
-    const toastId = toast.loading(
-      `Generating ${filters.serviceType} report...`,
-    );
+  const loadImage = (url) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.src = url;
+      img.onload = () => resolve(img);
+      img.onerror = (err) => reject(err);
+    });
+  };
 
+  const handleDownloadExcel = async () => {
+    const toastId = toast.loading(`Generating Excel report...`);
     try {
       const result = await dispatch(
         downloadWorkRecordsStatement({
@@ -121,60 +105,171 @@ const WorkRecords = () => {
         }),
       ).unwrap();
       const blob = result.blob;
-
-      if (blob.size < 100) {
-        console.warn("File size is very small, might be empty.");
-      }
-
       const url = window.URL.createObjectURL(new Blob([blob]));
       const link = document.createElement("a");
       link.href = url;
       link.download = `Statement_${filters.serviceType}_${filters.year}_${filters.month}.xlsx`;
       document.body.appendChild(link);
       link.click();
-
       link.remove();
       window.URL.revokeObjectURL(url);
-
-      toast.success("Download successful!", { id: toastId });
+      toast.success("Excel Download successful!", { id: toastId });
     } catch (error) {
       console.error("Download Error:", error);
-      toast.error("Failed to download file. Check if data exists.", {
-        id: toastId,
+      toast.error("Failed to download Excel.", { id: toastId });
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    setPdfLoading(true);
+    const toastId = toast.loading("Fetching data for PDF...");
+
+    try {
+      const data = await workRecordsService.getStatementData(
+        filters.year,
+        filters.month,
+        filters.serviceType,
+      );
+
+      if (!data || data.length === 0) {
+        toast.error("No records found for this period", { id: toastId });
+        setPdfLoading(false);
+        return;
+      }
+
+      // ✅ Landscape Mode for Wide Table
+      const doc = new jsPDF("landscape");
+      const monthName = availableMonths.find(
+        (m) => m.value === filters.month,
+      )?.label;
+
+      try {
+        const logoImg = await loadImage("/carwash.jpeg");
+        const imgWidth = 25;
+        const imgHeight = 25;
+        // Center on Landscape A4 (297mm width)
+        const xPos = (297 - imgWidth) / 2;
+        doc.addImage(logoImg, "JPEG", xPos, 10, imgWidth, imgHeight);
+      } catch (e) {
+        console.warn("Logo load failed", e);
+      }
+
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("BABA CAR WASHING AND CLEANING LLC", 148.5, 42, {
+        align: "center",
       });
+
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        `${filters.serviceType.toUpperCase()} WORK STATEMENT`,
+        148.5,
+        50,
+        { align: "center" },
+      );
+
+      doc.setFontSize(10);
+      doc.text(`Period: ${monthName} ${filters.year}`, 148.5, 56, {
+        align: "center",
+      });
+
+      // ✅ Dynamic Days Logic (1-28/30/31)
+      const daysInMonth = new Date(filters.year, filters.month, 0).getDate();
+      const daysHeader = Array.from({ length: daysInMonth }, (_, i) =>
+        (i + 1).toString(),
+      );
+
+      // Headers: Sl, Name, [1..31], Total, (Amount for OneWash)
+      const tableHead = [["Sl", "Worker Name", ...daysHeader, "Total", "Tips"]];
+
+      // Body Mapping
+      const tableBody = data.map((row, index) => {
+        // row.daily is array of counts [5, 4, 0...] from backend
+        // If undefined, fill with 0s
+        const dailyCounts = row.daily || Array(daysInMonth).fill(0);
+
+        return [
+          index + 1,
+          row.name,
+          ...dailyCounts,
+          row.totalCars || 0,
+          (row.amount || 0).toFixed(2),
+        ];
+      });
+
+      // Calculate Column Totals for Summary
+      const dailyTotals = Array(daysInMonth).fill(0);
+      let grandTotalCars = 0;
+      let grandTotalTips = 0;
+
+      data.forEach((row) => {
+        const daily = row.daily || [];
+        daily.forEach((count, i) => {
+          if (i < daysInMonth) dailyTotals[i] += count;
+        });
+        grandTotalCars += row.totalCars || 0;
+        grandTotalTips += row.amount || 0;
+      });
+
+      // Summary Row
+      tableBody.push([
+        {
+          content: "TOTAL",
+          colSpan: 2,
+          styles: { halign: "center", fontStyle: "bold" },
+        },
+        ...dailyTotals,
+        { content: grandTotalCars, styles: { fontStyle: "bold" } },
+        { content: grandTotalTips.toFixed(2), styles: { fontStyle: "bold" } },
+      ]);
+
+      autoTable(doc, {
+        startY: 65,
+        head: tableHead,
+        body: tableBody,
+        theme: "grid",
+        headStyles: {
+          fillColor: [30, 75, 133],
+          halign: "center",
+          fontSize: 7, // Smaller font for header
+          cellPadding: 1,
+        },
+        bodyStyles: {
+          fontSize: 7, // Smaller font for body
+          cellPadding: 1,
+          halign: "center",
+        },
+        columnStyles: {
+          0: { cellWidth: 8 }, // Sl
+          1: { halign: "left", cellWidth: 35 }, // Name (Wider)
+          // Days auto-size
+          [daysInMonth + 2]: { fontStyle: "bold", cellWidth: 12 }, // Total Column
+          [daysInMonth + 3]: { fontStyle: "bold", cellWidth: 15 }, // Tips Column
+        },
+      });
+
+      doc.save(
+        `Monthly_Statement_${filters.serviceType}_${monthName}_${filters.year}.pdf`,
+      );
+      toast.success("PDF Generated!", { id: toastId });
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to generate PDF", { id: toastId });
+    } finally {
+      setPdfLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 font-sans">
-      {/* --- HEADER --- */}
-      {/* <div className="max-w-7xl mx-auto mb-8">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg shadow-indigo-200">
-            <FileSpreadsheet className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-800 to-indigo-800 bg-clip-text text-transparent">
-              Work Records
-            </h1>
-            <p className="text-slate-500 font-medium mt-1">
-              Generate and download monthly work statements
-            </p>
-          </div>
-        </div>
-      </div> */}
-
-      {/* --- FILTER CARD --- */}
       <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-xl border border-slate-100 relative">
         <div className="h-1.5 w-full bg-gradient-to-r from-indigo-400 via-blue-500 to-cyan-500 rounded-t-2xl"></div>
-
         <div className="p-6 md:p-8">
           <div className="flex items-center gap-2 mb-6 text-slate-400 text-xs font-bold uppercase tracking-wider">
             <Filter className="w-4 h-4" /> Statement Parameters
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
-            {/* Service Type */}
             <div>
               <CustomDropdown
                 label="Service Type"
@@ -185,8 +280,6 @@ const WorkRecords = () => {
                 placeholder="Select Service"
               />
             </div>
-
-            {/* Year */}
             <div>
               <CustomDropdown
                 label="Year"
@@ -199,8 +292,6 @@ const WorkRecords = () => {
                 placeholder="Select Year"
               />
             </div>
-
-            {/* Month */}
             <div>
               <CustomDropdown
                 label="Month"
@@ -218,27 +309,35 @@ const WorkRecords = () => {
                 disabled={availableMonths.length === 0}
               />
             </div>
-
-            {/* Download Button */}
-            <div>
+            <div className="flex gap-2">
               <button
-                onClick={handleDownload}
+                onClick={handleDownloadExcel}
                 disabled={downloading || availableMonths.length === 0}
-                className="w-full h-[42px] bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl shadow-indigo-200 hover:shadow-indigo-200 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed text-sm"
+                className="flex-1 h-[42px] bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 hover:text-slate-900 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed text-xs shadow-sm"
               >
                 {downloading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Download className="w-5 h-5" />
-                )}
-                <span>{downloading ? "Processing..." : "Download Report"}</span>
+                  <FileSpreadsheet className="w-4 h-4" />
+                )}{" "}
+                Excel
+              </button>
+              <button
+                onClick={handleDownloadPDF}
+                disabled={pdfLoading || availableMonths.length === 0}
+                className="flex-1 h-[42px] bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl shadow-red-200 hover:shadow-red-200 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed text-xs"
+              >
+                {pdfLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FileText className="w-4 h-4" />
+                )}{" "}
+                Export pdf
               </button>
             </div>
           </div>
         </div>
       </div>
-
-      {/* --- EMPTY STATE ILLUSTRATION --- */}
       <div className="max-w-7xl mx-auto mt-16 flex flex-col items-center justify-center text-center opacity-70">
         <div className="w-32 h-32 rounded-full bg-white border-4 border-slate-100 flex items-center justify-center mb-6 shadow-sm">
           <div className="w-24 h-24 rounded-full bg-slate-50 flex items-center justify-center">
@@ -247,8 +346,8 @@ const WorkRecords = () => {
         </div>
         <h3 className="text-xl font-bold text-slate-700">Ready to Export</h3>
         <p className="text-slate-500 mt-2 max-w-sm">
-          Select the service type, month, and year from the panel above to
-          generate and download the work records statement.
+          Select the service type, month, and year to generate standard Excel or
+          formatted PDF reports.
         </p>
       </div>
     </div>

@@ -1,15 +1,10 @@
 import api from "./axiosInstance";
 
 export const workRecordsService = {
+  // 1. Standard Excel Download (Blob)
   downloadStatement: async (serviceType, month, year) => {
-    // 1. Determine Endpoint based on Service Type
-    // - OneWash uses the '/onewash' route
-    // - Residence uses the '/jobs' route (based on the code you provided)
     const baseUrl = serviceType === "onewash" ? "/onewash" : "/jobs";
-
-    // 2. Fix Date Index
-    // Frontend sends 1 for Jan, but Backend 'new Date()' expects 0 for Jan.
-    // We must subtract 1.
+    // Frontend (1-12) to Backend (0-11)
     const adjustedMonth = parseInt(month, 10) - 1;
 
     const response = await api.get(`${baseUrl}/export/statement/monthly`, {
@@ -18,9 +13,26 @@ export const workRecordsService = {
         year: year,
         month: adjustedMonth,
       },
-      responseType: "blob", // CRITICAL: Forces response to be a file
+      responseType: "blob", // Forces response to be a file
     });
 
+    return response.data;
+  },
+
+  // 2. JSON Data Fetch for Rich PDF (Corrected Route)
+  getStatementData: async (year, month, serviceType) => {
+    const baseUrl = serviceType === "onewash" ? "/onewash" : "/jobs";
+    const adjustedMonth = parseInt(month, 10) - 1;
+
+    // Hits the SAME endpoint but asks for JSON format
+    const response = await api.get(`${baseUrl}/export/statement/monthly`, {
+      params: {
+        year: year,
+        month: adjustedMonth,
+        service_type: serviceType,
+        format: "json", // ✅ Triggers JSON response from backend
+      },
+    });
     return response.data;
   },
 };

@@ -1,6 +1,14 @@
 import api from "./axiosInstance";
 
 export const workerService = {
+  // Add to src/api/workerService.js
+  getStatementData: async (year, month, serviceType) => {
+    // Replace with your actual endpoint that returns JSON
+    const response = await api.get(
+      `/analytics/statement-data?year=${year}&month=${month}&service_type=${serviceType}`,
+    );
+    return response.data;
+  },
   // ==========================================
   // 🟢 EXISTING WORKER METHODS (PRESERVED)
   // ==========================================

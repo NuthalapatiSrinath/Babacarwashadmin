@@ -63,8 +63,7 @@ export const paymentService = {
     console.log("✅ [API] DELETE /payments/:id Response:", response.data);
     return response.data;
   },
-
-  // Download Collection Sheet
+  // 1. Download Excel (Needs Blob)
   downloadCollectionSheet: async ({
     serviceType,
     year,
@@ -81,11 +80,28 @@ export const paymentService = {
         building: building || "all",
         worker: worker || "all",
       },
-      responseType: "blob",
+      responseType: "blob", // ✅ Correct for Excel
     });
     return response.data;
   },
 
+  // 2. Fetch Data for Rich PDF (Needs JSON)
+  // ✅ UPDATED: Removed 'responseType: blob' so it parses as JSON
+  getCollectionData: async ({ serviceType, year, month, building, worker }) => {
+    const adjustedMonth = parseInt(month, 10) - 1;
+    const response = await api.get("/payments/export/statement/monthly", {
+      params: {
+        service_type: serviceType,
+        year: year,
+        month: adjustedMonth,
+        building: building || "all",
+        worker: worker || "all",
+        format: "json", // ✅ Tells backend to return JSON
+      },
+      // ❌ DO NOT add responseType: 'blob' here
+    });
+    return response.data;
+  },
   // --- NEW: SETTLEMENTS API ---
 
   // 1. Get List of Settlements

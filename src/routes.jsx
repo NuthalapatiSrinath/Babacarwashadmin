@@ -53,6 +53,7 @@ import WorkerProfile from "./pages/workers-management/WorkerProfile";
 import MonthlyRecords from "./pages/workers-management/MonthlyRecords";
 import YearlyRecords from "./pages/workers-management/YearlyRecords";
 import SalarySlip from "./pages/salary/SalarySlip";
+import PendingPayments from "./pages/pending-payments/PendingPayments";
 
 export const routes = [
   // --- OVERVIEW ---
@@ -98,6 +99,12 @@ export const routes = [
     path: "/workers/yearly",
     title: "Yearly Records",
     component: <YearlyRecords />,
+    icon: BarChart2, // Make sure to import this
+  },
+  {
+    path: "/pending-payments",
+    title: "Pending Payments",
+    component: <PendingPayments />,
     icon: BarChart2, // Make sure to import this
   },
   {
