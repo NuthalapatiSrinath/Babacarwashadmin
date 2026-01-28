@@ -8,7 +8,6 @@ import {
   Filter,
   Layers,
   Calendar,
-  Download,
   FileText,
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -32,14 +31,13 @@ const CollectionSheet = () => {
   const { downloading } = useSelector((state) => state.collectionSheet);
 
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [viewData, setViewData] = useState([]); // Stores data for Table & PDF
 
-  // --- 1. DYNAMIC DATE LOGIC (COMPLETED MONTHS ONLY) ---
+  // --- DYNAMIC DATE LOGIC ---
   const today = new Date();
-  const currentMonth = today.getMonth() + 1; // 1-12
+  const currentMonth = today.getMonth() + 1;
   const currentYear = today.getFullYear();
-
-  // If currently Jan (1), previous completed month is Dec (12) of prev year
-  // If currently Feb (2), previous completed month is Jan (1) of current year
   const initialYear = currentMonth === 1 ? currentYear - 1 : currentYear;
   const initialMonth = currentMonth === 1 ? 12 : currentMonth - 1;
 
@@ -51,7 +49,8 @@ const CollectionSheet = () => {
     year: initialYear,
   });
 
-  // Calculate available years (only up to current year)
+  // --- MISSING VARIABLE FIXED HERE ---
+  // This calculates the list of years (2024, 2025, etc.) for the dropdown
   const yearOptions = useMemo(() => {
     const startYear = 2024;
     const years = [];
@@ -61,7 +60,7 @@ const CollectionSheet = () => {
     return years.reverse();
   }, [currentYear]);
 
-  // Calculate available months (Strictly Completed Months)
+  // Calculate available months based on selected year
   const availableMonths = useMemo(() => {
     const allMonths = [
       { value: 1, label: "January" },
@@ -77,19 +76,22 @@ const CollectionSheet = () => {
       { value: 11, label: "November" },
       { value: 12, label: "December" },
     ];
-
     return allMonths.filter((m) => {
-      // If past year, all months valid
       if (filters.year < currentYear) return true;
-      // If current year, only months LESS than current month
-      if (filters.year === currentYear) {
-        return m.value < currentMonth;
-      }
+      if (filters.year === currentYear) return m.value < currentMonth;
       return false;
     });
   }, [filters.year, currentMonth, currentYear]);
 
-  // Auto-correct month selection if invalid
+  // --- EFFECTS ---
+
+  // Initial Load of Dropdowns
+  useEffect(() => {
+    dispatch(fetchBuildings({ page: 1, limit: 1000 }));
+    dispatch(fetchWorkers({ page: 1, limit: 1000, status: 1 }));
+  }, [dispatch]);
+
+  // Auto-correct month if invalid for the selected year
   useEffect(() => {
     const isValid = availableMonths.some((m) => m.value === filters.month);
     if (!isValid && availableMonths.length > 0) {
@@ -97,14 +99,45 @@ const CollectionSheet = () => {
     }
   }, [availableMonths, filters.month]);
 
-  // --- INITIAL DATA LOAD ---
+  // Fetch Data for Worksheet View (Auto-refresh on filter change)
   useEffect(() => {
-    dispatch(fetchBuildings({ page: 1, limit: 1000 }));
-    dispatch(fetchWorkers({ page: 1, limit: 1000, status: 1 }));
-  }, [dispatch]);
+    const loadViewData = async () => {
+      if (!availableMonths.length) return;
+      setViewLoading(true);
+      try {
+        console.log("🔵 [FRONTEND] Fetching View Data with Filters:", filters);
+
+        const apiFilters = {
+          ...filters,
+          building: filters.building === "all" ? "" : filters.building,
+          worker: filters.worker === "all" ? "" : filters.worker,
+        };
+
+        const data = await paymentService.getCollectionData(apiFilters);
+        console.log(
+          "✅ [FRONTEND] View Data Received:",
+          data?.length || 0,
+          "groups",
+        );
+
+        setViewData(data || []);
+      } catch (error) {
+        console.error("❌ View Data Error:", error);
+      } finally {
+        setViewLoading(false);
+      }
+    };
+    loadViewData();
+  }, [filters, availableMonths]);
+
+  // --- HANDLERS ---
 
   const handleFilterChange = (name, value) => {
-    setFilters((prev) => ({ ...prev, [name]: value }));
+    if (name === "building") {
+      setFilters((prev) => ({ ...prev, building: value, worker: "all" }));
+    } else {
+      setFilters((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const loadImage = (url) => {
@@ -116,16 +149,28 @@ const CollectionSheet = () => {
     });
   };
 
-  // --- DOWNLOAD HANDLERS ---
+  // --- EXCEL DOWNLOAD ---
   const handleDownloadExcel = async () => {
     const toastId = toast.loading("Generating Excel Sheet...");
     try {
-      const result = await dispatch(downloadCollectionSheet(filters)).unwrap();
+      console.log("🔵 [FRONTEND] Downloading Excel with Filters:", filters);
+
+      const apiFilters = {
+        ...filters,
+        building: filters.building === "all" ? "" : filters.building,
+        worker: filters.worker === "all" ? "" : filters.worker,
+      };
+
+      const result = await dispatch(
+        downloadCollectionSheet(apiFilters),
+      ).unwrap();
       const blob = result.blob;
+
       if (blob.size < 100) {
         toast.error("File appears empty.", { id: toastId });
         return;
       }
+
       const url = window.URL.createObjectURL(new Blob([blob]));
       const link = document.createElement("a");
       link.href = url;
@@ -141,112 +186,126 @@ const CollectionSheet = () => {
     }
   };
 
+  // --- PDF DOWNLOAD ---
   const handleDownloadPDF = async () => {
     setPdfLoading(true);
-    const toastId = toast.loading("Fetching data for PDF...");
+    const toastId = toast.loading("Generating PDF...");
 
     try {
-      const data = await paymentService.getCollectionData(filters);
+      console.log("🔵 [FRONTEND] Downloading PDF with Filters:", filters);
 
-      if (!data || !Array.isArray(data)) {
-        toast.error("Invalid data format received.", { id: toastId });
+      let data = viewData;
+      if (!data || data.length === 0) {
+        // Fallback fetch if view data is empty
+        const apiFilters = {
+          ...filters,
+          building: filters.building === "all" ? "" : filters.building,
+          worker: filters.worker === "all" ? "" : filters.worker,
+        };
+        data = await paymentService.getCollectionData(apiFilters);
+      }
+
+      if (!data || data.length === 0) {
+        toast.error("No records found", { id: toastId });
         setPdfLoading(false);
         return;
       }
 
-      if (data.length === 0) {
-        toast.error("No records found for this period", { id: toastId });
-        setPdfLoading(false);
-        return;
-      }
-
-      const doc = new jsPDF("landscape");
+      const doc = new jsPDF("landscape", "mm", "a4");
+      const pageWidth = doc.internal.pageSize.getWidth();
 
       try {
         const logoImg = await loadImage("/carwash.jpeg");
-        const imgWidth = 25;
-        const imgHeight = 25;
-        const xPos = (297 - imgWidth) / 2;
-        doc.addImage(logoImg, "JPEG", xPos, 10, imgWidth, imgHeight);
+        doc.addImage(logoImg, "JPEG", (pageWidth - 25) / 2, 5, 25, 25);
       } catch (e) {
-        console.warn("Logo load failed", e);
+        console.warn("Logo load failed");
       }
 
-      doc.setFontSize(16);
+      doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
-      doc.text("BABA CAR WASHING AND CLEANING LLC", 148.5, 42, {
+      doc.text("BABA CAR WASHING AND CLEANING LLC", pageWidth / 2, 35, {
         align: "center",
       });
 
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "normal");
-      doc.text("MONTHLY COLLECTION SHEET", 148.5, 50, { align: "center" });
-
-      const monthName = availableMonths.find(
-        (m) => m.value === filters.month,
-      )?.label;
       doc.setFontSize(10);
-      doc.text(`Period: ${monthName} ${filters.year}`, 148.5, 56, {
+      doc.setFont("helvetica", "normal");
+      doc.text("MONTHLY COLLECTION SHEET", pageWidth / 2, 42, {
         align: "center",
       });
 
-      let currentY = 65;
+      const monthName =
+        availableMonths.find((m) => m.value === filters.month)?.label || "";
+      doc.setFontSize(9);
+      doc.text(`Period: ${monthName} ${filters.year}`, pageWidth / 2, 47, {
+        align: "center",
+      });
+
+      let currentY = 55;
 
       data.forEach((buildingGroup, bIndex) => {
         if (bIndex > 0 || currentY > 180) {
           doc.addPage();
-          currentY = 20;
+          currentY = 15;
         }
 
         buildingGroup.workers.forEach((workerGroup) => {
           if (currentY > 170) {
             doc.addPage();
-            currentY = 20;
+            currentY = 15;
           }
 
-          doc.setFontSize(11);
+          doc.setFontSize(9);
           doc.setFont("helvetica", "bold");
-          doc.setTextColor(40);
+          doc.setFillColor(240, 240, 240);
+          doc.rect(10, currentY - 4, pageWidth - 20, 6, "F");
           doc.text(
             `${workerGroup.workerName}  |  ${buildingGroup.buildingName}`,
-            14,
+            12,
             currentY,
           );
 
-          currentY += 5;
+          currentY += 4;
 
           const tableHead = [
             [
               "Sl",
               "Parking",
-              "Reg No",
+              "Car No",
               "Mobile",
               "Flat",
               "Start",
               "Sch",
               "Adv",
-              "Curr",
-              "Last",
+              "Sub.",
+              "Prev",
               "Total",
               "Paid",
+              "Bal",
+              "Pay Date",
+              "Rcpt",
               "Due Date",
+              "Rem",
             ],
           ];
 
-          const tableBody = workerGroup.payments.map((p, i) => [
-            i + 1,
+          const tableBody = workerGroup.payments.map((p) => [
+            p.slNo,
             p.parkingNo,
-            p.regNo,
+            p.carNo,
             p.mobile,
             p.flatNo,
             p.startDate,
             p.schedule,
             p.advance,
-            p.currentMonth,
-            p.lastMonth,
-            (p.totalDue - p.paid).toFixed(2),
+            p.subAmount,
+            p.prevDue,
+            p.totalDue,
             p.paid,
+            p.balance,
+            p.payDate,
+            p.receipt,
             p.dueDate,
+            p.remarks,
           ]);
 
           autoTable(doc, {
@@ -256,19 +315,40 @@ const CollectionSheet = () => {
             theme: "grid",
             headStyles: {
               fillColor: [30, 75, 133],
-              fontSize: 8,
+              fontSize: 6,
               halign: "center",
+              valign: "middle",
             },
-            bodyStyles: { fontSize: 8, cellPadding: 1.5, halign: "center" },
+            bodyStyles: {
+              fontSize: 6,
+              cellPadding: 1,
+              halign: "center",
+              valign: "middle",
+            },
+            // Fine-tuned column widths for A4 Landscape (297mm width)
             columnStyles: {
-              0: { cellWidth: 8 },
-              3: { cellWidth: 22 },
-              12: { cellWidth: 20 },
+              0: { cellWidth: 7 }, // Sl
+              1: { cellWidth: 12 }, // Parking
+              2: { cellWidth: 15 }, // Car
+              3: { cellWidth: 18 }, // Mobile
+              4: { cellWidth: 10 }, // Flat
+              5: { cellWidth: 15 }, // Start
+              6: { cellWidth: 12 }, // Sch
+              7: { cellWidth: 8 }, // Adv
+              8: { cellWidth: 12 }, // Sub
+              9: { cellWidth: 12 }, // Prev
+              10: { cellWidth: 12 }, // Total
+              11: { cellWidth: 12 }, // Paid
+              12: { cellWidth: 12 }, // Bal
+              13: { cellWidth: 16 }, // Pay Date
+              14: { cellWidth: 14 }, // Rcpt
+              15: { cellWidth: 16 }, // Due Date
+              16: { cellWidth: "auto" }, // Rem (auto fills rest)
             },
             margin: { left: 10, right: 10 },
           });
 
-          currentY = doc.lastAutoTable.finalY + 15;
+          currentY = doc.lastAutoTable.finalY + 10;
         });
       });
 
@@ -282,25 +362,34 @@ const CollectionSheet = () => {
     }
   };
 
+  // --- DEPENDENT OPTIONS ---
   const buildingList = useMemo(() => {
     const options = [{ value: "all", label: "All Buildings" }];
-    if (buildings) {
-      buildings.forEach((b) => {
-        options.push({ value: b._id, label: b.name });
-      });
-    }
+    if (buildings)
+      buildings.forEach((b) => options.push({ value: b._id, label: b.name }));
     return options;
   }, [buildings]);
 
   const workerList = useMemo(() => {
     const options = [{ value: "all", label: "All Workers" }];
-    if (workers) {
-      workers.forEach((w) => {
-        options.push({ value: w._id, label: w.name });
+    if (!workers) return options;
+
+    let filteredList = workers;
+    if (filters.building && filters.building !== "all") {
+      filteredList = workers.filter((w) => {
+        return (
+          w.buildings &&
+          (w.buildings.includes(filters.building) ||
+            w.buildings.some(
+              (b) => b === filters.building || b._id === filters.building,
+            ))
+        );
       });
     }
+
+    filteredList.forEach((w) => options.push({ value: w._id, label: w.name }));
     return options;
-  }, [workers]);
+  }, [workers, filters.building]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 font-sans">
@@ -313,7 +402,7 @@ const CollectionSheet = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 items-end">
-            <div className="relative group md:col-span-1">
+            <div className="md:col-span-1">
               <CustomDropdown
                 label="Service Type"
                 value={filters.serviceType}
@@ -323,59 +412,47 @@ const CollectionSheet = () => {
                   { value: "onewash", label: "One Wash", icon: Filter },
                 ]}
                 icon={Layers}
-                placeholder="Select Service"
               />
             </div>
-
-            <div className="relative group md:col-span-1 xl:col-span-1">
+            <div className="md:col-span-1 xl:col-span-1">
               <CustomDropdown
                 label="Building"
                 value={filters.building}
                 onChange={(val) => handleFilterChange("building", val)}
                 options={buildingList}
                 icon={Building}
-                placeholder="All Buildings"
-                searchable={true}
+                searchable
               />
             </div>
-
-            <div className="relative group md:col-span-1 xl:col-span-1">
+            <div className="md:col-span-1 xl:col-span-1">
               <CustomDropdown
                 label="Worker"
                 value={filters.worker}
                 onChange={(val) => handleFilterChange("worker", val)}
                 options={workerList}
                 icon={User}
-                placeholder="All Workers"
-                searchable={true}
+                searchable
               />
             </div>
-
-            <div className="relative group md:col-span-1">
+            <div className="md:col-span-1">
               <CustomDropdown
                 label="Month"
                 value={filters.month}
                 onChange={(val) => handleFilterChange("month", Number(val))}
                 options={availableMonths}
                 icon={Calendar}
-                placeholder={
-                  availableMonths.length === 0 ? "No Data" : "Select Month"
-                }
                 disabled={availableMonths.length === 0}
               />
             </div>
-
-            <div className="relative group md:col-span-1">
+            <div className="md:col-span-1">
               <CustomDropdown
                 label="Year"
                 value={filters.year}
                 onChange={(val) => handleFilterChange("year", Number(val))}
-                options={yearOptions}
+                options={yearOptions} // ✅ This is the variable that was missing before
                 icon={Calendar}
-                placeholder="Select Year"
               />
             </div>
-
             <div className="md:col-span-1 flex gap-2">
               <button
                 onClick={handleDownloadExcel}
@@ -386,20 +463,19 @@ const CollectionSheet = () => {
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <FileSpreadsheet className="w-4 h-4" />
-                )}
+                )}{" "}
                 Excel
               </button>
-
               <button
                 onClick={handleDownloadPDF}
                 disabled={pdfLoading || availableMonths.length === 0}
-                className="flex-1 h-[42px] bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl shadow-emerald-200 transition-all flex items-center justify-center gap-2 disabled:opacity-70 text-xs"
+                className="flex-1 h-[42px] bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-70 text-xs"
               >
                 {pdfLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <FileText className="w-4 h-4" />
-                )}
+                )}{" "}
                 PDF
               </button>
             </div>
@@ -407,19 +483,71 @@ const CollectionSheet = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto mt-16 flex flex-col items-center justify-center text-center opacity-70">
-        <div className="w-32 h-32 rounded-full bg-white border-4 border-slate-100 flex items-center justify-center mb-6 shadow-sm">
-          <div className="w-24 h-24 rounded-full bg-slate-50 flex items-center justify-center">
-            <FileSpreadsheet className="w-10 h-10 text-slate-300" />
+      {/* --- WORKSHEET VIEW (Table Below) --- */}
+      <div className="max-w-7xl mx-auto mt-8">
+        {viewLoading ? (
+          <div className="flex justify-center py-10">
+            <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
           </div>
-        </div>
-        <h3 className="text-xl font-bold text-slate-700">
-          Ready to Generate Report
-        </h3>
-        <p className="text-slate-500 mt-2 max-w-sm">
-          Select your desired parameters from the filters above and click the
-          download button to generate the collection sheet.
-        </p>
+        ) : viewData.length > 0 ? (
+          <div className="bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden">
+            {viewData.map((group, gIdx) => (
+              <div
+                key={gIdx}
+                className="border-b border-slate-200 last:border-0"
+              >
+                {group.workers.map((wGroup, wIdx) => (
+                  <div key={wIdx} className="p-4">
+                    <div className="bg-slate-50 px-4 py-2 rounded-lg border border-slate-200 font-bold text-slate-700 text-sm mb-3">
+                      {wGroup.workerName} | {group.buildingName}
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-slate-100 text-slate-500 font-bold uppercase">
+                          <tr>
+                            <th className="px-3 py-2">Sl</th>
+                            <th className="px-3 py-2">Parking</th>
+                            <th className="px-3 py-2">Car No</th>
+                            <th className="px-3 py-2">Total</th>
+                            <th className="px-3 py-2">Paid</th>
+                            <th className="px-3 py-2">Balance</th>
+                            <th className="px-3 py-2">Due Date</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {wGroup.payments.map((p, pIdx) => (
+                            <tr key={pIdx} className="hover:bg-slate-50">
+                              <td className="px-3 py-2">{p.slNo}</td>
+                              <td className="px-3 py-2">{p.parkingNo}</td>
+                              <td className="px-3 py-2">{p.carNo}</td>
+                              <td className="px-3 py-2 font-bold text-slate-700">
+                                {p.totalDue}
+                              </td>
+                              <td className="px-3 py-2 text-green-600">
+                                {p.paid}
+                              </td>
+                              <td className="px-3 py-2 text-red-500 font-bold">
+                                {p.balance}
+                              </td>
+                              <td className="px-3 py-2">{p.dueDate}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-10 opacity-60">
+            <FileSpreadsheet className="w-12 h-12 mx-auto text-slate-300 mb-2" />
+            <p className="text-sm text-slate-500">
+              No records found for selected criteria
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
