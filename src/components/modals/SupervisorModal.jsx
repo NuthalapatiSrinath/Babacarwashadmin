@@ -100,8 +100,8 @@ const SupervisorModal = ({ isOpen, onClose, onSuccess, editData }) => {
     setFormData({
       name: data.name || "",
       number: data.number || "",
-      password: "",
-      confirmPassword: "",
+      password: data.password || "",
+      confirmPassword: data.password || "",
       serviceType: sType,
       mall:
         data.mall && typeof data.mall === "object"

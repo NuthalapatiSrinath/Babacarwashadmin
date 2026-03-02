@@ -375,6 +375,15 @@ const OneWash = () => {
       ),
     },
     {
+      header: "Parking No",
+      accessor: "parking_no",
+      render: (row) => (
+        <span className="text-slate-600 font-medium">
+          {row.parking_no || "-"}
+        </span>
+      ),
+    },
+    {
       header: "Service Type",
       accessor: "display_service_type",
       className: "text-center",

@@ -189,11 +189,13 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
                       label="Onewash"
                       onClick={handleLinkClick}
                     />
-                    <SubNavItem
-                      to="/supervisor/washes/residence"
-                      label="Residence"
-                      onClick={handleLinkClick}
-                    />
+                    {user.service_type !== "mall" && (
+                      <SubNavItem
+                        to="/supervisor/washes/residence"
+                        label="Residence"
+                        onClick={handleLinkClick}
+                      />
+                    )}
                   </SubMenu>
                 </li>
 
