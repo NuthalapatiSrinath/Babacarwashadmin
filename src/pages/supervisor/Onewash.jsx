@@ -472,13 +472,6 @@ const SupervisorOnewash = () => {
           >
             <Edit2 className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => handleDelete(row._id)}
-            className="hover:text-red-600 text-slate-400 transition-colors"
-            title="Delete"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
         </div>
       ),
     },
@@ -530,6 +523,12 @@ const SupervisorOnewash = () => {
               <CreditCard className="w-3.5 h-3.5 text-blue-400" />
               <span>
                 Card: <b>{stats.card}</b>
+              </span>
+            </div>
+            <div className="bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm flex items-center gap-2">
+              <Coins className="w-3.5 h-3.5 text-amber-500" />
+              <span>
+                Tips: <b className="text-amber-600">{stats.tips || 0}</b>
               </span>
             </div>
           </div>

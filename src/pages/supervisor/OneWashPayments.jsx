@@ -572,7 +572,7 @@ const SupervisorOneWashPayments = () => {
         </div>
 
         {/* ─── STAT CARDS ─── */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
           {/* Total Revenue */}
           <div className="relative overflow-hidden p-4 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 text-white shadow-md">
             <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-white/5" />
@@ -655,6 +655,24 @@ const SupervisorOneWashPayments = () => {
                 </span>
                 <span className="block text-[10px] text-purple-500 font-bold">
                   {bankPct}%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Tips */}
+          <div className="relative overflow-hidden p-4 rounded-xl bg-white border border-slate-100 shadow-sm">
+            <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-amber-50" />
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+                <Coins className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Tips
+                </span>
+                <span className="text-xl font-bold text-amber-600">
+                  {stats.tips?.toLocaleString() || 0}
                 </span>
               </div>
             </div>

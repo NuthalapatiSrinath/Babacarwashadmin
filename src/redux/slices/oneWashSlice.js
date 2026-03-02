@@ -6,7 +6,7 @@ export const fetchOneWash = createAsyncThunk(
   "oneWash/fetchOneWash",
   async (
     { page = 1, limit = 50, search = "", filters = {} },
-    { rejectWithValue }
+    { rejectWithValue },
   ) => {
     try {
       const response = await oneWashService.list(page, limit, search, filters);
@@ -14,7 +14,7 @@ export const fetchOneWash = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
-  }
+  },
 );
 
 // Async thunk for deleting oneWash job
@@ -27,7 +27,7 @@ export const deleteOneWash = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
-  }
+  },
 );
 
 // Async thunk for creating oneWash job
@@ -40,7 +40,7 @@ export const createOneWash = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
-  }
+  },
 );
 
 const oneWashSlice = createSlice({
@@ -53,6 +53,7 @@ const oneWashSlice = createSlice({
       cash: 0,
       card: 0,
       bank: 0,
+      tips: 0,
     },
     total: 0,
     currentPage: 1,
@@ -84,7 +85,7 @@ const oneWashSlice = createSlice({
       // Delete OneWash - remove from list immediately
       .addCase(deleteOneWash.fulfilled, (state, action) => {
         state.oneWashJobs = state.oneWashJobs.filter(
-          (job) => job._id !== action.payload
+          (job) => job._id !== action.payload,
         );
         state.total = Math.max(0, state.total - 1);
       })

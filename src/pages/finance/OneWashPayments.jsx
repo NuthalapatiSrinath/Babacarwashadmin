@@ -375,12 +375,17 @@ const OneWashPayments = () => {
             <Car className="w-3 h-3 text-slate-400" />
             {row.registration_no || "N/A"}
           </span>
-          {row.parking_no && (
-            <span className="text-[10px] text-slate-400 flex items-center gap-1 pl-4">
-              P: {row.parking_no}
-            </span>
-          )}
         </div>
+      ),
+    },
+    {
+      header: "Parking",
+      accessor: "parking_no",
+      className: "text-center",
+      render: (row) => (
+        <span className="font-medium text-slate-600 text-sm">
+          {row.parking_no || "-"}
+        </span>
       ),
     },
     {
@@ -509,7 +514,7 @@ const OneWashPayments = () => {
     {
       header: "Actions",
       className:
-        "text-right sticky right-0 bg-white shadow-[-10px_0_10px_-10px_rgba(0,0,0,0.1)] min-w-[120px]",
+        "text-right sticky right-0 bg-white shadow-[-10px_0_10px_-10px_rgba(0,0,0,0.1)] min-w-[80px]",
       render: (row) => (
         <div className="flex items-center justify-end gap-1">
           <button
@@ -518,18 +523,15 @@ const OneWashPayments = () => {
           >
             <Eye className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => handleEdit(row)}
-            className="p-1.5 hover:bg-indigo-50 rounded text-slate-400 hover:text-indigo-600"
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleDelete(row)}
-            className="p-1.5 hover:bg-red-50 rounded text-slate-400 hover:text-red-600"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {(row.status || "").toLowerCase() === "completed" && (
+            <button
+              onClick={() => handleViewReceipt(row)}
+              className="p-1.5 hover:bg-indigo-50 rounded text-slate-400 hover:text-indigo-600"
+              title="View Receipt"
+            >
+              <FileText className="w-4 h-4" />
+            </button>
+          )}
         </div>
       ),
     },
@@ -584,8 +586,8 @@ const OneWashPayments = () => {
           </div>
         </div>
 
-        {/* ✅ UPDATED STATS GRID: 4 Equal Cards (25% each) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+        {/* ✅ UPDATED STATS GRID: 5 Equal Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-6">
           {/* 1. Total Revenue Card */}
           <div className="p-4 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 text-white shadow-md flex items-center gap-4">
             {/* Left: Icon Centered */}
@@ -645,6 +647,21 @@ const OneWashPayments = () => {
               </span>
               <span className="text-xl font-bold text-slate-700">
                 {stats.bank}
+              </span>
+            </div>
+          </div>
+
+          {/* 5. Tips Card */}
+          <div className="p-4 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
+              <Coins className="w-6 h-6" />
+            </div>
+            <div>
+              <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                Tips
+              </span>
+              <span className="text-xl font-bold text-amber-600">
+                {stats.tips || 0}
               </span>
             </div>
           </div>
