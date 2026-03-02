@@ -1036,7 +1036,9 @@ const AdminTracking = () => {
                         (d.countries || []).filter(Boolean).length > 0) && (
                         <span
                           className={`text-[10px] max-w-[180px] truncate ${isActive ? "text-white/60" : "text-slate-400"}`}
-                          title={(d.fullAddresses || []).filter(Boolean).join(" | ")}
+                          title={(d.fullAddresses || [])
+                            .filter(Boolean)
+                            .join(" | ")}
                         >
                           📍{" "}
                           {(d.fullAddresses || []).filter(Boolean).length > 0
@@ -2146,9 +2148,8 @@ const AdminTracking = () => {
                             {loc.fullAddress}
                           </span>
                         ) : (
-                          [loc.city, loc.country]
-                            .filter(Boolean)
-                            .join(", ") || "—"
+                          [loc.city, loc.country].filter(Boolean).join(", ") ||
+                          "—"
                         )}
                       </td>
                       <td

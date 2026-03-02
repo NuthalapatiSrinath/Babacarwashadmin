@@ -397,7 +397,10 @@ const OneWashPayments = () => {
           colorClass = "bg-green-50 text-green-700 border-green-200";
         } else if (serviceType === "external" || serviceType === "outside") {
           colorClass = "bg-blue-50 text-blue-700 border-blue-200";
-        } else if (serviceType === "total") {
+        } else if (
+          serviceType === "total" ||
+          serviceType === "inside + outside"
+        ) {
           colorClass = "bg-purple-50 text-purple-700 border-purple-200";
         } else if (serviceType === "internal" || serviceType === "inside") {
           colorClass = "bg-indigo-50 text-indigo-700 border-indigo-200";

@@ -122,11 +122,10 @@ const OneWashModal = ({ isOpen, onClose, job, onSuccess }) => {
       const response = await pricingService.getByMall(mallId);
       const pricing = response?.data;
 
-      // Check if pricing exists and has wash_types configured for sedan
+      // Check if pricing exists and has wash_types configured (unified)
       const hasWashTypesConfig = !!(
         pricing &&
-        pricing.sedan &&
-        pricing.sedan.wash_types
+        (pricing.wash_types || (pricing.sedan && pricing.sedan.wash_types))
       );
 
       setHasWashTypes(hasWashTypesConfig);
@@ -253,9 +252,9 @@ const OneWashModal = ({ isOpen, onClose, job, onSuccess }) => {
   ];
 
   const washTypeOptions = [
-    { value: "inside", label: "Internal" },
-    { value: "outside", label: "External" },
-    { value: "total", label: "Internal + External" },
+    { value: "inside", label: "Inside" },
+    { value: "outside", label: "Outside" },
+    { value: "total", label: "Inside + Outside" },
   ];
 
   const mallOptions = useMemo(

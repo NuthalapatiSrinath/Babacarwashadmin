@@ -1,865 +1,1081 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { analyticsService } from "../../api/analyticsService";
-import { supervisorService } from "../../api/supervisorService";
-import { motion, AnimatePresence } from "framer-motion";
-import { toast } from "react-toastify";
-import DateRangePicker from "../../components/DateRangePicker";
 import {
-  Activity,
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
   Briefcase,
-  Users,
-  Calendar,
-  RefreshCw,
-  Download,
-  Loader2,
-  CheckCircle,
+  DollarSign,
   CreditCard,
   Banknote,
+  Building2,
+  TrendingUp,
+  TrendingDown,
+  RefreshCw,
+  Loader2,
+  CheckCircle,
+  Activity,
   Wallet,
   BarChart3,
-  PieChart,
   ArrowUp,
   ArrowDown,
-  Clock,
-  MapPin,
-  Phone,
-  Building2,
-  Star,
-  Award,
-  Target,
   Zap,
+  Target,
+  PieChart as PieChartIcon,
+  Award,
+  Clock,
+  Sparkles,
+  CircleDollarSign,
+  BadgeDollarSign,
+  HandCoins,
+  LayoutDashboard,
 } from "lucide-react";
-import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { motion, AnimatePresence } from "framer-motion";
+import toast from "react-hot-toast";
 
+// ─────────────────────────────────────────────────────
+// Animation Variants
+// ─────────────────────────────────────────────────────
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08, delayChildren: 0.1 },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 24 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring", stiffness: 260, damping: 20 },
+  },
+};
+
+const scaleIn = {
+  hidden: { opacity: 0, scale: 0.85 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { type: "spring", stiffness: 200, damping: 18 },
+  },
+};
+
+// ─────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────
+const formatCurrency = (amount) => {
+  const sym = localStorage.getItem("app_currency") || "AED";
+  const formatted = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount || 0);
+  if (sym.length === 1 || sym === "₹") return `${sym} ${formatted}`;
+  return `${formatted} ${sym}`;
+};
+
+const formatNumber = (n) => new Intl.NumberFormat("en-IN").format(n || 0);
+
+const pct = (part, total) =>
+  total > 0 ? ((part / total) * 100).toFixed(1) : "0.0";
+
+// ─────────────────────────────────────────────────────
+// Main Component
+// ─────────────────────────────────────────────────────
 const SupervisorDashboard = () => {
-  // Date range state - default to last 7 days
-  const [dateRange, setDateRange] = useState({
-    startDate: format(subDays(new Date(), 7), "yyyy-MM-dd"),
-    endDate: format(new Date(), "yyyy-MM-dd"),
-  });
-
-  // Analytics data state
-  const [analytics, setAnalytics] = useState({
-    counts: {
-      totalJobs: 0,
-      totalAmount: 0,
-      totalCash: 0,
-      totalCard: 0,
-      totalBank: 0,
-      todaysJobs: 0,
-      todaysAmount: 0,
-      todaysCash: 0,
-      todaysCard: 0,
-      todaysBank: 0,
-    },
-    charts: {},
-  });
-
-  // Team data state
-  const [teamData, setTeamData] = useState({
-    workers: [],
-    total: 0,
-    active: 0,
-    inactive: 0,
-  });
-
-  // Loading states
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [counts, setCounts] = useState(null);
 
-  // Fetch analytics data
-  const fetchAnalytics = async () => {
+  const fetchDashboard = useCallback(async (showLoader = true) => {
+    if (showLoader) setLoading(true);
+    else setRefreshing(true);
     try {
-      setLoading(true);
-      const body = {
-        startDate: new Date(dateRange.startDate).toISOString(),
-        endDate: new Date(
-          new Date(dateRange.endDate).setHours(23, 59, 59),
-        ).toISOString(),
-      };
-
-      console.log("📊 [Dashboard] Fetching supervisor analytics", body);
-      const response = await analyticsService.getSupervisorStats(body);
-      console.log("✅ [Dashboard] Analytics received:", response.data);
-
-      setAnalytics(
-        response.data || {
-          counts: {
-            totalJobs: 0,
-            totalAmount: 0,
-            totalCash: 0,
-            totalCard: 0,
-            totalBank: 0,
-            todaysJobs: 0,
-            todaysAmount: 0,
-            todaysCash: 0,
-            todaysCard: 0,
-            todaysBank: 0,
-          },
-          charts: {},
-        },
-      );
+      const response = await analyticsService.getSupervisorStats({});
+      if (response.data?.counts) {
+        setCounts(response.data.counts);
+      }
+      if (!showLoader) toast.success("Dashboard refreshed");
     } catch (error) {
-      console.error("❌ Failed to fetch analytics:", error);
-      toast.error("Failed to load analytics data");
+      console.error("Failed to fetch dashboard:", error);
+      toast.error("Failed to load dashboard data");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, []);
 
-  // Fetch team data
-  const fetchTeam = async () => {
-    try {
-      const response = await supervisorService.getTeam({
-        pageNo: 0,
-        pageSize: 1000,
-        search: "",
-      });
-
-      const workers = response.data || [];
-      setTeamData({
-        workers,
-        total: response.total || 0,
-        active: workers.filter((w) => w.status === 1).length,
-        inactive: workers.filter((w) => w.status === 2).length,
-      });
-    } catch (error) {
-      console.error("❌ Failed to fetch team:", error);
-    }
-  };
-
-  // Initial data fetch
   useEffect(() => {
-    fetchAnalytics();
-    fetchTeam();
-  }, [dateRange]);
+    fetchDashboard();
+  }, [fetchDashboard]);
 
-  // Refresh handler
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await Promise.all([fetchAnalytics(), fetchTeam()]);
-    setRefreshing(false);
-    toast.success("Dashboard refreshed");
-  };
+  const handleRefresh = () => fetchDashboard(false);
 
-  // Export handler
-  const handleExport = () => {
-    const csvContent = [
-      ["Metric", "Total", "Today"],
-      ["Jobs", analytics.counts.totalJobs, analytics.counts.todaysJobs],
-      [
-        "Amount (₹)",
-        analytics.counts.totalAmount,
-        analytics.counts.todaysAmount,
-      ],
-      ["Cash (₹)", analytics.counts.totalCash, analytics.counts.todaysCash],
-      ["Card (₹)", analytics.counts.totalCard, analytics.counts.todaysCard],
-      [
-        "Bank Transfer (₹)",
-        analytics.counts.totalBank,
-        analytics.counts.todaysBank,
-      ],
-      ["", "", ""],
-      ["Team Statistics", "", ""],
-      ["Total Workers", teamData.total, ""],
-      ["Active Workers", teamData.active, ""],
-      ["Inactive Workers", teamData.inactive, ""],
-    ]
-      .map((row) => row.join(","))
-      .join("\n");
+  // Derived calculations
+  const derived = useMemo(() => {
+    if (!counts) return {};
+    return {
+      avgPerJob:
+        counts.totalJobs > 0 ? counts.totalAmount / counts.totalJobs : 0,
+      todayAvgPerJob:
+        counts.todaysJobs > 0 ? counts.todaysAmount / counts.todaysJobs : 0,
+      cashPct: pct(counts.totalCash, counts.totalAmount),
+      cardPct: pct(counts.totalCard, counts.totalAmount),
+      bankPct: pct(counts.totalBank, counts.totalAmount),
+      todayCashPct: pct(counts.todaysCash, counts.todaysAmount),
+      todayCardPct: pct(counts.todaysCard, counts.todaysAmount),
+      todayBankPct: pct(counts.todaysBank, counts.todaysAmount),
+      jobsTodayPct: pct(counts.todaysJobs, counts.totalJobs),
+      revTodayPct: pct(counts.todaysAmount, counts.totalAmount),
+    };
+  }, [counts]);
 
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `supervisor_dashboard_${format(new Date(), "yyyy-MM-dd")}.csv`;
-    a.click();
-    toast.success("Dashboard data exported");
-  };
-
-  // Calculate percentage change
-  const getPercentageChange = (total, today) => {
-    if (total === 0) return 0;
-    const avgPerDay = total / 7; // Assuming 7-day range
-    return avgPerDay > 0 ? ((today - avgPerDay) / avgPerDay) * 100 : 0;
-  };
+  // ─────────────── Loading Skeleton ───────────────
+  if (loading && !counts) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center"
+        >
+          <div className="relative">
+            <Loader2 className="w-20 h-20 animate-spin text-blue-600 mx-auto" />
+            <motion.div
+              animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="absolute inset-0 w-20 h-20 mx-auto rounded-full bg-blue-400/20 blur-xl"
+            />
+          </div>
+          <p className="text-slate-600 dark:text-slate-400 font-semibold text-lg mt-6">
+            Loading Dashboard...
+          </p>
+          <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
+            Fetching your team analytics
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      {/* Header Section */}
-      <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-8">
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
-          >
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
+      <div className="p-4 md:p-6 lg:p-8 space-y-8 max-w-[1600px] mx-auto">
+        {/* ════════════════════════════════════════════
+            HEADER
+        ════════════════════════════════════════════ */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 rounded-3xl p-8 text-white shadow-2xl"
+        >
+          {/* Decorative circles */}
+          <div className="absolute -top-12 -right-12 w-56 h-56 bg-white/5 rounded-full blur-2xl" />
+          <div className="absolute -bottom-16 -left-16 w-72 h-72 bg-purple-400/10 rounded-full blur-3xl" />
+          <div className="absolute top-1/2 right-1/4 w-32 h-32 bg-cyan-300/10 rounded-full blur-2xl" />
+
+          <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
             <div>
-              <h1 className="text-3xl font-bold flex items-center gap-3">
-                <Activity className="w-8 h-8" />
-                Supervisor Dashboard
-              </h1>
-              <p className="text-blue-100 mt-1">
-                Real-time overview of your team's performance and metrics
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className={`flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg hover:bg-white/30 transition-all ${
-                  refreshing ? "opacity-50 cursor-not-allowed" : ""
-                }`}
-              >
-                <RefreshCw
-                  className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`}
-                />
-                Refresh
-              </button>
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg hover:bg-white/30 transition-all"
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-            </div>
-          </motion.div>
-
-          {/* Date Range Picker */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="mt-6"
-          >
-            <DateRangePicker
-              startDate={dateRange.startDate}
-              endDate={dateRange.endDate}
-              onChange={setDateRange}
-              className="text-white"
-            />
-          </motion.div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="container mx-auto px-6 py-8 space-y-8">
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
-          </div>
-        ) : (
-          <>
-            {/* Overall Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-              <StatCard
-                title="Total Jobs"
-                value={analytics.counts.totalJobs}
-                subtitle={`${analytics.counts.todaysJobs} today`}
-                icon={Briefcase}
-                color="blue"
-                trend={getPercentageChange(
-                  analytics.counts.totalJobs,
-                  analytics.counts.todaysJobs,
-                )}
-              />
-              <StatCard
-                title="Total Revenue"
-                value={`₹${analytics.counts.totalAmount.toLocaleString()}`}
-                subtitle={`₹${analytics.counts.todaysAmount.toLocaleString()} today`}
-                icon={DollarSign}
-                color="green"
-                trend={getPercentageChange(
-                  analytics.counts.totalAmount,
-                  analytics.counts.todaysAmount,
-                )}
-              />
-              <StatCard
-                title="Cash Payments"
-                value={`₹${analytics.counts.totalCash.toLocaleString()}`}
-                subtitle={`₹${analytics.counts.todaysCash.toLocaleString()} today`}
-                icon={Wallet}
-                color="emerald"
-                trend={getPercentageChange(
-                  analytics.counts.totalCash,
-                  analytics.counts.todaysCash,
-                )}
-              />
-              <StatCard
-                title="Card Payments"
-                value={`₹${analytics.counts.totalCard.toLocaleString()}`}
-                subtitle={`₹${analytics.counts.todaysCard.toLocaleString()} today`}
-                icon={CreditCard}
-                color="purple"
-                trend={getPercentageChange(
-                  analytics.counts.totalCard,
-                  analytics.counts.todaysCard,
-                )}
-              />
-              <StatCard
-                title="Bank Transfers"
-                value={`₹${analytics.counts.totalBank.toLocaleString()}`}
-                subtitle={`₹${analytics.counts.todaysBank.toLocaleString()} today`}
-                icon={Banknote}
-                color="indigo"
-                trend={getPercentageChange(
-                  analytics.counts.totalBank,
-                  analytics.counts.todaysBank,
-                )}
-              />
-            </div>
-
-            {/* Payment Distribution & Daily Performance */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Payment Distribution */}
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 p-6"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 }}
+                className="flex items-center gap-3 mb-3"
               >
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                  <PieChart className="w-5 h-5 text-blue-600" />
-                  Payment Method Distribution
-                </h3>
-                <div className="space-y-4">
-                  <PaymentBar
-                    label="Cash"
-                    amount={analytics.counts.totalCash}
-                    total={analytics.counts.totalAmount}
-                    color="emerald"
-                    icon={Wallet}
-                  />
-                  <PaymentBar
-                    label="Card"
-                    amount={analytics.counts.totalCard}
-                    total={analytics.counts.totalAmount}
-                    color="purple"
-                    icon={CreditCard}
-                  />
-                  <PaymentBar
-                    label="Bank Transfer"
-                    amount={analytics.counts.totalBank}
-                    total={analytics.counts.totalAmount}
-                    color="indigo"
-                    icon={Banknote}
-                  />
+                <div className="p-3 bg-white/15 backdrop-blur-sm rounded-2xl">
+                  <LayoutDashboard className="w-8 h-8" />
                 </div>
-
-                {/* Today's Breakdown */}
-                <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
-                  <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-4">
-                    Today's Breakdown
-                  </h4>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-3">
-                      <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">
-                        Cash
-                      </p>
-                      <p className="text-sm font-bold text-slate-900 dark:text-white">
-                        ₹{analytics.counts.todaysCash.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3">
-                      <p className="text-xs text-purple-600 dark:text-purple-400 mb-1">
-                        Card
-                      </p>
-                      <p className="text-sm font-bold text-slate-900 dark:text-white">
-                        ₹{analytics.counts.todaysCard.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-3">
-                      <p className="text-xs text-indigo-600 dark:text-indigo-400 mb-1">
-                        Bank
-                      </p>
-                      <p className="text-sm font-bold text-slate-900 dark:text-white">
-                        ₹{analytics.counts.todaysBank.toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Daily Performance Comparison */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 p-6"
-              >
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-blue-600" />
-                  Today vs Average Performance
-                </h3>
-
-                <div className="space-y-6">
-                  <ComparisonMetric
-                    label="Jobs Completed"
-                    today={analytics.counts.todaysJobs}
-                    average={Math.round(analytics.counts.totalJobs / 7)}
-                    icon={Briefcase}
-                  />
-                  <ComparisonMetric
-                    label="Revenue Generated"
-                    today={analytics.counts.todaysAmount}
-                    average={Math.round(analytics.counts.totalAmount / 7)}
-                    icon={DollarSign}
-                    isCurrency
-                  />
-                  <ComparisonMetric
-                    label="Cash Collections"
-                    today={analytics.counts.todaysCash}
-                    average={Math.round(analytics.counts.totalCash / 7)}
-                    icon={Wallet}
-                    isCurrency
-                  />
-                  <ComparisonMetric
-                    label="Digital Payments"
-                    today={
-                      analytics.counts.todaysCard + analytics.counts.todaysBank
-                    }
-                    average={Math.round(
-                      (analytics.counts.totalCard +
-                        analytics.counts.totalBank) /
-                        7,
-                    )}
-                    icon={CreditCard}
-                    isCurrency
-                  />
+                <div>
+                  <h1 className="text-3xl md:text-4xl font-black tracking-tight">
+                    Supervisor Dashboard
+                  </h1>
+                  <p className="text-blue-200 text-sm md:text-base mt-1">
+                    Your team&apos;s complete performance overview
+                  </p>
                 </div>
               </motion.div>
             </div>
 
-            {/* Team Overview */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 p-6"
-            >
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                <Users className="w-5 h-5 text-blue-600" />
-                Team Overview
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <TeamStatCard
-                  label="Total Workers"
-                  value={teamData.total}
-                  icon={Users}
-                  color="blue"
-                />
-                <TeamStatCard
-                  label="Active Workers"
-                  value={teamData.active}
-                  icon={CheckCircle}
-                  color="green"
-                />
-                <TeamStatCard
-                  label="Inactive Workers"
-                  value={teamData.inactive}
-                  icon={Clock}
-                  color="red"
-                />
-              </div>
-
-              {/* Top Performers */}
-              {teamData.workers.length > 0 && (
-                <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
-                  <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-4 flex items-center gap-2">
-                    <Award className="w-4 h-4" />
-                    Team Members
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {teamData.workers.slice(0, 6).map((worker, index) => (
-                      <WorkerCard
-                        key={worker._id}
-                        worker={worker}
-                        rank={index + 1}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </motion.div>
-
-            {/* Performance Insights */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.3 }}
-              className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-slate-800 dark:to-slate-700 rounded-xl shadow-lg border border-blue-200 dark:border-slate-600 p-6"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="px-6 py-3 bg-white/15 hover:bg-white/25 backdrop-blur-sm rounded-xl font-bold flex items-center gap-2 transition-all disabled:opacity-50 border border-white/20 shadow-lg"
             >
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                <Target className="w-5 h-5 text-blue-600" />
-                Performance Insights
-              </h3>
+              <RefreshCw
+                className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`}
+              />
+              {refreshing ? "Refreshing..." : "Refresh Data"}
+            </motion.button>
+          </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <InsightCard
-                  title="Average Jobs/Day"
-                  value={Math.round(analytics.counts.totalJobs / 7)}
-                  icon={Briefcase}
-                  color="blue"
-                />
-                <InsightCard
-                  title="Average Revenue/Day"
-                  value={`₹${Math.round(analytics.counts.totalAmount / 7).toLocaleString()}`}
-                  icon={DollarSign}
-                  color="green"
-                />
-                <InsightCard
-                  title="Jobs/Worker"
-                  value={
-                    teamData.active > 0
-                      ? Math.round(
-                          analytics.counts.todaysJobs / teamData.active,
-                        )
-                      : 0
-                  }
-                  icon={Users}
-                  color="purple"
-                />
-                <InsightCard
-                  title="Revenue/Worker"
-                  value={`₹${teamData.active > 0 ? Math.round(analytics.counts.todaysAmount / teamData.active).toLocaleString() : 0}`}
-                  icon={TrendingUp}
-                  color="indigo"
-                />
-              </div>
-            </motion.div>
-
-            {/* Quick Actions */}
+          {/* Quick summary strip */}
+          {counts && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 p-6"
+              className="relative z-10 mt-6 grid grid-cols-2 md:grid-cols-4 gap-3"
             >
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                <Zap className="w-5 h-5 text-blue-600" />
-                Quick Actions
-              </h3>
+              <MiniStat
+                label="All-Time Jobs"
+                value={formatNumber(counts.totalJobs)}
+              />
+              <MiniStat
+                label="All-Time Revenue"
+                value={formatCurrency(counts.totalAmount)}
+              />
+              <MiniStat
+                label="Today's Jobs"
+                value={formatNumber(counts.todaysJobs)}
+              />
+              <MiniStat
+                label="Today's Revenue"
+                value={formatCurrency(counts.todaysAmount)}
+              />
+            </motion.div>
+          )}
+        </motion.div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <QuickActionButton
-                  label="View Team"
-                  icon={Users}
-                  onClick={() => (window.location.href = "/supervisor/workers")}
-                  color="blue"
+        {/* ════════════════════════════════════════════
+            SECTION: ALL-TIME STATISTICS
+        ════════════════════════════════════════════ */}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <SectionHeader
+            icon={TrendingUp}
+            title="All-Time Statistics"
+            subtitle="Cumulative performance metrics since the beginning"
+            gradient="from-blue-600 to-indigo-600"
+          />
+
+          {/* Primary All-Time Cards */}
+          <motion.div
+            variants={containerVariants}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mt-5"
+          >
+            <motion.div variants={itemVariants}>
+              <GlassCard
+                title="Total Jobs"
+                value={formatNumber(counts?.totalJobs)}
+                icon={Briefcase}
+                gradient="from-blue-500 to-blue-700"
+                glowColor="blue"
+                subtitle="All completed washes"
+              />
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <GlassCard
+                title="Total Revenue"
+                value={formatCurrency(counts?.totalAmount)}
+                icon={DollarSign}
+                gradient="from-emerald-500 to-green-700"
+                glowColor="green"
+                subtitle="Entire collection"
+              />
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <GlassCard
+                title="Cash Collection"
+                value={formatCurrency(counts?.totalCash)}
+                icon={Wallet}
+                gradient="from-green-500 to-teal-700"
+                glowColor="teal"
+                subtitle={`${derived.cashPct}% of revenue`}
+                badge={`${derived.cashPct}%`}
+              />
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <GlassCard
+                title="Card Payments"
+                value={formatCurrency(counts?.totalCard)}
+                icon={CreditCard}
+                gradient="from-purple-500 to-indigo-700"
+                glowColor="purple"
+                subtitle={`${derived.cardPct}% of revenue`}
+                badge={`${derived.cardPct}%`}
+              />
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <GlassCard
+                title="Bank Transfer"
+                value={formatCurrency(counts?.totalBank)}
+                icon={Building2}
+                gradient="from-orange-500 to-amber-700"
+                glowColor="orange"
+                subtitle={`${derived.bankPct}% of revenue`}
+                badge={`${derived.bankPct}%`}
+              />
+            </motion.div>
+          </motion.div>
+        </motion.div>
+
+        {/* ════════════════════════════════════════════
+            SECTION: TODAY'S STATISTICS
+        ════════════════════════════════════════════ */}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <SectionHeader
+            icon={Zap}
+            title="Today's Statistics"
+            subtitle="Real-time performance for the current day"
+            gradient="from-cyan-600 to-teal-600"
+          />
+
+          {/* Primary Today Cards */}
+          <motion.div
+            variants={containerVariants}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mt-5"
+          >
+            <motion.div variants={itemVariants}>
+              <GlassCard
+                title="Today's Jobs"
+                value={formatNumber(counts?.todaysJobs)}
+                icon={CheckCircle}
+                gradient="from-cyan-500 to-blue-700"
+                glowColor="cyan"
+                subtitle={`${derived.jobsTodayPct}% of all-time`}
+                badge={`${derived.jobsTodayPct}%`}
+              />
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <GlassCard
+                title="Today's Revenue"
+                value={formatCurrency(counts?.todaysAmount)}
+                icon={Activity}
+                gradient="from-teal-500 to-emerald-700"
+                glowColor="emerald"
+                subtitle={`${derived.revTodayPct}% of all-time`}
+                badge={`${derived.revTodayPct}%`}
+              />
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <GlassCard
+                title="Today's Cash"
+                value={formatCurrency(counts?.todaysCash)}
+                icon={HandCoins}
+                gradient="from-lime-500 to-green-700"
+                glowColor="lime"
+                subtitle={`${derived.todayCashPct}% of today`}
+                badge={`${derived.todayCashPct}%`}
+              />
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <GlassCard
+                title="Today's Card"
+                value={formatCurrency(counts?.todaysCard)}
+                icon={CreditCard}
+                gradient="from-fuchsia-500 to-purple-700"
+                glowColor="fuchsia"
+                subtitle={`${derived.todayCardPct}% of today`}
+                badge={`${derived.todayCardPct}%`}
+              />
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <GlassCard
+                title="Today's Bank"
+                value={formatCurrency(counts?.todaysBank)}
+                icon={Building2}
+                gradient="from-rose-500 to-red-700"
+                glowColor="rose"
+                subtitle={`${derived.todayBankPct}% of today`}
+                badge={`${derived.todayBankPct}%`}
+              />
+            </motion.div>
+          </motion.div>
+        </motion.div>
+
+        {/* ════════════════════════════════════════════
+            SECTION: REVENUE BREAKDOWN
+        ════════════════════════════════════════════ */}
+        {counts && (
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <SectionHeader
+              icon={PieChartIcon}
+              title="Revenue Breakdown"
+              subtitle="Payment method distribution and comparison"
+              gradient="from-purple-600 to-pink-600"
+            />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-5">
+              {/* All-Time Revenue Split */}
+              <motion.div variants={scaleIn}>
+                <div className="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-shadow duration-300">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg">
+                      <BarChart3 className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-800 dark:text-white">
+                        All-Time Revenue Split
+                      </h3>
+                      <p className="text-xs text-slate-400">
+                        Total: {formatCurrency(counts.totalAmount)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Donut visual */}
+                  <div className="flex items-center justify-center mb-8">
+                    <DonutChart
+                      segments={[
+                        {
+                          value: counts.totalCash,
+                          color: "#10b981",
+                          label: "Cash",
+                        },
+                        {
+                          value: counts.totalCard,
+                          color: "#8b5cf6",
+                          label: "Card",
+                        },
+                        {
+                          value: counts.totalBank,
+                          color: "#f59e0b",
+                          label: "Bank",
+                        },
+                      ]}
+                      total={counts.totalAmount}
+                      centerLabel={formatCurrency(counts.totalAmount)}
+                      centerSub="Total"
+                    />
+                  </div>
+
+                  <div className="space-y-4">
+                    <ProgressRow
+                      label="Cash"
+                      amount={counts.totalCash}
+                      total={counts.totalAmount}
+                      color="bg-emerald-500"
+                      trackColor="bg-emerald-100 dark:bg-emerald-900/30"
+                      icon={Wallet}
+                      iconBg="bg-emerald-100 dark:bg-emerald-900/40"
+                      iconColor="text-emerald-600"
+                    />
+                    <ProgressRow
+                      label="Card"
+                      amount={counts.totalCard}
+                      total={counts.totalAmount}
+                      color="bg-purple-500"
+                      trackColor="bg-purple-100 dark:bg-purple-900/30"
+                      icon={CreditCard}
+                      iconBg="bg-purple-100 dark:bg-purple-900/40"
+                      iconColor="text-purple-600"
+                    />
+                    <ProgressRow
+                      label="Bank Transfer"
+                      amount={counts.totalBank}
+                      total={counts.totalAmount}
+                      color="bg-amber-500"
+                      trackColor="bg-amber-100 dark:bg-amber-900/30"
+                      icon={Building2}
+                      iconBg="bg-amber-100 dark:bg-amber-900/40"
+                      iconColor="text-amber-600"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Today's Revenue Split */}
+              <motion.div variants={scaleIn}>
+                <div className="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-shadow duration-300">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2.5 bg-gradient-to-br from-cyan-500 to-teal-600 rounded-xl shadow-lg">
+                      <Zap className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-800 dark:text-white">
+                        Today&apos;s Revenue Split
+                      </h3>
+                      <p className="text-xs text-slate-400">
+                        Total: {formatCurrency(counts.todaysAmount)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Donut visual */}
+                  <div className="flex items-center justify-center mb-8">
+                    <DonutChart
+                      segments={[
+                        {
+                          value: counts.todaysCash,
+                          color: "#06b6d4",
+                          label: "Cash",
+                        },
+                        {
+                          value: counts.todaysCard,
+                          color: "#d946ef",
+                          label: "Card",
+                        },
+                        {
+                          value: counts.todaysBank,
+                          color: "#f43f5e",
+                          label: "Bank",
+                        },
+                      ]}
+                      total={counts.todaysAmount}
+                      centerLabel={formatCurrency(counts.todaysAmount)}
+                      centerSub="Today"
+                    />
+                  </div>
+
+                  <div className="space-y-4">
+                    <ProgressRow
+                      label="Cash"
+                      amount={counts.todaysCash}
+                      total={counts.todaysAmount}
+                      color="bg-cyan-500"
+                      trackColor="bg-cyan-100 dark:bg-cyan-900/30"
+                      icon={HandCoins}
+                      iconBg="bg-cyan-100 dark:bg-cyan-900/40"
+                      iconColor="text-cyan-600"
+                    />
+                    <ProgressRow
+                      label="Card"
+                      amount={counts.todaysCard}
+                      total={counts.todaysAmount}
+                      color="bg-fuchsia-500"
+                      trackColor="bg-fuchsia-100 dark:bg-fuchsia-900/30"
+                      icon={CreditCard}
+                      iconBg="bg-fuchsia-100 dark:bg-fuchsia-900/40"
+                      iconColor="text-fuchsia-600"
+                    />
+                    <ProgressRow
+                      label="Bank Transfer"
+                      amount={counts.todaysBank}
+                      total={counts.todaysAmount}
+                      color="bg-rose-500"
+                      trackColor="bg-rose-100 dark:bg-rose-900/30"
+                      icon={Building2}
+                      iconBg="bg-rose-100 dark:bg-rose-900/40"
+                      iconColor="text-rose-600"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ════════════════════════════════════════════
+            SECTION: KEY INSIGHTS
+        ════════════════════════════════════════════ */}
+        {counts && (
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <SectionHeader
+              icon={Sparkles}
+              title="Key Insights"
+              subtitle="Computed performance indicators"
+              gradient="from-amber-500 to-orange-600"
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-5">
+              <motion.div variants={itemVariants}>
+                <InsightCard
+                  title="Avg Revenue / Job"
+                  allTimeValue={formatCurrency(derived.avgPerJob)}
+                  todayValue={formatCurrency(derived.todayAvgPerJob)}
+                  icon={Target}
+                  gradient="from-blue-500 to-indigo-600"
                 />
-                <QuickActionButton
-                  label="View Jobs"
-                  icon={Briefcase}
-                  onClick={() => (window.location.href = "/supervisor/washes")}
-                  color="green"
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <InsightCard
+                  title="Cash Share"
+                  allTimeValue={`${derived.cashPct}%`}
+                  todayValue={`${derived.todayCashPct}%`}
+                  icon={Wallet}
+                  gradient="from-emerald-500 to-green-600"
                 />
-                <QuickActionButton
-                  label="View Reports"
-                  icon={BarChart3}
-                  onClick={() => (window.location.href = "/supervisor/reports")}
-                  color="purple"
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <InsightCard
+                  title="Card Share"
+                  allTimeValue={`${derived.cardPct}%`}
+                  todayValue={`${derived.todayCardPct}%`}
+                  icon={CreditCard}
+                  gradient="from-purple-500 to-fuchsia-600"
                 />
-                <QuickActionButton
-                  label="Export Data"
-                  icon={Download}
-                  onClick={handleExport}
-                  color="indigo"
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <InsightCard
+                  title="Today vs All-Time"
+                  allTimeValue={`${derived.jobsTodayPct}% jobs`}
+                  todayValue={`${derived.revTodayPct}% revenue`}
+                  icon={Award}
+                  gradient="from-orange-500 to-red-600"
                 />
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ════════════════════════════════════════════
+            SECTION: COMPARISON TABLE
+        ════════════════════════════════════════════ */}
+        {counts && (
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <SectionHeader
+              icon={BarChart3}
+              title="All-Time vs Today"
+              subtitle="Side-by-side comparison of all metrics"
+              gradient="from-slate-600 to-slate-800"
+            />
+
+            <motion.div
+              variants={scaleIn}
+              className="mt-5 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl shadow-xl overflow-hidden"
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-700 dark:to-slate-800">
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                        Metric
+                      </th>
+                      <th className="px-6 py-4 text-right text-xs font-bold text-blue-600 uppercase tracking-wider">
+                        <div className="flex items-center justify-end gap-2">
+                          <TrendingUp className="w-4 h-4" />
+                          All-Time
+                        </div>
+                      </th>
+                      <th className="px-6 py-4 text-right text-xs font-bold text-cyan-600 uppercase tracking-wider">
+                        <div className="flex items-center justify-end gap-2">
+                          <Zap className="w-4 h-4" />
+                          Today
+                        </div>
+                      </th>
+                      <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                        Today&apos;s %
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                    <ComparisonRow
+                      label="Total Jobs"
+                      icon={Briefcase}
+                      allTime={formatNumber(counts.totalJobs)}
+                      today={formatNumber(counts.todaysJobs)}
+                      percentage={derived.jobsTodayPct}
+                      iconColor="text-blue-600"
+                      iconBg="bg-blue-100 dark:bg-blue-900/40"
+                    />
+                    <ComparisonRow
+                      label="Total Revenue"
+                      icon={DollarSign}
+                      allTime={formatCurrency(counts.totalAmount)}
+                      today={formatCurrency(counts.todaysAmount)}
+                      percentage={derived.revTodayPct}
+                      iconColor="text-emerald-600"
+                      iconBg="bg-emerald-100 dark:bg-emerald-900/40"
+                    />
+                    <ComparisonRow
+                      label="Cash"
+                      icon={Wallet}
+                      allTime={formatCurrency(counts.totalCash)}
+                      today={formatCurrency(counts.todaysCash)}
+                      percentage={pct(counts.todaysCash, counts.totalCash)}
+                      iconColor="text-green-600"
+                      iconBg="bg-green-100 dark:bg-green-900/40"
+                    />
+                    <ComparisonRow
+                      label="Card"
+                      icon={CreditCard}
+                      allTime={formatCurrency(counts.totalCard)}
+                      today={formatCurrency(counts.todaysCard)}
+                      percentage={pct(counts.todaysCard, counts.totalCard)}
+                      iconColor="text-purple-600"
+                      iconBg="bg-purple-100 dark:bg-purple-900/40"
+                    />
+                    <ComparisonRow
+                      label="Bank Transfer"
+                      icon={Building2}
+                      allTime={formatCurrency(counts.totalBank)}
+                      today={formatCurrency(counts.todaysBank)}
+                      percentage={pct(counts.todaysBank, counts.totalBank)}
+                      iconColor="text-amber-600"
+                      iconBg="bg-amber-100 dark:bg-amber-900/40"
+                    />
+                    <ComparisonRow
+                      label="Avg per Job"
+                      icon={Target}
+                      allTime={formatCurrency(derived.avgPerJob)}
+                      today={formatCurrency(derived.todayAvgPerJob)}
+                      percentage={pct(
+                        derived.todayAvgPerJob,
+                        derived.avgPerJob,
+                      )}
+                      iconColor="text-rose-600"
+                      iconBg="bg-rose-100 dark:bg-rose-900/40"
+                      isLast
+                    />
+                  </tbody>
+                </table>
               </div>
             </motion.div>
-          </>
+          </motion.div>
         )}
+
+        {/* Footer */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 }}
+          className="text-center py-4"
+        >
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            Data refreshes on page load &bull; Click Refresh for latest numbers
+          </p>
+        </motion.div>
       </div>
     </div>
   );
 };
 
-/* Stat Card Component */
-const StatCard = ({ title, value, subtitle, icon: Icon, color, trend }) => {
-  const colorClasses = {
-    blue: {
-      bg: "bg-blue-50 dark:bg-blue-900/20",
-      text: "text-blue-600",
-      border: "border-blue-200",
-    },
-    green: {
-      bg: "bg-green-50 dark:bg-green-900/20",
-      text: "text-green-600",
-      border: "border-green-200",
-    },
-    purple: {
-      bg: "bg-purple-50 dark:bg-purple-900/20",
-      text: "text-purple-600",
-      border: "border-purple-200",
-    },
-    emerald: {
-      bg: "bg-emerald-50 dark:bg-emerald-900/20",
-      text: "text-emerald-600",
-      border: "border-emerald-200",
-    },
-    indigo: {
-      bg: "bg-indigo-50 dark:bg-indigo-900/20",
-      text: "text-indigo-600",
-      border: "border-indigo-200",
-    },
-  };
+// ─────────────────────────────────────────────────────────────
+// SUB-COMPONENTS
+// ─────────────────────────────────────────────────────────────
 
-  const styles = colorClasses[color] || colorClasses.blue;
+/* Mini stat in header strip */
+const MiniStat = ({ label, value }) => (
+  <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 border border-white/10">
+    <p className="text-[11px] text-blue-200 font-medium uppercase tracking-wider">
+      {label}
+    </p>
+    <p className="text-lg font-black text-white mt-0.5 truncate">{value}</p>
+  </div>
+);
+
+/* Section header with icon */
+const SectionHeader = ({ icon: Icon, title, subtitle, gradient }) => (
+  <motion.div variants={itemVariants} className="flex items-center gap-3">
+    <div className={`p-2.5 bg-gradient-to-br ${gradient} rounded-xl shadow-lg`}>
+      <Icon className="w-5 h-5 text-white" />
+    </div>
+    <div>
+      <h2 className="text-lg font-bold text-slate-800 dark:text-white">
+        {title}
+      </h2>
+      <p className="text-xs text-slate-400 dark:text-slate-500">{subtitle}</p>
+    </div>
+  </motion.div>
+);
+
+/* Glass card for main stat display */
+const GlassCard = ({
+  title,
+  value,
+  icon: Icon,
+  gradient,
+  glowColor,
+  subtitle,
+  badge,
+}) => {
+  const glowClasses = {
+    blue: "group-hover:shadow-blue-500/20",
+    green: "group-hover:shadow-green-500/20",
+    teal: "group-hover:shadow-teal-500/20",
+    purple: "group-hover:shadow-purple-500/20",
+    orange: "group-hover:shadow-orange-500/20",
+    cyan: "group-hover:shadow-cyan-500/20",
+    emerald: "group-hover:shadow-emerald-500/20",
+    lime: "group-hover:shadow-lime-500/20",
+    fuchsia: "group-hover:shadow-fuchsia-500/20",
+    rose: "group-hover:shadow-rose-500/20",
+  };
 
   return (
     <motion.div
-      whileHover={{ y: -4, boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }}
-      className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 transition-all"
+      whileHover={{ y: -6, scale: 1.02 }}
+      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      className={`group relative bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-5 overflow-hidden cursor-default shadow-lg hover:shadow-2xl ${glowClasses[glowColor] || ""} transition-all duration-300`}
     >
-      <div className="flex items-start justify-between mb-4">
-        <div className={`p-3 rounded-lg ${styles.bg} border ${styles.border}`}>
-          <Icon className={`w-6 h-6 ${styles.text}`} />
-        </div>
-        {trend !== undefined && trend !== 0 && (
-          <span
-            className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full ${
-              trend > 0
-                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-            }`}
+      {/* Top gradient accent */}
+      <div
+        className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${gradient} opacity-70 group-hover:opacity-100 transition-opacity`}
+      />
+
+      {/* Subtle background pattern on hover */}
+      <div
+        className={`absolute -bottom-8 -right-8 w-28 h-28 bg-gradient-to-br ${gradient} rounded-full opacity-0 group-hover:opacity-[0.07] transition-opacity duration-500 blur-xl`}
+      />
+
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-4">
+          <div
+            className={`p-2.5 rounded-xl bg-gradient-to-br ${gradient} shadow-lg`}
           >
-            {trend > 0 ? (
-              <ArrowUp className="w-3 h-3" />
-            ) : (
-              <ArrowDown className="w-3 h-3" />
-            )}
-            {Math.abs(Math.round(trend))}%
-          </span>
+            <Icon className="w-5 h-5 text-white" />
+          </div>
+          {badge && (
+            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-full">
+              {badge}
+            </span>
+          )}
+        </div>
+
+        <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+          {title}
+        </h3>
+
+        <p className="text-xl font-black text-slate-900 dark:text-white truncate mb-1">
+          {value}
+        </p>
+
+        {subtitle && (
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+            {subtitle}
+          </p>
         )}
       </div>
-      <h3 className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
-        {title}
-      </h3>
-      <p className="text-2xl font-bold text-slate-900 dark:text-white mb-1">
-        {value}
-      </p>
-      {subtitle && (
-        <p className="text-xs text-slate-500 dark:text-slate-500">{subtitle}</p>
-      )}
     </motion.div>
   );
 };
 
-/* Payment Bar Component */
-const PaymentBar = ({ label, amount, total, color, icon: Icon }) => {
-  const percentage = total > 0 ? (amount / total) * 100 : 0;
-
-  const colorClasses = {
-    emerald: "bg-emerald-500",
-    purple: "bg-purple-500",
-    indigo: "bg-indigo-500",
-  };
-
+/* Progress Row for Revenue Split */
+const ProgressRow = ({
+  label,
+  amount,
+  total,
+  color,
+  trackColor,
+  icon: Icon,
+  iconBg,
+  iconColor,
+}) => {
+  const percent = total > 0 ? ((amount / total) * 100).toFixed(1) : 0;
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <Icon className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+    <div className="group">
+      <div className="flex items-center gap-3 mb-2">
+        <div className={`p-1.5 rounded-lg ${iconBg}`}>
+          <Icon className={`w-3.5 h-3.5 ${iconColor}`} />
+        </div>
+        <div className="flex-1 flex justify-between items-center">
+          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
             {label}
           </span>
-        </div>
-        <div className="text-right">
-          <p className="text-sm font-bold text-slate-900 dark:text-white">
-            ₹{amount.toLocaleString()}
-          </p>
-          <p className="text-xs text-slate-500 dark:text-slate-500">
-            {percentage.toFixed(1)}%
-          </p>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-bold text-slate-900 dark:text-white">
+              {formatCurrency(amount)}
+            </span>
+            <span
+              className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                percent > 50
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                  : percent > 0
+                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                    : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400"
+              }`}
+            >
+              {percent}%
+            </span>
+          </div>
         </div>
       </div>
-      <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+      <div
+        className={`relative h-2.5 ${trackColor} rounded-full overflow-hidden`}
+      >
         <motion.div
           initial={{ width: 0 }}
-          animate={{ width: `${percentage}%` }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          className={`h-full ${colorClasses[color]}`}
+          animate={{ width: `${percent}%` }}
+          transition={{ duration: 1, ease: "easeOut", delay: 0.3 }}
+          className={`absolute inset-y-0 left-0 ${color} rounded-full`}
         />
       </div>
     </div>
   );
 };
 
-/* Comparison Metric Component */
-const ComparisonMetric = ({
-  label,
-  today,
-  average,
+/* Insight comparison card */
+const InsightCard = ({
+  title,
+  allTimeValue,
+  todayValue,
   icon: Icon,
-  isCurrency,
-}) => {
-  const difference = today - average;
-  const percentageChange = average > 0 ? (difference / average) * 100 : 0;
-
-  return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-slate-100 dark:bg-slate-700 rounded-lg">
-          <Icon className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-        </div>
-        <div>
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            {label}
-          </p>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-xs text-slate-500 dark:text-slate-500">
-              Today: {isCurrency ? "₹" : ""}
-              {today.toLocaleString()}
-            </span>
-            <span className="text-xs text-slate-400">|</span>
-            <span className="text-xs text-slate-500 dark:text-slate-500">
-              Avg: {isCurrency ? "₹" : ""}
-              {average.toLocaleString()}
-            </span>
-          </div>
-        </div>
+  gradient,
+}) => (
+  <motion.div
+    whileHover={{ y: -4 }}
+    className="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all duration-300"
+  >
+    <div className="flex items-center gap-3 mb-5">
+      <div
+        className={`p-2.5 bg-gradient-to-br ${gradient} rounded-xl shadow-lg`}
+      >
+        <Icon className="w-5 h-5 text-white" />
       </div>
-      {difference !== 0 && (
-        <span
-          className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
-            difference > 0
-              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-              : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-          }`}
-        >
-          {difference > 0 ? (
-            <TrendingUp className="w-3 h-3" />
-          ) : (
-            <TrendingDown className="w-3 h-3" />
-          )}
-          {Math.abs(Math.round(percentageChange))}%
+      <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300">
+        {title}
+      </h3>
+    </div>
+
+    <div className="space-y-3">
+      <div className="flex items-center justify-between py-2 px-3 bg-blue-50/80 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800/30">
+        <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+          All-Time
         </span>
-      )}
-    </div>
-  );
-};
-
-/* Team Stat Card Component */
-const TeamStatCard = ({ label, value, icon: Icon, color }) => {
-  const colorClasses = {
-    blue: {
-      bg: "bg-blue-100 dark:bg-blue-900/30",
-      text: "text-blue-600 dark:text-blue-400",
-    },
-    green: {
-      bg: "bg-green-100 dark:bg-green-900/30",
-      text: "text-green-600 dark:text-green-400",
-    },
-    red: {
-      bg: "bg-red-100 dark:bg-red-900/30",
-      text: "text-red-600 dark:text-red-400",
-    },
-  };
-
-  const styles = colorClasses[color] || colorClasses.blue;
-
-  return (
-    <div className={`${styles.bg} rounded-lg p-4`}>
-      <div className="flex items-center gap-3">
-        <Icon className={`w-8 h-8 ${styles.text}`} />
-        <div>
-          <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
-            {label}
-          </p>
-          <p className={`text-2xl font-bold ${styles.text}`}>{value}</p>
-        </div>
+        <span className="text-sm font-black text-blue-700 dark:text-blue-300">
+          {allTimeValue}
+        </span>
+      </div>
+      <div className="flex items-center justify-between py-2 px-3 bg-cyan-50/80 dark:bg-cyan-900/20 rounded-xl border border-cyan-100 dark:border-cyan-800/30">
+        <span className="text-[11px] font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">
+          Today
+        </span>
+        <span className="text-sm font-black text-cyan-700 dark:text-cyan-300">
+          {todayValue}
+        </span>
       </div>
     </div>
-  );
-};
+  </motion.div>
+);
 
-/* Worker Card Component */
-const WorkerCard = ({ worker, rank }) => {
+/* SVG Donut Chart */
+const DonutChart = ({ segments, total, centerLabel, centerSub }) => {
+  const radius = 60;
+  const circumference = 2 * Math.PI * radius;
+  let accumulated = 0;
+
+  const validSegments = segments.filter((s) => s.value > 0);
+  const hasData = total > 0;
+
   return (
-    <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4 border border-slate-200 dark:border-slate-600">
-      <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
-          {worker.name?.charAt(0).toUpperCase()}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h5 className="font-semibold text-slate-900 dark:text-white truncate">
-              {worker.name}
-            </h5>
-            {worker.status === 1 && (
-              <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-            )}
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-1">
-            <Phone className="w-3 h-3" />
-            {worker.mobile}
-          </p>
-          <div className="flex items-center gap-2 mt-2">
-            <span
-              className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                worker.service_type === "residence"
-                  ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                  : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
-              }`}
-            >
-              {worker.service_type}
+    <div className="relative w-44 h-44">
+      <svg viewBox="0 0 160 160" className="w-full h-full -rotate-90">
+        {/* Background ring */}
+        <circle
+          cx="80"
+          cy="80"
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="16"
+          className="text-slate-100 dark:text-slate-700"
+        />
+        {hasData &&
+          validSegments.map((seg, i) => {
+            const segPct = seg.value / total;
+            const dashLength = segPct * circumference;
+            const dashOffset = -(accumulated * circumference);
+            accumulated += segPct;
+
+            return (
+              <motion.circle
+                key={i}
+                cx="80"
+                cy="80"
+                r={radius}
+                fill="none"
+                stroke={seg.color}
+                strokeWidth="16"
+                strokeDasharray={`${dashLength} ${circumference - dashLength}`}
+                strokeDashoffset={dashOffset}
+                strokeLinecap="round"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 + i * 0.15 }}
+              />
+            );
+          })}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">
+          {centerSub}
+        </p>
+        <p className="text-sm font-black text-slate-800 dark:text-white mt-0.5 text-center px-2 leading-tight">
+          {centerLabel}
+        </p>
+      </div>
+      {/* Legend */}
+      <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 flex gap-3">
+        {segments.map((seg, i) => (
+          <div key={i} className="flex items-center gap-1">
+            <div
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: seg.color }}
+            />
+            <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+              {seg.label}
             </span>
-            {worker.buildings?.length > 0 && (
-              <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                <Building2 className="w-3 h-3" />
-                {worker.buildings.length}
-              </span>
-            )}
           </div>
-        </div>
+        ))}
       </div>
     </div>
   );
 };
 
-/* Insight Card Component */
-const InsightCard = ({ title, value, icon: Icon, color }) => {
-  const colorClasses = {
-    blue: "text-blue-600",
-    green: "text-green-600",
-    purple: "text-purple-600",
-    indigo: "text-indigo-600",
-  };
-
-  return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
-      <Icon className={`w-6 h-6 ${colorClasses[color]} mb-2`} />
-      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">{title}</p>
-      <p className="text-xl font-bold text-slate-900 dark:text-white">
-        {value}
-      </p>
-    </div>
-  );
-};
-
-/* Quick Action Button Component */
-const QuickActionButton = ({ label, icon: Icon, onClick, color }) => {
-  const colorClasses = {
-    blue: "bg-blue-600 hover:bg-blue-700",
-    green: "bg-green-600 hover:bg-green-700",
-    purple: "bg-purple-600 hover:bg-purple-700",
-    indigo: "bg-indigo-600 hover:bg-indigo-700",
-  };
-
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center justify-center gap-2 px-6 py-4 ${colorClasses[color]} text-white rounded-lg transition-colors font-medium`}
-    >
-      <Icon className="w-5 h-5" />
-      {label}
-    </button>
-  );
-};
+/* Comparison table row */
+const ComparisonRow = ({
+  label,
+  icon: Icon,
+  allTime,
+  today,
+  percentage,
+  iconColor,
+  iconBg,
+  isLast = false,
+}) => (
+  <tr className="group hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-colors">
+    <td className="px-6 py-4">
+      <div className="flex items-center gap-3">
+        <div className={`p-2 rounded-lg ${iconBg}`}>
+          <Icon className={`w-4 h-4 ${iconColor}`} />
+        </div>
+        <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
+          {label}
+        </span>
+      </div>
+    </td>
+    <td className="px-6 py-4 text-right">
+      <span className="text-sm font-bold text-slate-800 dark:text-white">
+        {allTime}
+      </span>
+    </td>
+    <td className="px-6 py-4 text-right">
+      <span className="text-sm font-bold text-cyan-700 dark:text-cyan-400">
+        {today}
+      </span>
+    </td>
+    <td className="px-6 py-4 text-right">
+      <span
+        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
+          parseFloat(percentage) >= 100
+            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+            : parseFloat(percentage) > 0
+              ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+              : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400"
+        }`}
+      >
+        {parseFloat(percentage) >= 100 ? (
+          <ArrowUp className="w-3 h-3" />
+        ) : parseFloat(percentage) > 0 ? (
+          <Clock className="w-3 h-3" />
+        ) : null}
+        {percentage}%
+      </span>
+    </td>
+  </tr>
+);
 
 export default SupervisorDashboard;

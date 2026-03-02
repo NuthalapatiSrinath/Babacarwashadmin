@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  Plus,
   Trash2,
   Edit2,
   Download,
@@ -18,7 +17,7 @@ import {
   Loader2,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import * as XLSX from "xlsx"; // Requires: npm install xlsx
+import * as XLSX from "xlsx";
 
 import DataTable from "../../components/DataTable";
 import OneWashModal from "../../components/modals/OneWashModal";
@@ -26,9 +25,9 @@ import RichDateRangePicker from "../../components/inputs/RichDateRangePicker";
 import CustomDropdown from "../../components/ui/CustomDropdown";
 
 import { oneWashService } from "../../api/oneWashService";
-import { workerService } from "../../api/workerService";
+import { supervisorService } from "../../api/supervisorService";
 
-const OneWash = () => {
+const SupervisorOnewash = () => {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [data, setData] = useState([]);
@@ -87,10 +86,14 @@ const OneWash = () => {
       if (savedCurrency) setCurrency(savedCurrency);
 
       try {
-        const res = await workerService.list(1, 1000);
+        const res = await supervisorService.getTeam({
+          pageNo: 0,
+          pageSize: 1000,
+        });
+        console.log("✅ [Supervisor Onewash] Team loaded:", res);
         setWorkers(res.data || []);
       } catch (e) {
-        console.error(e);
+        console.error("❌ [Supervisor Onewash] Failed to load team:", e);
       }
     };
     loadData();
@@ -111,7 +114,6 @@ const OneWash = () => {
   }, [searchTerm]);
 
   const fetchData = async (page = 1, limit = 50) => {
-    // ✅ FIX: Prevent fetching if dates are missing/invalid
     if (!filters.startDate || !filters.endDate) return;
 
     setLoading(true);
@@ -119,7 +121,6 @@ const OneWash = () => {
       const start = new Date(filters.startDate);
       const end = new Date(filters.endDate);
 
-      // ✅ FIX: Validate Date objects
       if (isNaN(start.getTime()) || isNaN(end.getTime())) {
         console.warn("Invalid Date Range Selected");
         setLoading(false);
@@ -135,12 +136,21 @@ const OneWash = () => {
         endDate: end.toISOString(),
       };
 
+      console.log("📤 [Supervisor Onewash] Fetching data with:", {
+        page,
+        limit,
+        searchTerm,
+        apiFilters,
+      });
+
       const res = await oneWashService.list(
         page,
         limit,
         searchTerm,
         apiFilters,
       );
+
+      console.log("📥 [Supervisor Onewash] API Response:", res);
 
       setData(res.data || []);
       if (res.counts) setStats(res.counts);
@@ -156,13 +166,12 @@ const OneWash = () => {
       });
     } catch (e) {
       console.error(e);
-      // Removed toast error here to prevent spamming while typing/selecting dates
     } finally {
       setLoading(false);
     }
   };
 
-  // --- EXPORT LOGIC (Summary + Detailed) ---
+  // --- EXPORT LOGIC ---
   const handleExport = async () => {
     if (!filters.startDate || !filters.endDate) {
       toast.error("Please select a valid date range");
@@ -182,7 +191,6 @@ const OneWash = () => {
         endDate: end.toISOString(),
       };
 
-      // 1. Fetch All Data
       const res = await oneWashService.list(1, 10000, searchTerm, apiFilters);
       const exportData = res.data || [];
 
@@ -192,11 +200,8 @@ const OneWash = () => {
         return;
       }
 
-      // 2. Prepare Detailed Data
       const detailedData = exportData.map((item) => {
         let washType = "-";
-
-        // Check if it's residential
         if (item.service_type === "residence") {
           washType = "Residence";
         } else if (item.wash_type === "outside") {
@@ -223,21 +228,16 @@ const OneWash = () => {
         };
       });
 
-      // 3. Prepare Summary Data (Aggregated by Date & Location)
-      const summaryMap = {}; // Key: "YYYY-MM-DD_LocationName"
-
+      const summaryMap = {};
       exportData.forEach((item) => {
         const dateKey = new Date(item.createdAt).toISOString().split("T")[0];
-
         let locationName = "Unknown";
         if (item.service_type === "mall" && item.mall?.name) {
           locationName = item.mall.name;
         } else if (item.service_type === "residence" && item.building?.name) {
           locationName = item.building.name;
         }
-
         const compositeKey = `${dateKey}_${locationName}`;
-
         if (!summaryMap[compositeKey]) {
           summaryMap[compositeKey] = {
             date: dateKey,
@@ -252,7 +252,6 @@ const OneWash = () => {
       const summaryArray = Object.values(summaryMap).sort(
         (a, b) => new Date(a.date) - new Date(b.date),
       );
-
       const mallSummary = summaryArray.filter((i) => i.type === "Mall");
       const buildingSummary = summaryArray.filter((i) => i.type === "Building");
 
@@ -262,10 +261,8 @@ const OneWash = () => {
         mallSummary.forEach((m) =>
           summarySheetRows.push([m.date, m.location, m.count]),
         );
-        summarySheetRows.push([]);
-        summarySheetRows.push([]);
+        summarySheetRows.push([], []);
       }
-
       if (buildingSummary.length > 0) {
         summarySheetRows.push(["Day", "Building", "Count"]);
         buildingSummary.forEach((b) =>
@@ -273,15 +270,11 @@ const OneWash = () => {
         );
       }
 
-      // 4. Generate Workbook
       const workbook = XLSX.utils.book_new();
-
-      // If summary data exists, add it
       if (summarySheetRows.length > 0) {
         const wsSummary = XLSX.utils.aoa_to_sheet(summarySheetRows);
         XLSX.utils.book_append_sheet(workbook, wsSummary, "Report");
       }
-
       const wsDetailed = XLSX.utils.json_to_sheet(detailedData);
       XLSX.utils.book_append_sheet(workbook, wsDetailed, "Detailed Report");
 
@@ -306,11 +299,6 @@ const OneWash = () => {
     } else {
       setFilters((prev) => ({ ...prev, [field]: value }));
     }
-  };
-
-  const handleCreate = () => {
-    setSelectedJob(null);
-    setIsModalOpen(true);
   };
 
   const handleEdit = (row) => {
@@ -342,7 +330,7 @@ const OneWash = () => {
     return options;
   }, [workers]);
 
-  // --- COLUMNS ---
+  // --- COLUMNS (matching the screenshot exactly) ---
   const columns = [
     {
       header: "Id",
@@ -375,35 +363,32 @@ const OneWash = () => {
       ),
     },
     {
-      header: "Service Type",
-      accessor: "display_service_type",
-      className: "text-center",
+      header: "Parking No",
+      accessor: "parking_no",
+      render: (row) => (
+        <span className="text-slate-600">{row.parking_no || "-"}</span>
+      ),
+    },
+    {
+      header: "Wash Type",
+      accessor: "wash_type",
       render: (row) => {
-        const displayText = row.display_service_type || "-";
-        let colorClass = "bg-slate-50 text-slate-600 border-slate-200";
-
-        const serviceType = (displayText || "").toLowerCase();
-
-        if (serviceType === "residence") {
-          colorClass = "bg-green-50 text-green-700 border-green-200";
-        } else if (serviceType === "external" || serviceType === "outside") {
-          colorClass = "bg-blue-50 text-blue-700 border-blue-200";
-        } else if (
-          serviceType === "total" ||
-          serviceType === "inside + outside"
-        ) {
-          colorClass = "bg-purple-50 text-purple-700 border-purple-200";
-        } else if (serviceType === "internal" || serviceType === "inside") {
-          colorClass = "bg-indigo-50 text-indigo-700 border-indigo-200";
-        } else if (serviceType === "mall") {
-          colorClass = "bg-amber-50 text-amber-700 border-amber-200";
-        }
-
+        if (!row.wash_type) return <span className="text-slate-400">-</span>;
+        const labels = {
+          outside: "Outside",
+          total: "Inside + Outside",
+          inside: "Inside",
+        };
+        const colors = {
+          outside: "bg-blue-100 text-blue-700",
+          total: "bg-purple-100 text-purple-700",
+          inside: "bg-teal-100 text-teal-700",
+        };
         return (
           <span
-            className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${colorClass}`}
+            className={`px-2 py-1 rounded-full text-xs font-bold ${colors[row.wash_type] || "bg-slate-100 text-slate-700"}`}
           >
-            {displayText}
+            {labels[row.wash_type] || row.wash_type}
           </span>
         );
       },
@@ -425,13 +410,12 @@ const OneWash = () => {
       accessor: "tip_amount",
       className: "text-right",
       render: (row) => {
-        // For residential jobs, don't show tip amount
         if (row.service_type === "residence") {
           return <span className="text-xs text-slate-400">-</span>;
         }
         return (
           <span className="text-xs text-slate-600">
-            {row.tip_amount ? `${row.tip_amount}` : "-"}
+            {row.tip_amount ? `${row.tip_amount}` : "0"}
           </span>
         );
       },
@@ -502,6 +486,7 @@ const OneWash = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 font-sans">
+      {/* Header */}
       <div className="mb-6 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-3">
@@ -517,7 +502,9 @@ const OneWash = () => {
               </p>
             </div>
           </div>
-          {/* <div className="flex flex-wrap gap-2 text-xs font-medium text-slate-600 mt-1">
+
+          {/* Stats summary pills */}
+          <div className="flex flex-wrap gap-2 text-xs font-medium text-slate-600 mt-1">
             <div className="bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm flex items-center gap-2">
               <Briefcase className="w-3.5 h-3.5 text-indigo-500" />
               <span>
@@ -527,7 +514,7 @@ const OneWash = () => {
             <div className="bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm flex items-center gap-2">
               <Coins className="w-3.5 h-3.5 text-emerald-500" />
               <span>
-                Revenue:{" "}
+                Amount:{" "}
                 <b className="text-emerald-700">
                   {stats.totalAmount} {currency}
                 </b>
@@ -545,7 +532,7 @@ const OneWash = () => {
                 Card: <b>{stats.card}</b>
               </span>
             </div>
-          </div> */}
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -561,16 +548,12 @@ const OneWash = () => {
             )}{" "}
             Export
           </button>
-          <button
-            onClick={handleCreate}
-            className="h-11 px-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transition-all active:scale-95 flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" /> New Job
-          </button>
         </div>
       </div>
 
+      {/* Table Card */}
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden flex flex-col">
+        {/* Filter Bar */}
         <div className="p-4 border-b border-gray-100 bg-slate-50/50 flex flex-col xl:flex-row gap-4 items-end">
           <div className="w-full xl:w-auto">
             <span className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
@@ -626,11 +609,10 @@ const OneWash = () => {
           </div>
         </div>
 
+        {/* Data Table */}
         <DataTable
           columns={columns}
           data={data.filter((row) => {
-            // Re-implement search logic here because filteredData variable was removed
-            // to simplify the flow and rely on 'data' state which is updated by fetchData
             if (!searchTerm) return true;
             const term = searchTerm.toLowerCase();
             return (
@@ -648,6 +630,7 @@ const OneWash = () => {
         />
       </div>
 
+      {/* Edit Modal */}
       <OneWashModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -658,4 +641,4 @@ const OneWash = () => {
   );
 };
 
-export default OneWash;
+export default SupervisorOnewash;

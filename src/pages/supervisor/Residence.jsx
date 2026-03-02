@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  Plus,
   Trash2,
   Edit2,
   Download,
@@ -16,7 +15,6 @@ import {
   Phone,
   Building2,
   Loader2,
-  Play,
   Info,
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -30,18 +28,16 @@ import CustomDropdown from "../../components/ui/CustomDropdown";
 
 // API
 import { jobService } from "../../api/jobService";
-import { workerService } from "../../api/workerService";
+import { supervisorService } from "../../api/supervisorService";
 import { buildingService } from "../../api/buildingService";
-import { customerService } from "../../api/customerService";
 
-const Residence = () => {
+const SupervisorResidence = () => {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [data, setData] = useState([]);
-  const [allJobsForFilters, setAllJobsForFilters] = useState([]); // ⚡ All jobs for filter counts
+  const [allJobsForFilters, setAllJobsForFilters] = useState([]);
   const [workers, setWorkers] = useState([]);
   const [buildings, setBuildings] = useState([]);
-  const [customers, setCustomers] = useState([]);
 
   // --- DATE HELPERS ---
   const formatDateLocal = (date) => {
@@ -73,6 +69,7 @@ const Residence = () => {
     worker: "",
     status: "",
     building: "",
+    customer: "",
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -86,22 +83,19 @@ const Residence = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
-  const [isSchedulerModalOpen, setIsSchedulerModalOpen] = useState(false);
-  const [schedulerDate, setSchedulerDate] = useState("");
-  const [runningScheduler, setRunningScheduler] = useState(false);
 
   // --- LOAD RESOURCES ---
   useEffect(() => {
     const loadResources = async () => {
       try {
-        const [wRes, bRes, cRes] = await Promise.all([
-          workerService.list(1, 1000),
+        const [wRes, bRes] = await Promise.all([
+          supervisorService.getTeam({ pageNo: 0, pageSize: 1000 }),
           buildingService.list(1, 1000),
-          customerService.list(1, 1000),
         ]);
+        console.log("✅ [Supervisor Residence] Team loaded:", wRes);
+        console.log("✅ [Supervisor Residence] Buildings loaded:", bRes);
         setWorkers(wRes.data || []);
         setBuildings(bRes.data || []);
-        setCustomers(cRes.data || []);
       } catch (e) {
         console.error(e);
       }
@@ -112,7 +106,7 @@ const Residence = () => {
   // --- AUTOMATIC FETCH ---
   useEffect(() => {
     fetchData(1, pagination.limit);
-    fetchAllJobsForFilters(); // ⚡ Fetch all jobs for accurate filter counts
+    fetchAllJobsForFilters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
@@ -124,7 +118,6 @@ const Residence = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm]);
 
-  // ⚡ NEW: Fetch ALL jobs (not paginated) for filter counts
   const fetchAllJobsForFilters = async () => {
     if (!filters.startDate || !filters.endDate) return;
 
@@ -137,27 +130,18 @@ const Residence = () => {
       start.setHours(0, 0, 0, 0);
       end.setHours(23, 59, 59, 999);
 
-      // ⚡ IMPORTANT: Don't include building/worker filters here
-      // We want to show ALL buildings/workers in dropdown, not just filtered ones
       const apiFilters = {
-        status: filters.status, // Include status filter
+        status: filters.status,
         startDate: start.toISOString(),
         endDate: end.toISOString(),
-        // ❌ DON'T include: building, worker (so dropdown shows all options)
       };
 
-      // Fetch with large limit to get all jobs (for filter counts only)
       const res = await jobService.list(1, 10000, "", apiFilters);
+      console.log("✅ [Supervisor Residence] All jobs for filters:", res);
       setAllJobsForFilters(res.data || []);
-
-      console.log(
-        "⚡ [FILTERS] Loaded",
-        res.data?.length || 0,
-        "total jobs for filter counts",
-      );
     } catch (e) {
       console.error("Failed to fetch all jobs for filters:", e);
-      setAllJobsForFilters([]); // Fallback to empty
+      setAllJobsForFilters([]);
     }
   };
 
@@ -180,8 +164,17 @@ const Residence = () => {
         endDate: end.toISOString(),
       };
 
+      console.log("📤 [Supervisor Residence] Fetching data with:", {
+        page,
+        limit,
+        searchTerm,
+        apiFilters,
+      });
+
       const res = await jobService.list(page, limit, searchTerm, apiFilters);
       let fetchedData = res.data || [];
+
+      console.log("📥 [Supervisor Residence] API Response:", res);
 
       fetchedData.sort(
         (a, b) => new Date(b.assignedDate) - new Date(a.assignedDate),
@@ -235,7 +228,6 @@ const Residence = () => {
     try {
       const start = new Date(filters.startDate);
       const end = new Date(filters.endDate);
-
       start.setHours(0, 0, 0, 0);
       end.setHours(23, 59, 59, 999);
 
@@ -254,13 +246,11 @@ const Residence = () => {
         return;
       }
 
-      // Summary Sheet
       const buildingCounts = {};
       exportData.forEach((item) => {
         const dateKey = new Date(item.assignedDate).toISOString().split("T")[0];
         const bName = item.building?.name || "Unknown";
         const compositeKey = `${dateKey}_${bName}`;
-
         if (!buildingCounts[compositeKey]) {
           buildingCounts[compositeKey] = {
             date: dateKey,
@@ -281,30 +271,25 @@ const Residence = () => {
         summarySheetRows.push([item.date, item.building, item.count]);
       });
 
-      // Detailed Sheet
-      const detailedData = exportData.map((item) => {
-        return {
-          ID: item.id,
-          Date: new Date(item.assignedDate).toLocaleDateString(),
-          "Customer Mobile": item.customer?.mobile || "-",
-          Building: item.building?.name || "-",
-          Vehicle: item.vehicle?.registration_no || "-",
-          Parking: item.vehicle?.parking_no || "-",
-          Status: item.status,
-          Worker: item.worker?.name || "Unassigned",
-          Completed: item.completedDate
-            ? new Date(item.completedDate).toLocaleDateString()
-            : "-",
-        };
-      });
+      const detailedData = exportData.map((item) => ({
+        ID: item.id,
+        Date: new Date(item.assignedDate).toLocaleDateString(),
+        "Customer Mobile": item.customer?.mobile || "-",
+        Building: item.building?.name || "-",
+        Vehicle: item.vehicle?.registration_no || "-",
+        Parking: item.vehicle?.parking_no || "-",
+        Status: item.status,
+        Worker: item.worker?.name || "Unassigned",
+        Completed: item.completedDate
+          ? new Date(item.completedDate).toLocaleDateString()
+          : "-",
+      }));
 
       const workbook = XLSX.utils.book_new();
-
       if (summarySheetRows.length > 1) {
         const wsSummary = XLSX.utils.aoa_to_sheet(summarySheetRows);
         XLSX.utils.book_append_sheet(workbook, wsSummary, "Report");
       }
-
       const wsDetailed = XLSX.utils.json_to_sheet(detailedData);
       XLSX.utils.book_append_sheet(workbook, wsDetailed, "Detailed Report");
 
@@ -327,43 +312,6 @@ const Residence = () => {
     } else {
       setFilters((prev) => ({ ...prev, [field]: value }));
     }
-  };
-
-  const handleRunScheduler = () => {
-    // Default to tomorrow's date
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    setSchedulerDate(formatDateLocal(tomorrow));
-    setIsSchedulerModalOpen(true);
-  };
-
-  const handleConfirmScheduler = async () => {
-    if (!schedulerDate) {
-      toast.error("Please select a date");
-      return;
-    }
-
-    setRunningScheduler(true);
-    try {
-      const result = await jobService.runScheduler(schedulerDate);
-      toast.success(
-        `✅ Scheduler executed successfully! Generated ${result.jobsGenerated} jobs for ${result.targetDate}`,
-      );
-      setIsSchedulerModalOpen(false);
-      // Refresh the data
-      fetchData(pagination.page, pagination.limit);
-    } catch (error) {
-      const errorMsg =
-        error.response?.data?.message || "Failed to run scheduler";
-      toast.error(errorMsg);
-    } finally {
-      setRunningScheduler(false);
-    }
-  };
-
-  const handleCreate = () => {
-    setSelectedJob(null);
-    setIsModalOpen(true);
   };
 
   const handleEdit = (row) => {
@@ -390,7 +338,6 @@ const Residence = () => {
     { value: "rejected", label: "Rejected" },
   ];
 
-  // ⚡ Extract unique buildings from ALL jobs (not just current page)
   const buildingOptions = useMemo(() => {
     const uniqueBuildings = new Map();
     allJobsForFilters.forEach((job) => {
@@ -405,18 +352,9 @@ const Residence = () => {
     uniqueBuildings.forEach((name, id) => {
       options.push({ value: id, label: name });
     });
-
-    console.log(
-      "🏢 Building Options:",
-      options.length - 1,
-      "buildings from",
-      allJobsForFilters.length,
-      "total jobs",
-    );
     return options;
   }, [allJobsForFilters]);
 
-  // ⚡ Extract unique workers from ALL jobs (not just current page)
   const workerOptions = useMemo(() => {
     const uniqueWorkers = new Map();
     allJobsForFilters.forEach((job) => {
@@ -431,33 +369,40 @@ const Residence = () => {
     uniqueWorkers.forEach((name, id) => {
       options.push({ value: id, label: name });
     });
-
-    console.log(
-      "👷 Worker Options:",
-      options.length - 1,
-      "workers from",
-      allJobsForFilters.length,
-      "total jobs",
-    );
     return options;
   }, [allJobsForFilters]);
 
-  // ✅ HELPER: Format Date (Shows the actual date without timezone conversion)
+  const customerOptions = useMemo(() => {
+    const uniqueCustomers = new Map();
+    allJobsForFilters.forEach((job) => {
+      if (job.customer && job.customer._id) {
+        const label =
+          job.customer.mobile || job.customer.firstName || job.customer._id;
+        uniqueCustomers.set(job.customer._id, label);
+      }
+    });
+
+    const options = [
+      { value: "", label: `All Customers (${uniqueCustomers.size})` },
+    ];
+    uniqueCustomers.forEach((label, id) => {
+      options.push({ value: id, label });
+    });
+    return options;
+  }, [allJobsForFilters]);
+
   const formatUtcDate = (isoString) => {
     if (!isoString) return "-";
     const date = new Date(isoString);
-    // Use local date components to avoid timezone shift
     const day = String(date.getDate()).padStart(2, "0");
-    const month = date.toLocaleString("en-US", {
-      month: "short",
-    });
+    const month = date.toLocaleString("en-US", { month: "short" });
     return `${month} ${day}`;
   };
 
-  // --- Columns ---
+  // --- Columns (matching admin Residence layout) ---
   const columns = [
     {
-      header: "ID",
+      header: "Id",
       accessor: "id",
       className: "w-16 text-center",
       render: (row, idx) => (
@@ -469,7 +414,7 @@ const Residence = () => {
       ),
     },
     {
-      header: "Date",
+      header: "Created",
       accessor: "assignedDate",
       render: (row) => (
         <div className="flex items-center gap-2">
@@ -477,7 +422,6 @@ const Residence = () => {
             <Calendar className="w-4 h-4" />
           </div>
           <span className="text-slate-700 text-sm font-bold">
-            {/* ✅ UPDATED: Using UTC formatting to fix date shift */}
             {formatUtcDate(row.assignedDate)}
           </span>
         </div>
@@ -488,7 +432,6 @@ const Residence = () => {
       accessor: "completedDate",
       render: (row) => (
         <span className="text-slate-500 text-xs font-medium bg-slate-50 px-2 py-1 rounded border border-slate-100">
-          {/* ✅ UPDATED: Using UTC formatting here too */}
           {formatUtcDate(row.completedDate)}
         </span>
       ),
@@ -501,17 +444,17 @@ const Residence = () => {
         const status = (row.status || "pending").toLowerCase();
         const config = {
           completed: {
-            text: "Completed",
+            text: "COMPLETED",
             classes: "bg-emerald-50 text-emerald-600 border-emerald-100",
             icon: CheckCircle,
           },
           rejected: {
-            text: "Rejected",
+            text: "REJECTED",
             classes: "bg-red-50 text-red-600 border-red-100",
             icon: XCircle,
           },
           pending: {
-            text: "Pending",
+            text: "PENDING",
             classes: "bg-amber-50 text-amber-600 border-amber-100",
             icon: Clock,
           },
@@ -549,49 +492,25 @@ const Residence = () => {
       },
     },
     {
-      header: "Customer",
-      accessor: "customer.mobile",
+      header: "Vehicle No",
+      accessor: "vehicle.registration_no",
       render: (row) => (
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-xs font-bold border border-indigo-200">
-            <Phone className="w-3 h-3" />
-          </div>
-          <span className="text-sm text-slate-700 font-mono font-bold">
-            {row.customer?.mobile || "-"}
+          <Car className="w-3.5 h-3.5 text-slate-400" />
+          <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-xs font-bold uppercase text-slate-700 tracking-wide">
+            {row.vehicle?.registration_no || "N/A"}
           </span>
         </div>
       ),
     },
     {
-      header: "Vehicle Details",
-      accessor: "vehicle.registration_no",
+      header: "Parking No",
+      accessor: "vehicle.parking_no",
+      className: "w-24 text-center",
       render: (row) => (
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <Car className="w-3.5 h-3.5 text-slate-400" />
-            <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-xs font-bold uppercase text-slate-700 tracking-wide w-fit">
-              {row.vehicle?.registration_no || "N/A"}
-            </span>
-          </div>
-          {row.vehicle?.parking_no && (
-            <span className="text-[10px] text-slate-500 pl-6">
-              Parking:{" "}
-              <span className="font-bold">{row.vehicle.parking_no}</span>
-            </span>
-          )}
-          {row.vehicle?.schedule_type && (
-            <span className="text-[10px] text-slate-500 pl-6">
-              Schedule:{" "}
-              <span className="font-bold capitalize">
-                {row.vehicle.schedule_type === "daily"
-                  ? "Daily"
-                  : row.vehicle.schedule_type === "weekly"
-                    ? `Weekly (${row.vehicle.schedule_days?.map((d) => (typeof d === "object" ? d.day : d)).join(", ") || ""})`
-                    : row.vehicle.schedule_type}
-              </span>
-            </span>
-          )}
-        </div>
+        <span className="text-sm text-slate-700 font-bold">
+          {row.vehicle?.parking_no || "-"}
+        </span>
       ),
     },
     {
@@ -602,6 +521,20 @@ const Residence = () => {
           <Building2 className="w-3 h-3 text-indigo-500" />
           <span className="text-xs font-bold uppercase text-slate-600 truncate max-w-[150px]">
             {row.building?.name || "-"}
+          </span>
+        </div>
+      ),
+    },
+    {
+      header: "Customer",
+      accessor: "customer.mobile",
+      render: (row) => (
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-xs font-bold border border-indigo-200">
+            <Phone className="w-3 h-3" />
+          </div>
+          <span className="text-sm text-slate-700 font-mono font-bold">
+            {row.customer?.mobile || "-"}
           </span>
         </div>
       ),
@@ -646,6 +579,7 @@ const Residence = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 font-sans">
+      {/* Header */}
       <div className="mb-6 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-3">
@@ -665,18 +599,6 @@ const Residence = () => {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={handleRunScheduler}
-            disabled={runningScheduler}
-            className="h-11 px-5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-200 hover:shadow-emerald-300 transition-all flex items-center gap-2 disabled:opacity-70"
-          >
-            {runningScheduler ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Play className="w-4 h-4" />
-            )}{" "}
-            Run Scheduler
-          </button>
-          <button
             onClick={handleExport}
             disabled={exporting}
             className="h-11 px-5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-2 disabled:opacity-70"
@@ -688,15 +610,10 @@ const Residence = () => {
             )}{" "}
             Export
           </button>
-          <button
-            onClick={handleCreate}
-            className="h-11 px-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transition-all active:scale-95 flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" /> Schedule Job
-          </button>
         </div>
       </div>
 
+      {/* Table */}
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden flex flex-col">
         <div className="p-4 border-b border-gray-100 bg-slate-50/50 flex flex-col xl:flex-row gap-4 items-end">
           <div className="w-full xl:w-auto">
@@ -710,7 +627,7 @@ const Residence = () => {
             />
           </div>
 
-          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 w-full">
             <div>
               <CustomDropdown
                 label="Status"
@@ -740,6 +657,17 @@ const Residence = () => {
                 options={workerOptions}
                 icon={User}
                 placeholder="All Workers"
+                searchable={true}
+              />
+            </div>
+            <div>
+              <CustomDropdown
+                label="Customer"
+                value={filters.customer}
+                onChange={(val) => setFilters({ ...filters, customer: val })}
+                options={customerOptions}
+                icon={Phone}
+                placeholder="All Customers"
                 searchable={true}
               />
             </div>
@@ -773,84 +701,17 @@ const Residence = () => {
         />
       </div>
 
+      {/* Edit Modal */}
       <JobModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         job={selectedJob}
         onSuccess={() => fetchData(pagination.page, pagination.limit)}
         workers={workers}
-        customers={customers}
+        customers={[]}
       />
-
-      {/* Scheduler Modal */}
-      {isSchedulerModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5">
-            <div>
-              <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <Play className="w-5 h-5 text-emerald-600" />
-                Run Job Scheduler
-              </h3>
-              <p className="text-sm text-slate-500 mt-1">
-                Generate jobs for a specific date
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">
-                Target Date
-              </label>
-              <input
-                type="date"
-                value={schedulerDate}
-                onChange={(e) => setSchedulerDate(e.target.value)}
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-              />
-              <p className="text-xs text-slate-500 mt-1.5">
-                💡 Jobs will be created for this date based on customer
-                schedules
-              </p>
-            </div>
-
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <p className="text-xs text-amber-800">
-                <strong>⚠️ Warning:</strong> This will create jobs for the
-                selected date. If jobs already exist for that date, the
-                operation will be blocked.
-              </p>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setIsSchedulerModalOpen(false)}
-                disabled={runningScheduler}
-                className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmScheduler}
-                disabled={runningScheduler || !schedulerDate}
-                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {runningScheduler ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Running...
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4" />
-                    Run Scheduler
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
 
-export default Residence;
+export default SupervisorResidence;

@@ -70,4 +70,19 @@ export const supervisorService = {
       throw error;
     }
   },
+
+  // Get Worker History (washes for a team member)
+  getWorkerHistory: async (workerId, params = {}) => {
+    console.log(`[SupervisorService] Fetching history for ${workerId}`, params);
+    try {
+      const response = await api.get(`/supervisors/team/${workerId}/history`, {
+        params,
+      });
+      console.log("[SupervisorService] History success:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("[SupervisorService] History error:", error);
+      throw error;
+    }
+  },
 };

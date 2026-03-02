@@ -52,7 +52,10 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
     if (location.pathname.startsWith("/customers")) {
       setOpenMenus((p) => ({ ...p, customers: true }));
     }
-    if (location.pathname.startsWith("/washes")) {
+    if (
+      location.pathname.startsWith("/washes") ||
+      location.pathname.startsWith("/supervisor/washes")
+    ) {
       setOpenMenus((p) => ({ ...p, washes: true }));
     }
     if (location.pathname.startsWith("/payments")) {
@@ -170,21 +173,48 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
                   isMobile={isMobile}
                 />
 
-                <NavItem
-                  to="/supervisor/washes"
-                  icon={Droplets}
-                  label="Washes"
-                  onClick={handleLinkClick}
-                  isMobile={isMobile}
-                />
+                <li>
+                  <MenuButton
+                    label="Washes"
+                    icon={Droplets}
+                    isOpen={openMenus.washes}
+                    isActive={isActiveParent(["/supervisor/washes"])}
+                    onClick={() => toggleMenu("washes")}
+                    isMobile={isMobile}
+                  />
 
-                <NavItem
-                  to="/supervisor/reports"
-                  icon={BarChart2}
-                  label="Reports"
-                  onClick={handleLinkClick}
-                  isMobile={isMobile}
-                />
+                  <SubMenu isOpen={openMenus.washes} isMobile={isMobile}>
+                    <SubNavItem
+                      to="/supervisor/washes/onewash"
+                      label="Onewash"
+                      onClick={handleLinkClick}
+                    />
+                    <SubNavItem
+                      to="/supervisor/washes/residence"
+                      label="Residence"
+                      onClick={handleLinkClick}
+                    />
+                  </SubMenu>
+                </li>
+
+                <li>
+                  <MenuButton
+                    label="Payments"
+                    icon={DollarSign}
+                    isOpen={openMenus.payments}
+                    isActive={isActiveParent(["/payments"])}
+                    onClick={() => toggleMenu("payments")}
+                    isMobile={isMobile}
+                  />
+
+                  <SubMenu isOpen={openMenus.payments} isMobile={isMobile}>
+                    <SubNavItem
+                      to="/supervisor/payments/onewash"
+                      label="Onewash"
+                      onClick={handleLinkClick}
+                    />
+                  </SubMenu>
+                </li>
 
                 {/* Work Records & Settlements */}
                 <li
@@ -212,7 +242,7 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
                   isMobile={isMobile}
                 />
                 <NavItem
-                  to="/settlements"
+                  to="/supervisor/settlements"
                   icon={Wallet}
                   label="Settlements"
                   onClick={handleLinkClick}

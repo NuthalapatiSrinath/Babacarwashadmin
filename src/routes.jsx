@@ -66,9 +66,11 @@ import PendingPayments from "./pages/pending-payments/PendingPayments";
 
 // Supervisor Pages
 import SupervisorDashboard from "./pages/supervisor/Dashboard";
-import SupervisorWashes from "./pages/supervisor/Washes";
+import SupervisorOnewash from "./pages/supervisor/Onewash";
+import SupervisorResidence from "./pages/supervisor/Residence";
 import SupervisorWorkers from "./pages/supervisor/Workers";
-import SupervisorReports from "./pages/supervisor/Reports";
+import SupervisorSettlements from "./pages/supervisor/Settlements";
+import SupervisorOneWashPayments from "./pages/supervisor/OneWashPayments";
 
 // Notifications
 import Notifications from "./pages/notifications/Notifications";
@@ -335,9 +337,15 @@ export const routes = [
     icon: Shield,
   },
   {
-    path: "/supervisor/washes",
-    title: "Supervisor Washes",
-    component: <SupervisorWashes />,
+    path: "/supervisor/washes/onewash",
+    title: "Supervisor One Wash",
+    component: <SupervisorOnewash />,
+    icon: Droplets,
+  },
+  {
+    path: "/supervisor/washes/residence",
+    title: "Supervisor Residence",
+    component: <SupervisorResidence />,
     icon: Droplets,
   },
   {
@@ -347,9 +355,15 @@ export const routes = [
     icon: Users,
   },
   {
-    path: "/supervisor/reports",
-    title: "Supervisor Reports",
-    component: <SupervisorReports />,
-    icon: BarChart2,
+    path: "/supervisor/payments/onewash",
+    title: "Supervisor One Wash Payments",
+    component: <SupervisorOneWashPayments />,
+    icon: DollarSign,
+  },
+  {
+    path: "/supervisor/settlements",
+    title: "Supervisor Settlements",
+    component: <SupervisorSettlements />,
+    icon: Wallet,
   },
 ];

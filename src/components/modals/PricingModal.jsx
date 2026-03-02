@@ -20,26 +20,16 @@ const PricingModal = ({ isOpen, onClose, pricing, onSuccess }) => {
     mall: "",
     // Mall pricing method: "onetime" or "wash_types"
     mall_pricing_method: "onetime",
-    // Sedan
-    sedan_onetime: "",
-    sedan_once: "",
-    sedan_twice: "",
-    sedan_thrice: "",
-    sedan_daily: "",
-    // SUV
-    suv_onetime: "",
-    suv_once: "",
-    suv_twice: "",
-    suv_thrice: "",
-    suv_daily: "",
-    // Mall Wash Types for Sedan
-    sedan_wash_inside: "",
-    sedan_wash_outside: "",
-    sedan_wash_total: "",
-    // Mall Wash Types for SUV
-    suv_wash_inside: "",
-    suv_wash_outside: "",
-    suv_wash_total: "",
+    // Unified pricing (no sedan/SUV split)
+    onetime: "",
+    once: "",
+    twice: "",
+    thrice: "",
+    daily: "",
+    // Mall Wash Types (unified)
+    wash_inside: "",
+    wash_outside: "",
+    wash_total: "",
   });
 
   // Load Data
@@ -57,43 +47,40 @@ const PricingModal = ({ isOpen, onClose, pricing, onSuccess }) => {
       fetchMalls();
 
       if (pricing) {
-        // Map nested backend data to flat form state
+        // Map backend data to flat form state
+        // Support both new flat format and legacy sedan/4x4 format
         const sedan = pricing.sedan || {};
         const suv = pricing["4x4"] || {};
 
         // Determine pricing method based on data
+        const hasFlatWashTypes =
+          pricing.wash_types &&
+          (pricing.wash_types.inside || pricing.wash_types.outside);
         const hasSedanWashTypes =
           sedan.wash_types &&
           (sedan.wash_types.inside || sedan.wash_types.outside);
-        const mall_pricing_method = hasSedanWashTypes
-          ? "wash_types"
-          : "onetime";
+        const mall_pricing_method =
+          hasFlatWashTypes || hasSedanWashTypes ? "wash_types" : "onetime";
+
+        // Read from flat structure first, fallback to sedan, then 4x4
+        const washTypes =
+          pricing.wash_types || sedan.wash_types || suv.wash_types || {};
 
         setFormData({
           service_type: pricing.service_type || "mobile",
           mall: pricing.mall?._id || pricing.mall || "",
           mall_pricing_method: mall_pricing_method,
 
-          sedan_onetime: sedan.onetime || "",
-          sedan_once: sedan.once || "",
-          sedan_twice: sedan.twice || "",
-          sedan_thrice: sedan.thrice || "",
-          sedan_daily: sedan.daily || "",
+          onetime: pricing.onetime || sedan.onetime || suv.onetime || "",
+          once: pricing.once || sedan.once || suv.once || "",
+          twice: pricing.twice || sedan.twice || suv.twice || "",
+          thrice: pricing.thrice || sedan.thrice || suv.thrice || "",
+          daily: pricing.daily || sedan.daily || suv.daily || "",
 
-          suv_onetime: suv.onetime || "",
-          suv_once: suv.once || "",
-          suv_twice: suv.twice || "",
-          suv_thrice: suv.thrice || "",
-          suv_daily: suv.daily || "",
-
-          // Wash types for malls
-          sedan_wash_inside: sedan.wash_types?.inside || "",
-          sedan_wash_outside: sedan.wash_types?.outside || "",
-          sedan_wash_total: sedan.wash_types?.total || "",
-
-          suv_wash_inside: suv.wash_types?.inside || "",
-          suv_wash_outside: suv.wash_types?.outside || "",
-          suv_wash_total: suv.wash_types?.total || "",
+          // Wash types (unified)
+          wash_inside: washTypes.inside || "",
+          wash_outside: washTypes.outside || "",
+          wash_total: washTypes.total || "",
         });
       } else {
         // Reset Form
@@ -101,22 +88,14 @@ const PricingModal = ({ isOpen, onClose, pricing, onSuccess }) => {
           service_type: "mobile",
           mall: "",
           mall_pricing_method: "onetime",
-          sedan_onetime: "",
-          sedan_once: "",
-          sedan_twice: "",
-          sedan_thrice: "",
-          sedan_daily: "",
-          suv_onetime: "",
-          suv_once: "",
-          suv_twice: "",
-          suv_thrice: "",
-          suv_daily: "",
-          sedan_wash_inside: "",
-          sedan_wash_outside: "",
-          sedan_wash_total: "",
-          suv_wash_inside: "",
-          suv_wash_outside: "",
-          suv_wash_total: "",
+          onetime: "",
+          once: "",
+          twice: "",
+          thrice: "",
+          daily: "",
+          wash_inside: "",
+          wash_outside: "",
+          wash_total: "",
         });
       }
     }
@@ -126,34 +105,21 @@ const PricingModal = ({ isOpen, onClose, pricing, onSuccess }) => {
     const { name, value } = e.target;
     const newFormData = { ...formData, [name]: value };
 
-    // Auto-calculate totals for mall wash types
+    // Auto-calculate totals for mall wash types (unified)
     if (
       formData.service_type === "mall" &&
       formData.mall_pricing_method === "wash_types"
     ) {
-      // For sedan
-      if (name === "sedan_wash_inside" || name === "sedan_wash_outside") {
+      if (name === "wash_inside" || name === "wash_outside") {
         const inside =
-          name === "sedan_wash_inside"
+          name === "wash_inside"
             ? Number(value)
-            : Number(newFormData.sedan_wash_inside || 0);
+            : Number(newFormData.wash_inside || 0);
         const outside =
-          name === "sedan_wash_outside"
+          name === "wash_outside"
             ? Number(value)
-            : Number(newFormData.sedan_wash_outside || 0);
-        newFormData.sedan_wash_total = inside + outside;
-      }
-      // For SUV
-      if (name === "suv_wash_inside" || name === "suv_wash_outside") {
-        const inside =
-          name === "suv_wash_inside"
-            ? Number(value)
-            : Number(newFormData.suv_wash_inside || 0);
-        const outside =
-          name === "suv_wash_outside"
-            ? Number(value)
-            : Number(newFormData.suv_wash_outside || 0);
-        newFormData.suv_wash_total = inside + outside;
+            : Number(newFormData.wash_outside || 0);
+        newFormData.wash_total = inside + outside;
       }
     }
 
@@ -165,61 +131,38 @@ const PricingModal = ({ isOpen, onClose, pricing, onSuccess }) => {
     setLoading(true);
     try {
       // Construct Nested Payload
+      // Unified pricing payload (no sedan/SUV split)
       const payload = {
         service_type: formData.service_type,
         ...(formData.service_type === "mall" && { mall: formData.mall }),
 
-        sedan:
-          formData.service_type === "mall" &&
-          formData.mall_pricing_method === "wash_types"
-            ? {
-                // Mall: wash_types method
-                wash_types: {
-                  inside: formData.sedan_wash_inside || null,
-                  outside: formData.sedan_wash_outside || null,
-                  total: formData.sedan_wash_total || null,
-                },
-              }
-            : formData.service_type === "mall" &&
-                formData.mall_pricing_method === "onetime"
-              ? {
-                  // Mall: onetime method
-                  onetime: formData.sedan_onetime || null,
-                }
-              : {
-                  // Residence/Mobile: Regular pricing
-                  onetime: formData.sedan_onetime || null,
-                  once: formData.sedan_once || null,
-                  twice: formData.sedan_twice || null,
-                  thrice: formData.sedan_thrice || null,
-                  daily: formData.sedan_daily || null,
-                },
+        // Mall wash_types method: flat wash_types
+        ...(formData.service_type === "mall" &&
+          formData.mall_pricing_method === "wash_types" && {
+            wash_types: {
+              inside: formData.wash_inside || null,
+              outside: formData.wash_outside || null,
+              total: formData.wash_total || null,
+            },
+          }),
 
-        "4x4":
+        // Mall onetime / Mobile / Residence: flat pricing fields
+        ...(!(
           formData.service_type === "mall" &&
           formData.mall_pricing_method === "wash_types"
-            ? {
-                // Mall: wash_types method
-                wash_types: {
-                  inside: formData.suv_wash_inside || null,
-                  outside: formData.suv_wash_outside || null,
-                  total: formData.suv_wash_total || null,
-                },
-              }
-            : formData.service_type === "mall" &&
-                formData.mall_pricing_method === "onetime"
-              ? {
-                  // Mall: onetime method
-                  onetime: formData.suv_onetime || null,
-                }
-              : {
-                  // Residence/Mobile: Regular pricing
-                  onetime: formData.suv_onetime || null,
-                  once: formData.suv_once || null,
-                  twice: formData.suv_twice || null,
-                  thrice: formData.suv_thrice || null,
-                  daily: formData.suv_daily || null,
-                },
+        ) && {
+          onetime: formData.onetime || null,
+          ...(formData.service_type === "residence" && {
+            once: formData.once || null,
+            twice: formData.twice || null,
+            thrice: formData.thrice || null,
+            daily: formData.daily || null,
+          }),
+        }),
+
+        // Clear legacy sedan/4x4 fields
+        sedan: null,
+        "4x4": null,
       };
 
       if (pricing) {
@@ -366,9 +309,9 @@ const PricingModal = ({ isOpen, onClose, pricing, onSuccess }) => {
                 </motion.div>
               )}
 
-              {/* Sedan Pricing */}
+              {/* Pricing (Unified - no sedan/SUV split) */}
               <div>
-                <h4 className={sectionLabel}>Sedan Pricing</h4>
+                <h4 className={sectionLabel}>Pricing</h4>
 
                 {formData.service_type === "mall" &&
                 formData.mall_pricing_method === "wash_types" ? (
@@ -376,10 +319,10 @@ const PricingModal = ({ isOpen, onClose, pricing, onSuccess }) => {
                   <div className="grid grid-cols-3 gap-3">
                     <CustomDropdown
                       label="Inside"
-                      value={formData.sedan_wash_inside}
+                      value={formData.wash_inside}
                       onChange={(value) =>
                         handleChange({
-                          target: { name: "sedan_wash_inside", value },
+                          target: { name: "wash_inside", value },
                         })
                       }
                       options={[
@@ -392,10 +335,10 @@ const PricingModal = ({ isOpen, onClose, pricing, onSuccess }) => {
                     />
                     <CustomDropdown
                       label="Outside"
-                      value={formData.sedan_wash_outside}
+                      value={formData.wash_outside}
                       onChange={(value) =>
                         handleChange({
-                          target: { name: "sedan_wash_outside", value },
+                          target: { name: "wash_outside", value },
                         })
                       }
                       options={[
@@ -410,8 +353,8 @@ const PricingModal = ({ isOpen, onClose, pricing, onSuccess }) => {
                       <label className={labelClass}>Total (Auto)</label>
                       <input
                         type="number"
-                        name="sedan_wash_total"
-                        value={formData.sedan_wash_total || 0}
+                        name="wash_total"
+                        value={formData.wash_total || 0}
                         readOnly
                         className={
                           inputGroupClass +
@@ -429,8 +372,8 @@ const PricingModal = ({ isOpen, onClose, pricing, onSuccess }) => {
                       <label className={labelClass}>Onetime</label>
                       <input
                         type="number"
-                        name="sedan_onetime"
-                        value={formData.sedan_onetime}
+                        name="onetime"
+                        value={formData.onetime}
                         onChange={handleChange}
                         className={
                           inputGroupClass + " w-full text-sm font-bold"
@@ -446,8 +389,8 @@ const PricingModal = ({ isOpen, onClose, pricing, onSuccess }) => {
                       <label className={labelClass}>Onetime</label>
                       <input
                         type="number"
-                        name="sedan_onetime"
-                        value={formData.sedan_onetime}
+                        name="onetime"
+                        value={formData.onetime}
                         onChange={handleChange}
                         className={
                           inputGroupClass + " w-full text-sm font-bold"
@@ -462,8 +405,8 @@ const PricingModal = ({ isOpen, onClose, pricing, onSuccess }) => {
                           <label className={labelClass}>Once/Wk</label>
                           <input
                             type="number"
-                            name="sedan_once"
-                            value={formData.sedan_once}
+                            name="once"
+                            value={formData.once}
                             onChange={handleChange}
                             className={
                               inputGroupClass + " w-full text-sm font-bold"
@@ -475,8 +418,8 @@ const PricingModal = ({ isOpen, onClose, pricing, onSuccess }) => {
                           <label className={labelClass}>Twice/Wk</label>
                           <input
                             type="number"
-                            name="sedan_twice"
-                            value={formData.sedan_twice}
+                            name="twice"
+                            value={formData.twice}
                             onChange={handleChange}
                             className={
                               inputGroupClass + " w-full text-sm font-bold"
@@ -488,8 +431,8 @@ const PricingModal = ({ isOpen, onClose, pricing, onSuccess }) => {
                           <label className={labelClass}>Thrice/Wk</label>
                           <input
                             type="number"
-                            name="sedan_thrice"
-                            value={formData.sedan_thrice}
+                            name="thrice"
+                            value={formData.thrice}
                             onChange={handleChange}
                             className={
                               inputGroupClass + " w-full text-sm font-bold"
@@ -501,158 +444,8 @@ const PricingModal = ({ isOpen, onClose, pricing, onSuccess }) => {
                           <label className={labelClass}>Daily</label>
                           <input
                             type="number"
-                            name="sedan_daily"
-                            value={formData.sedan_daily}
-                            onChange={handleChange}
-                            className={
-                              inputGroupClass + " w-full text-sm font-bold"
-                            }
-                            placeholder="0"
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* SUV Pricing */}
-              <div>
-                <h4 className={sectionLabel}>4x4 (SUV) Pricing</h4>
-
-                {formData.service_type === "mall" &&
-                formData.mall_pricing_method === "wash_types" ? (
-                  // Mall: Inside/Outside/Total pricing
-                  <div className="grid grid-cols-3 gap-3">
-                    <CustomDropdown
-                      label="Inside"
-                      value={formData.suv_wash_inside}
-                      onChange={(value) =>
-                        handleChange({
-                          target: { name: "suv_wash_inside", value },
-                        })
-                      }
-                      options={[
-                        { value: "10", label: "10" },
-                        { value: "20", label: "20" },
-                        { value: "30", label: "30" },
-                        { value: "40", label: "40" },
-                      ]}
-                      placeholder="Select price"
-                    />
-                    <CustomDropdown
-                      label="Outside"
-                      value={formData.suv_wash_outside}
-                      onChange={(value) =>
-                        handleChange({
-                          target: { name: "suv_wash_outside", value },
-                        })
-                      }
-                      options={[
-                        { value: "10", label: "10" },
-                        { value: "20", label: "20" },
-                        { value: "30", label: "30" },
-                        { value: "40", label: "40" },
-                      ]}
-                      placeholder="Select price"
-                    />
-                    <div>
-                      <label className={labelClass}>Total (Auto)</label>
-                      <input
-                        type="number"
-                        name="suv_wash_total"
-                        value={formData.suv_wash_total || 0}
-                        readOnly
-                        className={
-                          inputGroupClass +
-                          " w-full text-sm font-bold bg-slate-100 cursor-not-allowed"
-                        }
-                        placeholder="0"
-                      />
-                    </div>
-                  </div>
-                ) : formData.service_type === "mall" &&
-                  formData.mall_pricing_method === "onetime" ? (
-                  // Mall: Onetime pricing only
-                  <div className="grid grid-cols-1 gap-3 max-w-xs">
-                    <div>
-                      <label className={labelClass}>Onetime</label>
-                      <input
-                        type="number"
-                        name="suv_onetime"
-                        value={formData.suv_onetime}
-                        onChange={handleChange}
-                        className={
-                          inputGroupClass + " w-full text-sm font-bold"
-                        }
-                        placeholder="0"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  // Residence/Mobile: Show regular pricing fields
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                    <div>
-                      <label className={labelClass}>Onetime</label>
-                      <input
-                        type="number"
-                        name="suv_onetime"
-                        value={formData.suv_onetime}
-                        onChange={handleChange}
-                        className={
-                          inputGroupClass + " w-full text-sm font-bold"
-                        }
-                        placeholder="0"
-                      />
-                    </div>
-
-                    {formData.service_type === "residence" && (
-                      <>
-                        <div>
-                          <label className={labelClass}>Once/Wk</label>
-                          <input
-                            type="number"
-                            name="suv_once"
-                            value={formData.suv_once}
-                            onChange={handleChange}
-                            className={
-                              inputGroupClass + " w-full text-sm font-bold"
-                            }
-                            placeholder="0"
-                          />
-                        </div>
-                        <div>
-                          <label className={labelClass}>Twice/Wk</label>
-                          <input
-                            type="number"
-                            name="suv_twice"
-                            value={formData.suv_twice}
-                            onChange={handleChange}
-                            className={
-                              inputGroupClass + " w-full text-sm font-bold"
-                            }
-                            placeholder="0"
-                          />
-                        </div>
-                        <div>
-                          <label className={labelClass}>Thrice/Wk</label>
-                          <input
-                            type="number"
-                            name="suv_thrice"
-                            value={formData.suv_thrice}
-                            onChange={handleChange}
-                            className={
-                              inputGroupClass + " w-full text-sm font-bold"
-                            }
-                            placeholder="0"
-                          />
-                        </div>
-                        <div>
-                          <label className={labelClass}>Daily</label>
-                          <input
-                            type="number"
-                            name="suv_daily"
-                            value={formData.suv_daily}
+                            name="daily"
+                            value={formData.daily}
                             onChange={handleChange}
                             className={
                               inputGroupClass + " w-full text-sm font-bold"

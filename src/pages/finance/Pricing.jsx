@@ -7,7 +7,6 @@ import {
   Building,
   Layers,
   Car,
-  Truck,
   DollarSign,
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -155,38 +154,44 @@ const Pricing = () => {
       accessor: "pricing",
       className: "align-top py-4",
       render: (row) => {
+        // Unified pricing - read flat structure with fallback to legacy sedan/4x4
         const sedan = row.sedan || {};
         const suv = row["4x4"] || {};
         const isMall = row.service_type === "mall";
 
+        // Resolve wash_types: flat first, then sedan, then 4x4
+        const washTypes =
+          row.wash_types || sedan.wash_types || suv.wash_types || {};
+        const hasWashTypes = washTypes.inside || washTypes.outside;
+
+        // Resolve frequency prices: flat first, then sedan, then 4x4
+        const onetime = row.onetime || sedan.onetime || suv.onetime;
+        const once = row.once || sedan.once || suv.once;
+        const twice = row.twice || sedan.twice || suv.twice;
+        const thrice = row.thrice || sedan.thrice || suv.thrice;
+        const daily = row.daily || sedan.daily || suv.daily;
+
         return (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* SEDAN CARD */}
-            <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+          <div>
+            {/* SINGLE PRICING CARD */}
+            <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden max-w-md">
               <div className="bg-white px-3 py-2 border-b border-slate-200 flex items-center gap-2">
                 <Car className="w-4 h-4 text-blue-500" />
                 <span className="font-bold text-xs text-slate-800 uppercase tracking-wide">
-                  Sedan
+                  Pricing
                 </span>
               </div>
               <div className="p-3 grid grid-cols-2 gap-x-4 gap-y-1">
                 {isMall ? (
-                  // Mall: Show wash types OR onetime based on what's configured
-                  sedan.wash_types &&
-                  (sedan.wash_types.inside || sedan.wash_types.outside) ? (
+                  // Mall: Show wash types OR onetime
+                  hasWashTypes ? (
                     <>
-                      <PriceItem
-                        label="Inside"
-                        value={sedan.wash_types.inside}
-                      />
-                      <PriceItem
-                        label="Outside"
-                        value={sedan.wash_types.outside}
-                      />
-                      <PriceItem label="Total" value={sedan.wash_types.total} />
+                      <PriceItem label="Inside" value={washTypes.inside} />
+                      <PriceItem label="Outside" value={washTypes.outside} />
+                      <PriceItem label="Total" value={washTypes.total} />
                     </>
-                  ) : sedan.onetime ? (
-                    <PriceItem label="Onetime" value={sedan.onetime} />
+                  ) : onetime ? (
+                    <PriceItem label="Onetime" value={onetime} />
                   ) : (
                     <div className="col-span-2 text-xs text-slate-400 text-center py-2">
                       No pricing configured
@@ -195,58 +200,13 @@ const Pricing = () => {
                 ) : (
                   // Residence/Mobile: Show regular pricing
                   <>
-                    <PriceItem label="Onetime" value={sedan.onetime} />
+                    <PriceItem label="Onetime" value={onetime} />
                     {row.service_type === "residence" && (
                       <>
-                        <PriceItem label="Once/Wk" value={sedan.once} />
-                        <PriceItem label="Twice/Wk" value={sedan.twice} />
-                        <PriceItem label="Thrice/Wk" value={sedan.thrice} />
-                        <PriceItem label="Daily" value={sedan.daily} />
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* SUV CARD */}
-            <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
-              <div className="bg-white px-3 py-2 border-b border-slate-200 flex items-center gap-2">
-                <Truck className="w-4 h-4 text-indigo-500" />
-                <span className="font-bold text-xs text-slate-800 uppercase tracking-wide">
-                  SUV / 4x4
-                </span>
-              </div>
-              <div className="p-3 grid grid-cols-2 gap-x-4 gap-y-1">
-                {isMall ? (
-                  // Mall: Show wash types OR onetime based on what's configured
-                  suv.wash_types &&
-                  (suv.wash_types.inside || suv.wash_types.outside) ? (
-                    <>
-                      <PriceItem label="Inside" value={suv.wash_types.inside} />
-                      <PriceItem
-                        label="Outside"
-                        value={suv.wash_types.outside}
-                      />
-                      <PriceItem label="Total" value={suv.wash_types.total} />
-                    </>
-                  ) : suv.onetime ? (
-                    <PriceItem label="Onetime" value={suv.onetime} />
-                  ) : (
-                    <div className="col-span-2 text-xs text-slate-400 text-center py-2">
-                      No pricing configured
-                    </div>
-                  )
-                ) : (
-                  // Residence/Mobile: Show regular pricing
-                  <>
-                    <PriceItem label="Onetime" value={suv.onetime} />
-                    {row.service_type === "residence" && (
-                      <>
-                        <PriceItem label="Once/Wk" value={suv.once} />
-                        <PriceItem label="Twice/Wk" value={suv.twice} />
-                        <PriceItem label="Thrice/Wk" value={suv.thrice} />
-                        <PriceItem label="Daily" value={suv.daily} />
+                        <PriceItem label="Once/Wk" value={once} />
+                        <PriceItem label="Twice/Wk" value={twice} />
+                        <PriceItem label="Thrice/Wk" value={thrice} />
+                        <PriceItem label="Daily" value={daily} />
                       </>
                     )}
                   </>
