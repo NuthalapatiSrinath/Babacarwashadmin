@@ -36,6 +36,7 @@ import ResidenceReceiptModal from "../../components/modals/ResidenceReceiptModal
 import ViewPaymentModal from "../../components/modals/ViewPaymentModal";
 import DeleteModal from "../../components/modals/DeleteModal";
 import PaymentModal from "../../components/modals/PaymentModal";
+import EditPaymentAmountModal from "../../components/modals/EditPaymentAmountModal";
 import RichDateRangePicker from "../../components/inputs/RichDateRangePicker";
 import CustomDropdown from "../../components/ui/CustomDropdown"; // Import CustomDropdown
 
@@ -141,6 +142,7 @@ const ResidencePayments = () => {
   const [viewPayment, setViewPayment] = useState(null);
   const [deletePayment, setDeletePayment] = useState(null);
   const [editPayment, setEditPayment] = useState(null);
+  const [editAmountPayment, setEditAmountPayment] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSettling, setIsSettling] = useState(false);
@@ -497,6 +499,7 @@ Are you sure you want to proceed?`;
 
   const handleViewDetails = (row) => setViewPayment(row);
   const handleEdit = (row) => setEditPayment(row);
+  const handleEditAmount = (row) => setEditAmountPayment(row);
 
   const handleDelete = (row) => {
     setDeletePayment(row);
@@ -1181,8 +1184,16 @@ Are you sure you want to proceed?`;
           <button
             onClick={() => handleEdit(row)}
             className="p-1.5 hover:bg-indigo-50 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors"
+            title="Collect Payment"
           >
             <Edit2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => handleEditAmount(row)}
+            className="p-1.5 hover:bg-amber-50 rounded-lg text-slate-400 hover:text-amber-600 transition-colors"
+            title="Edit Amount"
+          >
+            <Calculator className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => handleDelete(row)}
@@ -1536,6 +1547,15 @@ Are you sure you want to proceed?`;
           onSuccess={() => {
             fetchData(pagination.page, pagination.limit);
             setEditPayment(null);
+          }}
+        />
+        <EditPaymentAmountModal
+          isOpen={!!editAmountPayment}
+          onClose={() => setEditAmountPayment(null)}
+          payment={editAmountPayment}
+          onSuccess={() => {
+            fetchData(pagination.page, pagination.limit);
+            setEditAmountPayment(null);
           }}
         />
       </div>

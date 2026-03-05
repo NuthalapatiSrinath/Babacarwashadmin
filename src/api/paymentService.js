@@ -47,6 +47,15 @@ export const paymentService = {
     return response.data;
   },
 
+  // Edit Payment Amount (with reason)
+  editAmount: async (id, new_total_amount, reason) => {
+    const response = await api.put(`/payments/${id}/edit-amount`, {
+      new_total_amount: Number(new_total_amount),
+      reason,
+    });
+    return response.data;
+  },
+
   // Settle Payment
   settlePayment: async (payload) => {
     const response = await api.put("/payments/collect/settle", payload);

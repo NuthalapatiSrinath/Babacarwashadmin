@@ -77,6 +77,41 @@ const ViewPaymentModal = ({ isOpen, onClose, payment }) => {
                 </p>
               </div>
             )}
+
+            {payment.amount_edit_history &&
+              payment.amount_edit_history.length > 0 && (
+                <div className="pt-2 border-t border-slate-200">
+                  <span className="block text-xs font-bold text-slate-500 uppercase mb-2">
+                    Amount Edit History
+                  </span>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {payment.amount_edit_history.map((entry, idx) => (
+                      <div
+                        key={idx}
+                        className="text-xs bg-amber-50 border border-amber-200 rounded-lg p-2.5"
+                      >
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-bold text-amber-700">
+                            {entry.old_total_amount} → {entry.new_total_amount}{" "}
+                            AED
+                          </span>
+                          <span className="text-amber-500">
+                            {formatDate(entry.editedAt)}
+                          </span>
+                        </div>
+                        <p className="text-amber-600">
+                          <strong>Reason:</strong> {entry.reason}
+                        </p>
+                        {entry.editedByName && (
+                          <p className="text-amber-500 mt-0.5">
+                            By: {entry.editedByName}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
           </div>
         </motion.div>
       </div>

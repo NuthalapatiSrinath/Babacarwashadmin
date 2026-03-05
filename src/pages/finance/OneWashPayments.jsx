@@ -23,6 +23,7 @@ import {
   MapPin,
   Coins,
   Droplets,
+  Calculator,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -32,6 +33,7 @@ import ReceiptModal from "../../components/modals/ReceiptModal";
 import ViewPaymentModal from "../../components/modals/ViewPaymentModal";
 import OneWashModal from "../../components/modals/OneWashModal";
 import DeleteModal from "../../components/modals/DeleteModal";
+import EditPaymentAmountModal from "../../components/modals/EditPaymentAmountModal";
 import RichDateRangePicker from "../../components/inputs/RichDateRangePicker";
 import CustomDropdown from "../../components/ui/CustomDropdown";
 
@@ -120,6 +122,7 @@ const OneWashPayments = () => {
   const [deleteJob, setDeleteJob] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [editAmountPayment, setEditAmountPayment] = useState(null);
 
   useEffect(() => {
     const savedCurrency = localStorage.getItem("app_currency");
@@ -528,6 +531,13 @@ const OneWashPayments = () => {
           >
             <Eye className="w-4 h-4" />
           </button>
+          <button
+            onClick={() => setEditAmountPayment(row)}
+            className="p-1.5 hover:bg-amber-50 rounded text-slate-400 hover:text-amber-600"
+            title="Edit Amount"
+          >
+            <Calculator className="w-4 h-4" />
+          </button>
           {(row.status || "").toLowerCase() === "completed" && (
             <button
               onClick={() => handleViewReceipt(row)}
@@ -888,6 +898,15 @@ const OneWashPayments = () => {
         message={`Delete payment for ${
           deleteJob?.registration_no || "this vehicle"
         }?`}
+      />
+      <EditPaymentAmountModal
+        isOpen={!!editAmountPayment}
+        onClose={() => setEditAmountPayment(null)}
+        payment={editAmountPayment}
+        onSuccess={() => {
+          fetchData(pagination.page, pagination.limit);
+          setEditAmountPayment(null);
+        }}
       />
     </div>
   );
