@@ -22,6 +22,7 @@ import {
   Building,
   MapPin,
   Coins,
+  Droplets,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -66,19 +67,20 @@ const OneWashPayments = () => {
     const today = new Date();
     let start, end;
 
-    if (tab === "this_month") {
+    if (tab === "today") {
+      start = new Date(today);
+      end = new Date(today);
+    } else if (tab === "this_month") {
       start = new Date(today.getFullYear(), today.getMonth(), 1);
-      start.setDate(start.getDate() - 1);
-      start.setUTCHours(18, 30, 0, 0);
-      end = new Date();
-      end.setUTCHours(18, 29, 59, 999);
+      end = new Date(today);
     } else {
       start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      start.setDate(start.getDate() - 1);
-      start.setUTCHours(18, 30, 0, 0);
       end = new Date(today.getFullYear(), today.getMonth(), 0);
-      end.setUTCHours(18, 29, 59, 999);
     }
+
+    // Set to start and end of day in local time
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
 
     return {
       startDate: start.toISOString(),
@@ -86,8 +88,8 @@ const OneWashPayments = () => {
     };
   };
 
-  const [activeTab, setActiveTab] = useState("this_month");
-  const initialDates = getRangeForTab("this_month");
+  const [activeTab, setActiveTab] = useState("today");
+  const initialDates = getRangeForTab("today");
 
   const [filters, setFilters] = useState({
     startDate: initialDates.startDate,
@@ -97,6 +99,8 @@ const OneWashPayments = () => {
     service_type: "",
     mall: "",
     building: "",
+    payment_mode: "",
+    wash_type: "",
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -219,7 +223,7 @@ const OneWashPayments = () => {
 
   const handleDateChange = (field, value) => {
     if (field === "clear") {
-      handleTabChange("this_month");
+      handleTabChange("today");
     } else {
       setFilters((prev) => ({ ...prev, [field]: value }));
       setActiveTab("custom");
@@ -558,14 +562,14 @@ const OneWashPayments = () => {
           <div className="flex flex-wrap items-center gap-3">
             <div className="bg-slate-100 p-1 rounded-xl flex">
               <button
-                onClick={() => handleTabChange("last_month")}
+                onClick={() => handleTabChange("today")}
                 className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
-                  activeTab === "last_month"
+                  activeTab === "today"
                     ? "bg-white text-indigo-600 shadow-sm"
                     : "text-slate-500 hover:text-slate-700"
                 }`}
               >
-                {lastMonth}
+                Today
               </button>
               <button
                 onClick={() => handleTabChange("this_month")}
@@ -577,7 +581,24 @@ const OneWashPayments = () => {
               >
                 {thisMonth}
               </button>
+              <button
+                onClick={() => handleTabChange("last_month")}
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+                  activeTab === "last_month"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                {lastMonth}
+              </button>
             </div>
+            <button
+              onClick={handleAddNew}
+              className="h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition-all active:scale-95"
+              title="Add New Payment"
+            >
+              <Plus className="w-5 h-5" /> New
+            </button>
             <button
               onClick={handleExport}
               className="h-10 px-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md"
@@ -735,7 +756,7 @@ const OneWashPayments = () => {
       {/* --- FILTERS & ACTIONS --- */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-2">
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">
               Date Range
             </label>
@@ -745,7 +766,7 @@ const OneWashPayments = () => {
               onChange={handleDateChange}
             />
           </div>
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-1">
             <CustomDropdown
               label="Status"
               value={filters.status}
@@ -767,6 +788,35 @@ const OneWashPayments = () => {
           </div>
           <div className="lg:col-span-2">
             <CustomDropdown
+              label="Payment Mode"
+              value={filters.payment_mode}
+              onChange={(val) => setFilters({ ...filters, payment_mode: val })}
+              options={[
+                { value: "", label: "All Modes" },
+                { value: "cash", label: "Cash" },
+                { value: "card", label: "Card" },
+                { value: "bank transfer", label: "Bank Transfer" },
+              ]}
+              icon={CreditCard}
+              placeholder="All Modes"
+            />
+          </div>
+          <div className="lg:col-span-2">
+            <CustomDropdown
+              label="Wash Type"
+              value={filters.wash_type}
+              onChange={(val) => setFilters({ ...filters, wash_type: val })}
+              options={[
+                { value: "", label: "All Types" },
+                { value: "outside", label: "Outside" },
+                { value: "total", label: "Inside + Outside" },
+              ]}
+              icon={Droplets}
+              placeholder="All Types"
+            />
+          </div>
+          <div className="lg:col-span-2">
+            <CustomDropdown
               label="Worker"
               value={filters.worker}
               onChange={(val) => setFilters({ ...filters, worker: val })}
@@ -777,7 +827,7 @@ const OneWashPayments = () => {
             />
           </div>
           {/* ✅ INSTANT SEARCH INPUT */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-1">
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">
               Search
             </label>
@@ -791,15 +841,6 @@ const OneWashPayments = () => {
               />
               <Search className="absolute left-3 top-3.5 w-4 h-4 text-slate-400" />
             </div>
-          </div>
-          <div className="lg:col-span-1 flex gap-2">
-            <button
-              onClick={handleAddNew}
-              className="flex-1 h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-1"
-              title="Add New Payment"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
           </div>
         </div>
       </div>

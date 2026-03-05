@@ -48,21 +48,22 @@ const PaymentModal = ({ isOpen, onClose, payment, onSuccess }) => {
 
     setLoading(true);
     try {
-      const payload = {};
-
-      // Include payment details if amount is provided
+      // Collect payment via the proper /collect endpoint (updates amount_paid, balance, status)
       if (hasAmount) {
-        payload.amount = Number(formData.amount);
-        payload.payment_mode = formData.payment_mode;
-        payload.payment_date = formData.payment_date;
+        await paymentService.collect(
+          payment._id,
+          Number(formData.amount),
+          formData.payment_mode,
+          formData.payment_date,
+        );
       }
 
-      // Include notes if provided
+      // Update notes/remarks via the /update endpoint
       if (hasRemarks) {
-        payload.notes = formData.notes.trim();
+        await paymentService.updatePayment(payment._id, {
+          notes: formData.notes.trim(),
+        });
       }
-
-      await paymentService.updatePayment(payment._id, payload);
 
       if (hasAmount && hasRemarks) {
         toast.success("Payment collected and remarks updated");

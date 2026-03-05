@@ -15,6 +15,7 @@ import {
   MapPin,
   Coins,
   Loader2,
+  Droplets,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import * as XLSX from "xlsx";
@@ -70,6 +71,8 @@ const SupervisorOnewash = () => {
     startDate: getToday(),
     endDate: getToday(),
     worker: "",
+    payment_mode: "",
+    wash_type: "",
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -594,6 +597,37 @@ const SupervisorOnewash = () => {
               startDate={filters.startDate}
               endDate={filters.endDate}
               onChange={handleDateChange}
+            />
+          </div>
+
+          <div className="flex-1 w-full max-w-xs">
+            <CustomDropdown
+              label="Payment Mode"
+              value={filters.payment_mode}
+              onChange={(val) => setFilters({ ...filters, payment_mode: val })}
+              options={[
+                { value: "", label: "All Modes" },
+                { value: "cash", label: "Cash" },
+                { value: "card", label: "Card" },
+                { value: "bank transfer", label: "Bank Transfer" },
+              ]}
+              icon={CreditCard}
+              placeholder="All Modes"
+            />
+          </div>
+
+          <div className="flex-1 w-full max-w-xs">
+            <CustomDropdown
+              label="Wash Type"
+              value={filters.wash_type}
+              onChange={(val) => setFilters({ ...filters, wash_type: val })}
+              options={[
+                { value: "", label: "All Types" },
+                { value: "outside", label: "Outside" },
+                { value: "total", label: "Inside + Outside" },
+              ]}
+              icon={Droplets}
+              placeholder="All Types"
             />
           </div>
 

@@ -72,23 +72,17 @@ const SupervisorOneWashPayments = () => {
     let start, end;
     if (tab === "today") {
       start = new Date(today);
-      start.setDate(start.getDate() - 1);
-      start.setUTCHours(18, 30, 0, 0);
       end = new Date(today);
-      end.setUTCHours(18, 29, 59, 999);
     } else if (tab === "this_month") {
       start = new Date(today.getFullYear(), today.getMonth(), 1);
-      start.setDate(start.getDate() - 1);
-      start.setUTCHours(18, 30, 0, 0);
-      end = new Date();
-      end.setUTCHours(18, 29, 59, 999);
+      end = new Date(today);
     } else {
       start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      start.setDate(start.getDate() - 1);
-      start.setUTCHours(18, 30, 0, 0);
       end = new Date(today.getFullYear(), today.getMonth(), 0);
-      end.setUTCHours(18, 29, 59, 999);
     }
+    // Set to start and end of day in local time
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
     return { startDate: start.toISOString(), endDate: end.toISOString() };
   };
 
@@ -100,6 +94,8 @@ const SupervisorOneWashPayments = () => {
     endDate: initialDates.endDate,
     worker: "",
     status: "",
+    payment_mode: "",
+    wash_type: "",
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -794,7 +790,7 @@ const SupervisorOneWashPayments = () => {
               onChange={handleDateChange}
             />
           </div>
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-1">
             <CustomDropdown
               label="Status"
               value={filters.status}
@@ -802,6 +798,35 @@ const SupervisorOneWashPayments = () => {
               options={statusOptions}
               icon={Filter}
               placeholder="All Status"
+            />
+          </div>
+          <div className="lg:col-span-1">
+            <CustomDropdown
+              label="Payment Mode"
+              value={filters.payment_mode}
+              onChange={(val) => setFilters({ ...filters, payment_mode: val })}
+              options={[
+                { value: "", label: "All Modes" },
+                { value: "cash", label: "Cash" },
+                { value: "card", label: "Card" },
+                { value: "bank transfer", label: "Bank Transfer" },
+              ]}
+              icon={CreditCard}
+              placeholder="All Modes"
+            />
+          </div>
+          <div className="lg:col-span-1">
+            <CustomDropdown
+              label="Wash Type"
+              value={filters.wash_type}
+              onChange={(val) => setFilters({ ...filters, wash_type: val })}
+              options={[
+                { value: "", label: "All Types" },
+                { value: "outside", label: "Outside" },
+                { value: "total", label: "Inside + Outside" },
+              ]}
+              icon={Droplets}
+              placeholder="All Types"
             />
           </div>
           <div className="lg:col-span-2">

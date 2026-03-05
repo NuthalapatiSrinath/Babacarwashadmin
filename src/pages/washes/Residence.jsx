@@ -68,8 +68,8 @@ const Residence = () => {
   };
 
   const [filters, setFilters] = useState({
-    startDate: getFirstOfMonth(),
-    endDate: getLastOfMonth(),
+    startDate: getToday(),
+    endDate: getToday(),
     worker: "",
     status: "",
     building: "",

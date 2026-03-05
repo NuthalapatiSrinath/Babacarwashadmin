@@ -86,7 +86,11 @@ const ResidencePayments = () => {
     const today = new Date();
     let start, end;
 
-    if (tab === "this_month") {
+    if (tab === "today") {
+      // Today only
+      start = new Date(today);
+      end = new Date(today);
+    } else if (tab === "this_month") {
       // Current month: 1st of month to today
       start = new Date(today.getFullYear(), today.getMonth(), 1);
       end = new Date(today);
@@ -110,8 +114,8 @@ const ResidencePayments = () => {
     };
   };
 
-  const [activeTab, setActiveTab] = useState("this_month");
-  const initialDates = getRangeForTab("this_month");
+  const [activeTab, setActiveTab] = useState("today");
+  const initialDates = getRangeForTab("today");
 
   const [filters, setFilters] = useState({
     startDate: initialDates.startDate,
@@ -120,6 +124,7 @@ const ResidencePayments = () => {
     status: "",
     onewash: "false",
     building: "",
+    payment_mode: "",
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -443,8 +448,8 @@ Are you sure you want to proceed?`;
 
   const handleDateChange = (field, value) => {
     if (field === "clear") {
-      // If clearing manually, revert to This Month
-      handleTabChange("this_month");
+      // If clearing manually, revert to Today
+      handleTabChange("today");
     } else {
       setFilters((prev) => ({ ...prev, [field]: value }));
       setActiveTab("custom"); // If manual date pick, deselect tabs
@@ -1223,14 +1228,14 @@ Are you sure you want to proceed?`;
               {/* TAB SWITCHER */}
               <div className="bg-slate-100 p-1 rounded-xl flex">
                 <button
-                  onClick={() => handleTabChange("last_month")}
+                  onClick={() => handleTabChange("today")}
                   className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
-                    activeTab === "last_month"
+                    activeTab === "today"
                       ? "bg-white text-indigo-600 shadow-sm"
                       : "text-slate-500 hover:text-slate-700"
                   }`}
                 >
-                  {lastMonth}
+                  Today
                 </button>
                 <button
                   onClick={() => handleTabChange("this_month")}
@@ -1241,6 +1246,16 @@ Are you sure you want to proceed?`;
                   }`}
                 >
                   {thisMonth}
+                </button>
+                <button
+                  onClick={() => handleTabChange("last_month")}
+                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+                    activeTab === "last_month"
+                      ? "bg-white text-indigo-600 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  {lastMonth}
                 </button>
               </div>
 
@@ -1389,7 +1404,7 @@ Are you sure you want to proceed?`;
               />
             </div>
 
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
               {/* Building Dropdown */}
               <div>
                 <CustomDropdown
@@ -1418,6 +1433,25 @@ Are you sure you want to proceed?`;
                   options={statusOptions}
                   icon={Filter}
                   placeholder="All Status"
+                />
+              </div>
+
+              {/* Payment Mode Dropdown */}
+              <div>
+                <CustomDropdown
+                  label="Payment Mode"
+                  value={filters.payment_mode}
+                  onChange={(val) =>
+                    setFilters({ ...filters, payment_mode: val })
+                  }
+                  options={[
+                    { value: "", label: "All Modes" },
+                    { value: "cash", label: "Cash" },
+                    { value: "card", label: "Card" },
+                    { value: "bank transfer", label: "Bank Transfer" },
+                  ]}
+                  icon={CreditCard}
+                  placeholder="All Modes"
                 />
               </div>
 

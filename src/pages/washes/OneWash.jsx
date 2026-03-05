@@ -16,6 +16,7 @@ import {
   MapPin,
   Coins,
   Loader2,
+  Droplets,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import * as XLSX from "xlsx"; // Requires: npm install xlsx
@@ -68,10 +69,12 @@ const OneWash = () => {
   };
 
   const [filters, setFilters] = useState({
-    startDate: getFirstOfMonth(),
+    startDate: getToday(),
     endDate: getToday(),
     service_type: "",
     worker: "",
+    payment_mode: "",
+    wash_type: "",
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -660,7 +663,7 @@ const OneWash = () => {
             />
           </div>
 
-          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+          <div className="flex-[2] grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
             <div>
               <CustomDropdown
                 label="Service Type"
@@ -671,6 +674,37 @@ const OneWash = () => {
                 options={serviceTypeOptions}
                 icon={Filter}
                 placeholder="All Services"
+              />
+            </div>
+            <div>
+              <CustomDropdown
+                label="Payment Mode"
+                value={filters.payment_mode}
+                onChange={(val) =>
+                  setFilters({ ...filters, payment_mode: val })
+                }
+                options={[
+                  { value: "", label: "All Modes" },
+                  { value: "cash", label: "Cash" },
+                  { value: "card", label: "Card" },
+                  { value: "bank transfer", label: "Bank Transfer" },
+                ]}
+                icon={CreditCard}
+                placeholder="All Modes"
+              />
+            </div>
+            <div>
+              <CustomDropdown
+                label="Wash Type"
+                value={filters.wash_type}
+                onChange={(val) => setFilters({ ...filters, wash_type: val })}
+                options={[
+                  { value: "", label: "All Types" },
+                  { value: "outside", label: "Outside" },
+                  { value: "total", label: "Inside + Outside" },
+                ]}
+                icon={Droplets}
+                placeholder="All Types"
               />
             </div>
             <div>
@@ -686,7 +720,7 @@ const OneWash = () => {
             </div>
           </div>
 
-          <div className="flex-1 w-full">
+          <div className="w-full xl:w-48">
             <span className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
               Search
             </span>
