@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   Download,
   Search,
@@ -37,6 +38,7 @@ import ViewPaymentModal from "../../components/modals/ViewPaymentModal";
 import DeleteModal from "../../components/modals/DeleteModal";
 import PaymentModal from "../../components/modals/PaymentModal";
 import EditPaymentAmountModal from "../../components/modals/EditPaymentAmountModal";
+import PaymentHistoryModal from "../../components/modals/PaymentHistoryModal";
 import RichDateRangePicker from "../../components/inputs/RichDateRangePicker";
 import CustomDropdown from "../../components/ui/CustomDropdown"; // Import CustomDropdown
 
@@ -59,6 +61,7 @@ import { paymentService } from "../../api/paymentService";
 
 const ResidencePayments = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   const { payments, stats, loading, total } = useSelector(
     (state) => state.residencePayment,
@@ -115,8 +118,8 @@ const ResidencePayments = () => {
     };
   };
 
-  const [activeTab, setActiveTab] = useState("today");
-  const initialDates = getRangeForTab("today");
+  const [activeTab, setActiveTab] = useState("this_month");
+  const initialDates = getRangeForTab("this_month");
 
   const [filters, setFilters] = useState({
     startDate: initialDates.startDate,
@@ -167,6 +170,7 @@ const ResidencePayments = () => {
   const [runningInvoice, setRunningInvoice] = useState(false);
   const [invoiceCheckResult, setInvoiceCheckResult] = useState(null);
   const [checkingInvoice, setCheckingInvoice] = useState(false);
+  const [historyPayment, setHistoryPayment] = useState(null);
 
   // Load Currency & Initial Data
   useEffect(() => {
@@ -482,10 +486,16 @@ Are you sure you want to proceed?`;
       worker: row.worker,
       service_type: "residence",
       billAmountDesc: row.createdAt
-        ? `For the month of ${new Date(row.createdAt).toLocaleDateString(
-            "en-US",
-            { month: "long" },
-          )}`
+        ? (() => {
+            const createdDate = new Date(row.createdAt);
+            const billingDate = new Date(createdDate);
+            billingDate.setMonth(billingDate.getMonth() - 1);
+            const month = billingDate.toLocaleDateString("en-US", {
+              month: "long",
+            });
+            const year = billingDate.getFullYear();
+            return `For the month of ${month} ${year}`;
+          })()
         : "",
     };
     setSelectedRecord(docData);
@@ -500,6 +510,7 @@ Are you sure you want to proceed?`;
   const handleViewDetails = (row) => setViewPayment(row);
   const handleEdit = (row) => setEditPayment(row);
   const handleEditAmount = (row) => setEditAmountPayment(row);
+  const handleViewHistory = (row) => setHistoryPayment(row);
 
   const handleDelete = (row) => {
     setDeletePayment(row);
@@ -1098,11 +1109,20 @@ Are you sure you want to proceed?`;
       accessor: "notes",
       className: "max-w-[200px]",
       render: (row) => (
-        <div
-          className="text-xs text-slate-600 truncate"
-          title={row.notes || "-"}
-        >
-          {row.notes || "-"}
+        <div className="flex items-center gap-2 group">
+          <div
+            className="text-xs text-slate-600 truncate flex-1"
+            title={row.notes || "-"}
+          >
+            {row.notes || "-"}
+          </div>
+          <button
+            onClick={() => handleViewHistory(row)}
+            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-indigo-50 rounded-lg text-indigo-400 hover:text-indigo-600 transition-all shrink-0"
+            title="View payment history"
+          >
+            <FileText className="w-3.5 h-3.5" />
+          </button>
         </div>
       ),
     },
@@ -1314,6 +1334,14 @@ Are you sure you want to proceed?`;
               >
                 <Calendar className="w-4 h-4" />
                 {isClosingMonth ? "Closing..." : "Month-End Close"}
+              </button>
+
+              {/* EDIT HISTORY BUTTON */}
+              <button
+                onClick={() => navigate("/payments/edit-history")}
+                className="h-10 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
+              >
+                <Clock className="w-4 h-4" /> Edit History
               </button>
 
               {/* SETTLE ALL BUTTON */}
@@ -1557,6 +1585,13 @@ Are you sure you want to proceed?`;
             fetchData(pagination.page, pagination.limit);
             setEditAmountPayment(null);
           }}
+        />
+
+        {/* Payment History Modal */}
+        <PaymentHistoryModal
+          isOpen={!!historyPayment}
+          onClose={() => setHistoryPayment(null)}
+          payment={historyPayment}
         />
       </div>
 

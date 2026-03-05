@@ -56,6 +56,14 @@ export const paymentService = {
     return response.data;
   },
 
+  // Get edit history
+  getEditHistory: async (page = 1, limit = 20, type = "") => {
+    const params = { pageNo: page - 1, pageSize: limit };
+    if (type) params.type = type;
+    const response = await api.get("/payments/edit-history", { params });
+    return response.data;
+  },
+
   // Settle Payment
   settlePayment: async (payload) => {
     const response = await api.put("/payments/collect/settle", payload);
@@ -176,6 +184,12 @@ export const paymentService = {
     const response = await api.get("/payments/check-invoice", {
       params: { month, year },
     });
+    return response.data;
+  },
+
+  // Get payment history (amount edits + transactions)
+  getPaymentHistory: async (id) => {
+    const response = await api.get(`/payments/${id}/history`);
     return response.data;
   },
 };

@@ -34,13 +34,18 @@ const ReceiptModal = ({ isOpen, onClose, data, onSave }) => {
         building: data.building?.name || data.customer?.building?.name || "-",
         billAmount:
           data.billAmountDesc ||
-          `For the month of ${
-            data.createdAt
-              ? new Date(data.createdAt).toLocaleString("default", {
-                  month: "long",
-                })
-              : "Current Month"
-          }`,
+          (() => {
+            if (!data.createdAt) return "For the month of Current Month";
+            const createdDate = new Date(data.createdAt);
+            // Subtract 1 month to get the billing month
+            const billingDate = new Date(createdDate);
+            billingDate.setMonth(billingDate.getMonth() - 1);
+            const month = billingDate.toLocaleDateString("en-US", {
+              month: "long",
+            });
+            const year = billingDate.getFullYear();
+            return `For the month of ${month} ${year}`;
+          })(),
         vat: "-",
         total: `${data.amount_paid || 0} د.إ`,
         tip: `${data.tip || data.tip_amount || 0} د.إ`,

@@ -65,7 +65,7 @@ const SupervisorResidence = () => {
 
   const [filters, setFilters] = useState({
     startDate: getFirstOfMonth(),
-    endDate: getLastOfMonth(),
+    endDate: getToday(),
     worker: "",
     status: "",
     building: "",

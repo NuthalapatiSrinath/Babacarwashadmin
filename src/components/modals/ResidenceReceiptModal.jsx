@@ -42,13 +42,18 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
         building: data.building?.name || data.customer?.building?.name || "-",
         billAmountDesc:
           data.billAmountDesc ||
-          `For the month of ${
-            data.createdAt
-              ? new Date(data.createdAt).toLocaleDateString("en-US", {
-                  month: "long",
-                })
-              : "Current Month"
-          }`,
+          (() => {
+            if (!data.createdAt) return "For the month of Current Month";
+            const createdDate = new Date(data.createdAt);
+            // Subtract 1 month to get the billing month
+            const billingDate = new Date(createdDate);
+            billingDate.setMonth(billingDate.getMonth() - 1);
+            const month = billingDate.toLocaleDateString("en-US", {
+              month: "long",
+            });
+            const year = billingDate.getFullYear();
+            return `For the month of ${month} ${year}`;
+          })(),
         amount: data.amount_paid || 0, // Number for Invoice calculations
         vat: "-",
         total: `${data.amount_paid || 0} د.إ`, // String for Receipt View

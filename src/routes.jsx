@@ -53,6 +53,7 @@ import ResidencePayments from "./pages/finance/ResidencePayments";
 import WorkRecords from "./pages/finance/WorkRecords";
 import CollectionSheet from "./pages/finance/CollectionSheet";
 import Settlements from "./pages/finance/Settlements";
+import PaymentEditHistory from "./pages/finance/PaymentEditHistory";
 import WorkerCustomers from "./pages/workers-management/WorkerCustomers";
 import WorkerPayments from "./pages/workers-management/WorkerPayments";
 import WorkerWashedCars from "./pages/workers-management/WorkerWashedCars";
@@ -259,6 +260,12 @@ export const routes = [
     title: "Residence Payments",
     component: <ResidencePayments />, // <-- use your Residence payments page
     icon: DollarSign,
+  },
+
+  {
+    path: "/payments/edit-history",
+    title: "Payment Edit History",
+    component: <PaymentEditHistory />,
   },
 
   {

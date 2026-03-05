@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   Download,
   Search,
@@ -44,6 +45,7 @@ import { fetchOneWash, deleteOneWash } from "../../redux/slices/oneWashSlice";
 
 const OneWashPayments = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   // Redux State
   const { oneWashJobs, stats, total, loading } = useSelector(
@@ -570,6 +572,16 @@ const OneWashPayments = () => {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search vehicle, worker, parking..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-52 h-10 bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 text-xs outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all"
+              />
+              <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+            </div>
             <div className="bg-slate-100 p-1 rounded-xl flex">
               <button
                 onClick={() => handleTabChange("today")}
@@ -614,6 +626,12 @@ const OneWashPayments = () => {
               className="h-10 px-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md"
             >
               <Download className="w-4 h-4" /> Export
+            </button>
+            <button
+              onClick={() => navigate("/payments/edit-history")}
+              className="h-10 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
+            >
+              <Clock className="w-4 h-4" /> Edit History
             </button>
           </div>
         </div>
@@ -765,8 +783,8 @@ const OneWashPayments = () => {
 
       {/* --- FILTERS & ACTIONS --- */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
-          <div className="lg:col-span-2">
+        <div className="space-y-4">
+          <div className="max-w-xs">
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">
               Date Range
             </label>
@@ -776,80 +794,58 @@ const OneWashPayments = () => {
               onChange={handleDateChange}
             />
           </div>
-          <div className="lg:col-span-1">
-            <CustomDropdown
-              label="Status"
-              value={filters.status}
-              onChange={(val) => setFilters({ ...filters, status: val })}
-              options={statusOptions}
-              icon={Filter}
-              placeholder="All Status"
-            />
-          </div>
-          <div className="lg:col-span-2">
-            <CustomDropdown
-              label="Service Type"
-              value={filters.service_type}
-              onChange={(val) => setFilters({ ...filters, service_type: val })}
-              options={serviceTypeOptions}
-              icon={Filter}
-              placeholder="All Services"
-            />
-          </div>
-          <div className="lg:col-span-2">
-            <CustomDropdown
-              label="Payment Mode"
-              value={filters.payment_mode}
-              onChange={(val) => setFilters({ ...filters, payment_mode: val })}
-              options={[
-                { value: "", label: "All Modes" },
-                { value: "cash", label: "Cash" },
-                { value: "card", label: "Card" },
-                { value: "bank transfer", label: "Bank Transfer" },
-              ]}
-              icon={CreditCard}
-              placeholder="All Modes"
-            />
-          </div>
-          <div className="lg:col-span-2">
-            <CustomDropdown
-              label="Wash Type"
-              value={filters.wash_type}
-              onChange={(val) => setFilters({ ...filters, wash_type: val })}
-              options={[
-                { value: "", label: "All Types" },
-                { value: "outside", label: "Outside" },
-                { value: "total", label: "Inside + Outside" },
-              ]}
-              icon={Droplets}
-              placeholder="All Types"
-            />
-          </div>
-          <div className="lg:col-span-2">
-            <CustomDropdown
-              label="Worker"
-              value={filters.worker}
-              onChange={(val) => setFilters({ ...filters, worker: val })}
-              options={workerOptions}
-              icon={User}
-              placeholder="All Workers"
-              searchable={true}
-            />
-          </div>
-          {/* ✅ INSTANT SEARCH INPUT */}
-          <div className="lg:col-span-1">
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">
-              Search
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Worker, Vehicle..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all"
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <CustomDropdown
+                label="Status"
+                value={filters.status}
+                onChange={(val) => setFilters({ ...filters, status: val })}
+                options={statusOptions}
+                icon={Filter}
+                placeholder="All Status"
               />
-              <Search className="absolute left-3 top-3.5 w-4 h-4 text-slate-400" />
+            </div>
+            <div>
+              <CustomDropdown
+                label="Payment Mode"
+                value={filters.payment_mode}
+                onChange={(val) =>
+                  setFilters({ ...filters, payment_mode: val })
+                }
+                options={[
+                  { value: "", label: "All Modes" },
+                  { value: "cash", label: "Cash" },
+                  { value: "card", label: "Card" },
+                  { value: "bank transfer", label: "Bank Transfer" },
+                ]}
+                icon={CreditCard}
+                placeholder="All Modes"
+              />
+            </div>
+            <div>
+              <CustomDropdown
+                label="Wash Type"
+                value={filters.wash_type}
+                onChange={(val) => setFilters({ ...filters, wash_type: val })}
+                options={[
+                  { value: "", label: "All Types" },
+                  { value: "outside", label: "Outside" },
+                  { value: "total", label: "Inside + Outside" },
+                ]}
+                icon={Droplets}
+                placeholder="All Types"
+              />
+            </div>
+            <div>
+              <CustomDropdown
+                label="Worker"
+                value={filters.worker}
+                onChange={(val) => setFilters({ ...filters, worker: val })}
+                options={workerOptions}
+                icon={User}
+                placeholder="All Workers"
+                searchable={true}
+              />
             </div>
           </div>
         </div>

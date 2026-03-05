@@ -18,10 +18,6 @@ import {
   X,
   MapPin,
   Droplets,
-  TrendingUp,
-  BarChart3,
-  ArrowUpRight,
-  ArrowDownRight,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
@@ -519,12 +515,23 @@ const SupervisorOneWashPayments = () => {
                 One Wash Payments
               </h1>
               <p className="text-sm text-slate-500 font-medium">
-                On-demand wash transactions for your team
+                Manage on-demand wash transactions
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            {/* Search */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search vehicle, worker, parking..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-52 h-10 bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 text-xs outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all"
+              />
+              <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+            </div>
             {/* Date Tabs */}
             <div className="bg-slate-100 p-1 rounded-xl flex">
               <button
@@ -569,218 +576,166 @@ const SupervisorOneWashPayments = () => {
         </div>
 
         {/* ─── STAT CARDS ─── */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-6">
           {/* Original Amount */}
-          <div className="relative overflow-hidden p-4 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 text-white shadow-md">
-            <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-white/5" />
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center">
-                <Coins className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold opacity-60 uppercase tracking-wider">
-                  Original Amount
+          <div className="p-4 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 text-white shadow-md flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white shrink-0">
+              <Coins className="w-6 h-6" />
+            </div>
+            <div>
+              <span className="block text-xs font-bold opacity-60 uppercase tracking-wider mb-0.5">
+                Original Amount
+              </span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl font-bold">
+                  {stats.totalAmount?.toLocaleString() || 0}
                 </span>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-xl font-bold">
-                    {stats.totalAmount?.toLocaleString() || 0}
-                  </span>
-                  <span className="text-[10px] opacity-70">{currency}</span>
-                </div>
-                <span className="text-[10px] opacity-50">
-                  {stats.totalJobs || 0} transactions
-                </span>
+                <span className="text-xs opacity-70">{currency}</span>
               </div>
+              <span className="text-[10px] opacity-50">
+                {stats.totalJobs || 0} transactions
+              </span>
             </div>
           </div>
 
           {/* Cash */}
-          <div className="relative overflow-hidden p-4 rounded-xl bg-white border border-slate-100 shadow-sm">
-            <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-emerald-50" />
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-                <Banknote className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Cash
-                </span>
-                <span className="text-xl font-bold text-slate-700">
-                  {stats.cash?.toLocaleString() || 0}
-                </span>
-                <span className="block text-[10px] text-emerald-500 font-bold">
-                  {cashPct}%
-                </span>
-              </div>
+          <div className="p-4 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+              <Banknote className="w-6 h-6" />
+            </div>
+            <div>
+              <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                Cash
+              </span>
+              <span className="text-xl font-bold text-slate-700">
+                {stats.cash?.toLocaleString() || 0}
+              </span>
+              <span className="block text-[10px] text-emerald-500 font-bold">
+                {cashPct}%
+              </span>
             </div>
           </div>
 
           {/* Card */}
-          <div className="relative overflow-hidden p-4 rounded-xl bg-white border border-slate-100 shadow-sm">
-            <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-blue-50" />
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-                <CreditCard className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Card
-                </span>
-                <span className="text-xl font-bold text-slate-700">
-                  {stats.card?.toLocaleString() || 0}
-                </span>
-                <span className="block text-[10px] text-blue-500 font-bold">
-                  {cardPct}%
-                </span>
-              </div>
+          <div className="p-4 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+              <CreditCard className="w-6 h-6" />
+            </div>
+            <div>
+              <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                Card
+              </span>
+              <span className="text-xl font-bold text-slate-700">
+                {stats.card?.toLocaleString() || 0}
+              </span>
+              <span className="block text-[10px] text-blue-500 font-bold">
+                {cardPct}%
+              </span>
             </div>
           </div>
 
           {/* Bank */}
-          <div className="relative overflow-hidden p-4 rounded-xl bg-white border border-slate-100 shadow-sm">
-            <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-purple-50" />
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
-                <Landmark className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Bank
-                </span>
-                <span className="text-xl font-bold text-slate-700">
-                  {stats.bank?.toLocaleString() || 0}
-                </span>
-                <span className="block text-[10px] text-purple-500 font-bold">
-                  {bankPct}%
-                </span>
-              </div>
+          <div className="p-4 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 shrink-0">
+              <Landmark className="w-6 h-6" />
+            </div>
+            <div>
+              <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                Bank
+              </span>
+              <span className="text-xl font-bold text-slate-700">
+                {stats.bank?.toLocaleString() || 0}
+              </span>
+              <span className="block text-[10px] text-purple-500 font-bold">
+                {bankPct}%
+              </span>
             </div>
           </div>
 
           {/* Tips */}
-          <div className="relative overflow-hidden p-4 rounded-xl bg-white border border-slate-100 shadow-sm">
-            <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-amber-50" />
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
-                <Coins className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Tips
-                </span>
-                <span className="text-xl font-bold text-amber-600">
-                  {stats.tips?.toLocaleString() || 0}
-                </span>
-              </div>
+          <div className="p-4 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
+              <Coins className="w-6 h-6" />
+            </div>
+            <div>
+              <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                Tips
+              </span>
+              <span className="text-xl font-bold text-amber-600">
+                {stats.tips?.toLocaleString() || 0}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Wash Type Amount Breakdown */}
+        {/* Wash Type Breakdown */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-          <div className="relative overflow-hidden p-3 rounded-xl bg-blue-50 border border-blue-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                <Car className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold text-blue-400 uppercase tracking-wider">
-                  Outside
+          <div className="p-3 rounded-xl bg-blue-50 border border-blue-100 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+              <Car className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold text-blue-400 uppercase tracking-wider">
+                Outside
+              </span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-lg font-bold text-blue-700">
+                  {stats.outsideAmount?.toLocaleString() || 0}{" "}
+                  <span className="text-[10px] text-blue-400">{currency}</span>
                 </span>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-lg font-bold text-blue-700">
-                    {stats.outsideAmount?.toLocaleString() || 0}{" "}
-                    <span className="text-[10px] text-blue-400">
-                      {currency}
-                    </span>
-                  </span>
-                  <span className="text-[10px] font-bold text-blue-500">
-                    ({stats.outsideCount || 0} jobs)
-                  </span>
-                </div>
+                <span className="text-[10px] font-bold text-blue-500">
+                  ({stats.outsideCount || 0} jobs)
+                </span>
               </div>
             </div>
           </div>
-          <div className="relative overflow-hidden p-3 rounded-xl bg-purple-50 border border-purple-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600 shrink-0">
-                <Car className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold text-purple-400 uppercase tracking-wider">
-                  Inside + Outside
+          <div className="p-3 rounded-xl bg-purple-50 border border-purple-100 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 shrink-0">
+              <Car className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold text-purple-400 uppercase tracking-wider">
+                Inside + Outside
+              </span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-lg font-bold text-purple-700">
+                  {stats.insideOutsideAmount?.toLocaleString() || 0}{" "}
+                  <span className="text-[10px] text-purple-400">
+                    {currency}
+                  </span>
                 </span>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-lg font-bold text-purple-700">
-                    {stats.insideOutsideAmount?.toLocaleString() || 0}{" "}
-                    <span className="text-[10px] text-purple-400">
-                      {currency}
-                    </span>
-                  </span>
-                  <span className="text-[10px] font-bold text-purple-500">
-                    ({stats.insideOutsideCount || 0} jobs)
-                  </span>
-                </div>
+                <span className="text-[10px] font-bold text-purple-500">
+                  ({stats.insideOutsideCount || 0} jobs)
+                </span>
               </div>
             </div>
           </div>
-          <div className="relative overflow-hidden p-3 rounded-xl bg-green-50 border border-green-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center text-green-600 shrink-0">
-                <MapPin className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold text-green-400 uppercase tracking-wider">
-                  Residence
+          <div className="p-3 rounded-xl bg-green-50 border border-green-100 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 shrink-0">
+              <MapPin className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold text-green-400 uppercase tracking-wider">
+                Residence
+              </span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-lg font-bold text-green-700">
+                  {stats.residenceAmount?.toLocaleString() || 0}{" "}
+                  <span className="text-[10px] text-green-400">{currency}</span>
                 </span>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-lg font-bold text-green-700">
-                    {stats.residenceAmount?.toLocaleString() || 0}{" "}
-                    <span className="text-[10px] text-green-400">
-                      {currency}
-                    </span>
-                  </span>
-                  <span className="text-[10px] font-bold text-green-500">
-                    ({stats.residenceCount || 0} jobs)
-                  </span>
-                </div>
+                <span className="text-[10px] font-bold text-green-500">
+                  ({stats.residenceCount || 0} jobs)
+                </span>
               </div>
             </div>
           </div>
         </div>
-
-        {/* Revenue Bar */}
-        {stats.totalAmount > 0 && (
-          <div className="mt-4 h-3 rounded-full overflow-hidden flex bg-slate-100">
-            {Number(cashPct) > 0 && (
-              <div
-                className="bg-emerald-500 transition-all duration-700"
-                style={{ width: `${cashPct}%` }}
-                title={`Cash: ${cashPct}%`}
-              />
-            )}
-            {Number(cardPct) > 0 && (
-              <div
-                className="bg-blue-500 transition-all duration-700"
-                style={{ width: `${cardPct}%` }}
-                title={`Card: ${cardPct}%`}
-              />
-            )}
-            {Number(bankPct) > 0 && (
-              <div
-                className="bg-purple-500 transition-all duration-700"
-                style={{ width: `${bankPct}%` }}
-                title={`Bank: ${bankPct}%`}
-              />
-            )}
-          </div>
-        )}
       </div>
 
       {/* ─── FILTERS ─── */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
-          <div className="lg:col-span-3">
+        <div className="space-y-4">
+          <div className="max-w-xs">
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">
               Date Range
             </label>
@@ -790,69 +745,58 @@ const SupervisorOneWashPayments = () => {
               onChange={handleDateChange}
             />
           </div>
-          <div className="lg:col-span-1">
-            <CustomDropdown
-              label="Status"
-              value={filters.status}
-              onChange={(val) => setFilters({ ...filters, status: val })}
-              options={statusOptions}
-              icon={Filter}
-              placeholder="All Status"
-            />
-          </div>
-          <div className="lg:col-span-1">
-            <CustomDropdown
-              label="Payment Mode"
-              value={filters.payment_mode}
-              onChange={(val) => setFilters({ ...filters, payment_mode: val })}
-              options={[
-                { value: "", label: "All Modes" },
-                { value: "cash", label: "Cash" },
-                { value: "card", label: "Card" },
-                { value: "bank transfer", label: "Bank Transfer" },
-              ]}
-              icon={CreditCard}
-              placeholder="All Modes"
-            />
-          </div>
-          <div className="lg:col-span-1">
-            <CustomDropdown
-              label="Wash Type"
-              value={filters.wash_type}
-              onChange={(val) => setFilters({ ...filters, wash_type: val })}
-              options={[
-                { value: "", label: "All Types" },
-                { value: "outside", label: "Outside" },
-                { value: "total", label: "Inside + Outside" },
-              ]}
-              icon={Droplets}
-              placeholder="All Types"
-            />
-          </div>
-          <div className="lg:col-span-2">
-            <CustomDropdown
-              label="Worker"
-              value={filters.worker}
-              onChange={(val) => setFilters({ ...filters, worker: val })}
-              options={workerOptions}
-              icon={User}
-              placeholder="All Workers"
-              searchable={true}
-            />
-          </div>
-          <div className="lg:col-span-3">
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">
-              Search
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Vehicle, Worker, Parking..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all"
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <CustomDropdown
+                label="Status"
+                value={filters.status}
+                onChange={(val) => setFilters({ ...filters, status: val })}
+                options={statusOptions}
+                icon={Filter}
+                placeholder="All Status"
               />
-              <Search className="absolute left-3 top-3.5 w-4 h-4 text-slate-400" />
+            </div>
+            <div>
+              <CustomDropdown
+                label="Payment Mode"
+                value={filters.payment_mode}
+                onChange={(val) =>
+                  setFilters({ ...filters, payment_mode: val })
+                }
+                options={[
+                  { value: "", label: "All Modes" },
+                  { value: "cash", label: "Cash" },
+                  { value: "card", label: "Card" },
+                  { value: "bank transfer", label: "Bank Transfer" },
+                ]}
+                icon={CreditCard}
+                placeholder="All Modes"
+              />
+            </div>
+            <div>
+              <CustomDropdown
+                label="Wash Type"
+                value={filters.wash_type}
+                onChange={(val) => setFilters({ ...filters, wash_type: val })}
+                options={[
+                  { value: "", label: "All Types" },
+                  { value: "outside", label: "Outside" },
+                  { value: "total", label: "Inside + Outside" },
+                ]}
+                icon={Droplets}
+                placeholder="All Types"
+              />
+            </div>
+            <div>
+              <CustomDropdown
+                label="Worker"
+                value={filters.worker}
+                onChange={(val) => setFilters({ ...filters, worker: val })}
+                options={workerOptions}
+                icon={User}
+                placeholder="All Workers"
+                searchable={true}
+              />
             </div>
           </div>
         </div>
