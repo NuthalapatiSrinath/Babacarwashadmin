@@ -17,6 +17,7 @@ import {
   LayoutGrid,
   MessageSquare,
   Shield,
+  Activity,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
@@ -308,6 +309,15 @@ const AdminStaff = () => {
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() =>
+                          navigate(`/admin-staff/${staff._id}/activity`)
+                        }
+                        className="p-2 hover:bg-blue-50 text-text-sub hover:text-blue-600 rounded-lg transition-colors"
+                        title="Activity Tracking"
+                      >
+                        <Activity className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => handleEdit(staff)}
                         className="p-2 hover:bg-primary/10 text-text-sub hover:text-primary rounded-lg transition-colors"

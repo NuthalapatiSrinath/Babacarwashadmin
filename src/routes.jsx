@@ -85,6 +85,7 @@ import SupervisorActivityDetail from "./pages/supervisors/SupervisorActivityDeta
 import AdminStaff from "./pages/admin-staff/AdminStaff";
 import StaffPermissions from "./pages/admin-staff/StaffPermissions";
 import AccessRequests from "./pages/admin-staff/AccessRequests";
+import AdminStaffActivityDetail from "./pages/admin-staff/AdminStaffActivityDetail";
 
 export const routes = [
   // --- OVERVIEW ---
@@ -359,6 +360,11 @@ export const routes = [
     path: "/admin-staff/access-requests",
     title: "Access Requests",
     component: <AccessRequests />,
+  },
+  {
+    path: "/admin-staff/:adminId/activity",
+    title: "Admin Staff Activity",
+    component: <AdminStaffActivityDetail />,
   },
 
   // --- SUPERVISOR SECTION ---
