@@ -98,17 +98,36 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
   };
 
   // --- Helper: Convert schedule_days to string (handles all formats) ---
+  // Normalizes day names to proper case (e.g., "thu" → "Thu")
+  const normalizeDayName = (d) => {
+    const map = {
+      sun: "Sun",
+      mon: "Mon",
+      tue: "Tue",
+      wed: "Wed",
+      thu: "Thu",
+      fri: "Fri",
+      sat: "Sat",
+    };
+    return map[d.trim().toLowerCase()] || d.trim();
+  };
   const getScheduleDaysString = (scheduleDays) => {
     if (!scheduleDays) return "";
-    if (typeof scheduleDays === "string") return scheduleDays;
+    if (typeof scheduleDays === "string") {
+      return scheduleDays
+        .split(",")
+        .filter(Boolean)
+        .map(normalizeDayName)
+        .join(",");
+    }
     if (Array.isArray(scheduleDays)) {
       return scheduleDays
-        .map((d) => (typeof d === "object" ? d.day : d))
+        .map((d) => normalizeDayName(typeof d === "object" ? d.day : String(d)))
         .filter(Boolean)
         .join(",");
     }
     if (typeof scheduleDays === "object" && scheduleDays.day) {
-      return scheduleDays.day;
+      return normalizeDayName(scheduleDays.day);
     }
     return "";
   };
@@ -123,22 +142,23 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
   useEffect(() => {
     if (isOpen) {
       const loadDependencies = async () => {
-        try {
-          const [locRes, buildRes, workRes] = await Promise.all([
-            locationService.list(1, 1000),
-            buildingService.list(1, 1000),
-            workerService.list(1, 1000),
-          ]);
+        const [locRes, buildRes, workRes] = await Promise.allSettled([
+          locationService.list(1, 1000),
+          buildingService.list(1, 1000),
+          workerService.list(1, 1000),
+        ]);
 
-          setLocations(locRes.data || []);
-          setAllBuildings(buildRes.data || []);
-          const validWorkers = (workRes.data || []).filter(
+        if (locRes.status === "fulfilled") {
+          setLocations(locRes.value?.data || []);
+        }
+        if (buildRes.status === "fulfilled") {
+          setAllBuildings(buildRes.value?.data || []);
+        }
+        if (workRes.status === "fulfilled") {
+          const validWorkers = (workRes.value?.data || []).filter(
             (w) => !w.role || w.role === "worker" || w.role === "supervisor",
           );
           setAllWorkers(validWorkers);
-        } catch (error) {
-          console.error("Failed to load options", error);
-          toast.error("Failed to load dropdown data");
         }
       };
       loadDependencies();

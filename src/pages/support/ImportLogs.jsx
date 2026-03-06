@@ -17,11 +17,13 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // Components
 import DataTable from "../../components/DataTable";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 // API
 import { importLogsService } from "../../api/importLogsService";
 
 const ImportLogs = () => {
+  const pp = usePagePermissions("importLogs");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
 
@@ -101,6 +103,7 @@ const ImportLogs = () => {
     {
       header: "Date",
       accessor: "createdAt",
+      key: "date",
       className: "w-40",
       render: (row) => (
         <span className="text-slate-600 text-sm font-medium">
@@ -111,6 +114,7 @@ const ImportLogs = () => {
     {
       header: "Type",
       accessor: "type",
+      key: "type",
       render: (row) => (
         <span className="px-2.5 py-1 rounded-md bg-blue-50 text-blue-600 text-xs font-bold uppercase tracking-wide">
           {row.type}
@@ -120,6 +124,7 @@ const ImportLogs = () => {
     {
       header: "Success",
       accessor: "logs.success",
+      key: "success",
       render: (row) => (
         <div className="flex items-center gap-1.5 text-green-600 font-medium">
           <CheckCircle className="w-4 h-4" />
@@ -130,6 +135,7 @@ const ImportLogs = () => {
     {
       header: "Errors",
       accessor: "logs.errors",
+      key: "errors",
       render: (row) => (
         <div
           className={`flex items-center gap-1.5 font-medium ${
@@ -144,6 +150,7 @@ const ImportLogs = () => {
     {
       header: "Duplicates",
       accessor: "logs.duplicates",
+      key: "duplicates",
       render: (row) => (
         <div
           className={`flex items-center gap-1.5 font-medium ${
@@ -160,6 +167,7 @@ const ImportLogs = () => {
     {
       header: "Changes",
       accessor: "logs.changes",
+      key: "changes",
       render: (row) => (
         <div
           className={`flex items-center gap-1.5 font-medium ${
@@ -175,13 +183,13 @@ const ImportLogs = () => {
       header: "Action",
       className: "text-right",
       render: (row) => (
-        <button
+        pp.isActionVisible("view") && (<button
           onClick={() => handleView(row)}
           className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors"
           title="View Details"
         >
           <Eye className="w-4 h-4" />
-        </button>
+        </button>)
       ),
     },
   ];
@@ -197,7 +205,7 @@ const ImportLogs = () => {
 
       <DataTable
         title="History"
-        columns={columns}
+        columns={pp.filterColumns(columns)}
         data={data}
         loading={loading}
         pagination={pagination}

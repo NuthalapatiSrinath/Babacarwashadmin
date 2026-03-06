@@ -17,9 +17,11 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { paymentService } from "../../api/paymentService";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 const PaymentEditHistory = () => {
   const navigate = useNavigate();
+  const pp = usePagePermissions("paymentEditHistory");
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -111,7 +113,7 @@ const PaymentEditHistory = () => {
 
           <div className="flex items-center gap-3">
             {/* Type filter */}
-            <div className="bg-slate-100 p-1 rounded-xl flex">
+            {pp.isToolbarVisible("typeFilter") && (<div className="bg-slate-100 p-1 rounded-xl flex">
               <button
                 onClick={() => {
                   setTypeFilter("");
@@ -151,7 +153,7 @@ const PaymentEditHistory = () => {
               >
                 One Wash
               </button>
-            </div>
+            </div>)}
 
             <span className="text-sm text-slate-500 font-medium">
               {total} payment{total !== 1 ? "s" : ""} with edits

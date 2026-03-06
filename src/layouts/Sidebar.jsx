@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { usePermissions } from "../utils/usePermissions";
 
 import {
   LayoutDashboard,
@@ -26,10 +27,12 @@ import {
   BarChart2,
   Clock,
   Car,
+  Shield,
 } from "lucide-react";
 
 const Sidebar = ({ isOpen, isMobile, onClose }) => {
   const location = useLocation();
+  const { hasPermission, isAdmin } = usePermissions();
 
   // Get user role from localStorage
   const userString = localStorage.getItem("user");
@@ -267,263 +270,333 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
                   Overview
                 </li>
 
-                <NavItem
-                  to="/"
-                  icon={LayoutDashboard}
-                  label="Dashboard"
-                  onClick={handleLinkClick}
-                  isMobile={isMobile}
-                />
+                {hasPermission("dashboard", "view") && (
+                  <NavItem
+                    to="/"
+                    icon={LayoutDashboard}
+                    label="Dashboard"
+                    onClick={handleLinkClick}
+                    isMobile={isMobile}
+                  />
+                )}
 
                 {/* CUSTOMERS */}
-                <NavItem
-                  to="/customers"
-                  icon={Users}
-                  label="Customers"
-                  onClick={handleLinkClick}
-                  isMobile={isMobile}
-                />
+                {hasPermission("customers", "view") && (
+                  <NavItem
+                    to="/customers"
+                    icon={Users}
+                    label="Customers"
+                    onClick={handleLinkClick}
+                    isMobile={isMobile}
+                  />
+                )}
 
                 {/* WORKERS */}
-                <li>
-                  <MenuButton
-                    label="Workers Management"
-                    icon={Briefcase}
-                    isOpen={openMenus.workers}
-                    isActive={isActiveParent(["/workers"])}
-                    onClick={() => toggleMenu("workers")}
+                {(hasPermission("workers", "view") ||
+                  hasPermission("attendance", "view")) && (
+                  <li>
+                    <MenuButton
+                      label="Workers Management"
+                      icon={Briefcase}
+                      isOpen={openMenus.workers}
+                      isActive={isActiveParent(["/workers"])}
+                      onClick={() => toggleMenu("workers")}
+                      isMobile={isMobile}
+                    />
+
+                    <SubMenu isOpen={openMenus.workers} isMobile={isMobile}>
+                      {hasPermission("workers", "view") && (
+                        <SubNavItem
+                          to="/workers/list"
+                          label="Workers"
+                          onClick={handleLinkClick}
+                        />
+                      )}
+                      {hasPermission("attendance", "view") && (
+                        <SubNavItem
+                          to="/workers/attendance"
+                          label="Attendance"
+                          onClick={handleLinkClick}
+                        />
+                      )}
+                    </SubMenu>
+                  </li>
+                )}
+
+                {hasPermission("supervisors", "view") && (
+                  <NavItem
+                    to="/supervisors"
+                    icon={UserCheck}
+                    label="Supervisors"
+                    onClick={handleLinkClick}
                     isMobile={isMobile}
                   />
-
-                  <SubMenu isOpen={openMenus.workers} isMobile={isMobile}>
-                    <SubNavItem
-                      to="/workers/list"
-                      label="Workers"
-                      onClick={handleLinkClick}
-                    />
-                    <SubNavItem
-                      to="/workers/attendance"
-                      label="Attendance"
-                      onClick={handleLinkClick}
-                    />
-                  </SubMenu>
-                </li>
-
-                <NavItem
-                  to="/supervisors"
-                  icon={UserCheck}
-                  label="Supervisors"
-                  onClick={handleLinkClick}
-                  isMobile={isMobile}
-                />
+                )}
 
                 {/* WASHES */}
-                <li>
-                  <MenuButton
-                    label="Washes"
-                    icon={Droplets}
-                    isOpen={openMenus.washes}
-                    isActive={isActiveParent(["/washes"])}
-                    onClick={() => toggleMenu("washes")}
+                {hasPermission("washes", "view") && (
+                  <li>
+                    <MenuButton
+                      label="Washes"
+                      icon={Droplets}
+                      isOpen={openMenus.washes}
+                      isActive={isActiveParent(["/washes"])}
+                      onClick={() => toggleMenu("washes")}
+                      isMobile={isMobile}
+                    />
+
+                    <SubMenu isOpen={openMenus.washes} isMobile={isMobile}>
+                      <SubNavItem
+                        to="/washes/onewash"
+                        label="One Wash"
+                        onClick={handleLinkClick}
+                      />
+                      <SubNavItem
+                        to="/washes/residence"
+                        label="Residence"
+                        onClick={handleLinkClick}
+                      />
+                    </SubMenu>
+                  </li>
+                )}
+
+                {/* PAYMENTS */}
+                {hasPermission("payments", "view") && (
+                  <li>
+                    <MenuButton
+                      label="Payments"
+                      icon={DollarSign}
+                      isOpen={openMenus.payments}
+                      isActive={isActiveParent(["/payments"])}
+                      onClick={() => toggleMenu("payments")}
+                      isMobile={isMobile}
+                    />
+
+                    <SubMenu isOpen={openMenus.payments} isMobile={isMobile}>
+                      <SubNavItem
+                        to="/payments/onewash"
+                        label="One Wash"
+                        onClick={handleLinkClick}
+                      />
+                      <SubNavItem
+                        to="/payments/residence"
+                        label="Residence"
+                        onClick={handleLinkClick}
+                      />
+                    </SubMenu>
+                  </li>
+                )}
+
+                {hasPermission("yearlyRecords", "view") && (
+                  <NavItem
+                    to="/workers/yearly"
+                    icon={BarChart2}
+                    label="Worker Yearly Records"
+                    onClick={handleLinkClick}
                     isMobile={isMobile}
                   />
+                )}
 
-                  <SubMenu isOpen={openMenus.washes} isMobile={isMobile}>
-                    <SubNavItem
-                      to="/washes/onewash"
-                      label="One Wash"
-                      onClick={handleLinkClick}
-                    />
-                    <SubNavItem
-                      to="/washes/residence"
-                      label="Residence"
-                      onClick={handleLinkClick}
-                    />
-                  </SubMenu>
-                </li>
-
-                {/* FINANCE */}
-                {/* <li
-                  className={`
-                  px-4 text-[11px] font-extrabold text-text-muted uppercase tracking-widest
-                  mb-2 mt-6
-                  ${isMobile ? "block" : "hidden group-hover:block"}
-                `}
-                >
-                  Finance
-                </li> */}
-
-                <li>
-                  <MenuButton
-                    label="Payments"
-                    icon={DollarSign}
-                    isOpen={openMenus.payments}
-                    isActive={isActiveParent(["/payments"])}
-                    onClick={() => toggleMenu("payments")}
+                {hasPermission("pendingPayments", "view") && (
+                  <NavItem
+                    to="/pending-payments"
+                    icon={Clock}
+                    label="Due Lists"
+                    onClick={handleLinkClick}
                     isMobile={isMobile}
                   />
+                )}
 
-                  <SubMenu isOpen={openMenus.payments} isMobile={isMobile}>
-                    <SubNavItem
-                      to="/payments/onewash"
-                      label="One Wash"
-                      onClick={handleLinkClick}
-                    />
-                    <SubNavItem
-                      to="/payments/residence"
-                      label="Residence"
-                      onClick={handleLinkClick}
-                    />
-                  </SubMenu>
-                </li>
-
-                <NavItem
-                  to="/workers/yearly"
-                  icon={BarChart2}
-                  label="Worker Yearly Records"
-                  onClick={handleLinkClick}
-                  isMobile={isMobile}
-                />
-
-                <NavItem
-                  to="/pending-payments"
-                  icon={Clock}
-                  label="Due Lists"
-                  onClick={handleLinkClick}
-                  isMobile={isMobile}
-                />
-
-                <NavItem
-                  to="/work-records"
-                  icon={FileText}
-                  label="Work Records"
-                  onClick={handleLinkClick}
-                  isMobile={isMobile}
-                />
-                <NavItem
-                  to="/collection-sheet"
-                  icon={Receipt}
-                  label="Collection Sheet"
-                  onClick={handleLinkClick}
-                  isMobile={isMobile}
-                />
-                <NavItem
-                  to="/settlements"
-                  icon={Wallet}
-                  label="Settlements"
-                  onClick={handleLinkClick}
-                  isMobile={isMobile}
-                />
-
-                <NavItem
-                  to="/pricing"
-                  icon={Tags}
-                  label="Pricing"
-                  onClick={handleLinkClick}
-                  isMobile={isMobile}
-                />
-                {/* MANAGEMENT - Hide from supervisors */}
-                <li>
-                  <MenuButton
-                    label="Management"
-                    icon={Briefcase}
-                    isOpen={openMenus.management}
-                    isActive={isActiveParent([
-                      "/locations",
-                      "/buildings",
-                      "/malls",
-                      "/sites",
-                      "/customers/vehicle-management",
-                    ])}
-                    onClick={() => toggleMenu("management")}
+                {hasPermission("workRecords", "view") && (
+                  <NavItem
+                    to="/work-records"
+                    icon={FileText}
+                    label="Work Records"
+                    onClick={handleLinkClick}
                     isMobile={isMobile}
                   />
-                  <SubMenu isOpen={openMenus.management} isMobile={isMobile}>
-                    <SubNavItem
-                      to="/locations"
-                      label="Locations"
-                      onClick={handleLinkClick}
+                )}
+                {hasPermission("collectionSheet", "view") && (
+                  <NavItem
+                    to="/collection-sheet"
+                    icon={Receipt}
+                    label="Collection Sheet"
+                    onClick={handleLinkClick}
+                    isMobile={isMobile}
+                  />
+                )}
+                {hasPermission("settlements", "view") && (
+                  <NavItem
+                    to="/settlements"
+                    icon={Wallet}
+                    label="Settlements"
+                    onClick={handleLinkClick}
+                    isMobile={isMobile}
+                  />
+                )}
+
+                {hasPermission("pricing", "view") && (
+                  <NavItem
+                    to="/pricing"
+                    icon={Tags}
+                    label="Pricing"
+                    onClick={handleLinkClick}
+                    isMobile={isMobile}
+                  />
+                )}
+
+                {/* MANAGEMENT - Hide from supervisors, permission-based for managers */}
+                {(hasPermission("locations", "view") ||
+                  hasPermission("buildings", "view") ||
+                  hasPermission("malls", "view") ||
+                  hasPermission("sites", "view") ||
+                  hasPermission("vehicles", "view")) && (
+                  <li>
+                    <MenuButton
+                      label="Management"
+                      icon={Briefcase}
+                      isOpen={openMenus.management}
+                      isActive={isActiveParent([
+                        "/locations",
+                        "/buildings",
+                        "/malls",
+                        "/sites",
+                        "/customers/vehicle-management",
+                      ])}
+                      onClick={() => toggleMenu("management")}
+                      isMobile={isMobile}
                     />
-                    <SubNavItem
-                      to="/buildings"
-                      label="Buildings"
-                      onClick={handleLinkClick}
-                    />
-                    <SubNavItem
-                      to="/malls"
-                      label="Malls"
-                      onClick={handleLinkClick}
-                    />
-                    <SubNavItem
-                      to="/sites"
-                      label="Sites"
-                      onClick={handleLinkClick}
-                    />
-                    <SubNavItem
-                      to="/customers/vehicle-management"
-                      label="Vehicle Management"
-                      onClick={handleLinkClick}
-                    />
-                  </SubMenu>
-                </li>
+                    <SubMenu isOpen={openMenus.management} isMobile={isMobile}>
+                      {hasPermission("locations", "view") && (
+                        <SubNavItem
+                          to="/locations"
+                          label="Locations"
+                          onClick={handleLinkClick}
+                        />
+                      )}
+                      {hasPermission("buildings", "view") && (
+                        <SubNavItem
+                          to="/buildings"
+                          label="Buildings"
+                          onClick={handleLinkClick}
+                        />
+                      )}
+                      {hasPermission("malls", "view") && (
+                        <SubNavItem
+                          to="/malls"
+                          label="Malls"
+                          onClick={handleLinkClick}
+                        />
+                      )}
+                      {hasPermission("sites", "view") && (
+                        <SubNavItem
+                          to="/sites"
+                          label="Sites"
+                          onClick={handleLinkClick}
+                        />
+                      )}
+                      {hasPermission("vehicles", "view") && (
+                        <SubNavItem
+                          to="/customers/vehicle-management"
+                          label="Vehicle Management"
+                          onClick={handleLinkClick}
+                        />
+                      )}
+                    </SubMenu>
+                  </li>
+                )}
 
                 {/* SUPPORT */}
-                <li
-                  className={`
-                  px-4 text-[11px] font-extrabold text-text-muted uppercase tracking-widest
-                  mb-2 mt-6
-                  ${isMobile ? "block" : "hidden group-hover:block"}
-                `}
-                >
-                  Support
-                </li>
+                {(hasPermission("enquiry", "view") ||
+                  hasPermission("bookings", "view") ||
+                  hasPermission("importLogs", "view")) && (
+                  <li
+                    className={`
+                    px-4 text-[11px] font-extrabold text-text-muted uppercase tracking-widest
+                    mb-2 mt-6
+                    ${isMobile ? "block" : "hidden group-hover:block"}
+                  `}
+                  >
+                    Support
+                  </li>
+                )}
 
-                <NavItem
-                  to="/enquiry"
-                  icon={HelpCircle}
-                  label="Enquiry"
-                  onClick={handleLinkClick}
-                  isMobile={isMobile}
-                />
-                <NavItem
-                  to="/bookings"
-                  icon={ClipboardCheck}
-                  label="Bookings"
-                  onClick={handleLinkClick}
-                  isMobile={isMobile}
-                />
-                <NavItem
-                  to="/import-logs"
-                  icon={FileText}
-                  label="Import Logs"
-                  onClick={handleLinkClick}
-                  isMobile={isMobile}
-                />
-
-                {/* SETTINGS SUBMENU */}
-                <li>
-                  <MenuButton
-                    label="Settings"
-                    icon={Settings}
-                    isOpen={openMenus.settings}
-                    isActive={isActiveParent(["/settings"])}
-                    onClick={() => toggleMenu("settings")}
+                {hasPermission("enquiry", "view") && (
+                  <NavItem
+                    to="/enquiry"
+                    icon={HelpCircle}
+                    label="Enquiry"
+                    onClick={handleLinkClick}
                     isMobile={isMobile}
                   />
+                )}
+                {hasPermission("bookings", "view") && (
+                  <NavItem
+                    to="/bookings"
+                    icon={ClipboardCheck}
+                    label="Bookings"
+                    onClick={handleLinkClick}
+                    isMobile={isMobile}
+                  />
+                )}
+                {hasPermission("importLogs", "view") && (
+                  <NavItem
+                    to="/import-logs"
+                    icon={FileText}
+                    label="Import Logs"
+                    onClick={handleLinkClick}
+                    isMobile={isMobile}
+                  />
+                )}
 
-                  <SubMenu isOpen={openMenus.settings} isMobile={isMobile}>
-                    <SubNavItem
-                      to="/settings"
-                      label="General Settings"
-                      onClick={handleLinkClick}
+                {/* SETTINGS SUBMENU */}
+                {hasPermission("settings", "view") && (
+                  <li>
+                    <MenuButton
+                      label="Settings"
+                      icon={Settings}
+                      isOpen={openMenus.settings}
+                      isActive={isActiveParent(["/settings"])}
+                      onClick={() => toggleMenu("settings")}
+                      isMobile={isMobile}
                     />
-                    <SubNavItem
-                      to="/settings/salary"
-                      label="Salary Configuration"
+
+                    <SubMenu isOpen={openMenus.settings} isMobile={isMobile}>
+                      <SubNavItem
+                        to="/settings"
+                        label="General Settings"
+                        onClick={handleLinkClick}
+                      />
+                      <SubNavItem
+                        to="/settings/salary"
+                        label="Salary Configuration"
+                        onClick={handleLinkClick}
+                      />
+                    </SubMenu>
+                  </li>
+                )}
+
+                {/* ADMIN STAFF - Only visible to Super Admin (role: admin) */}
+                {isAdmin && (
+                  <>
+                    <li
+                      className={`
+                      px-4 text-[11px] font-extrabold text-text-muted uppercase tracking-widest
+                      mb-2 mt-6
+                      ${isMobile ? "block" : "hidden group-hover:block"}
+                    `}
+                    >
+                      Administration
+                    </li>
+                    <NavItem
+                      to="/admin-staff"
+                      icon={Shield}
+                      label="Admin Staff"
                       onClick={handleLinkClick}
+                      isMobile={isMobile}
                     />
-                  </SubMenu>
-                </li>
+                  </>
+                )}
               </>
             )}
           </ul>

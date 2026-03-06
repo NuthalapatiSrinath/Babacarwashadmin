@@ -23,8 +23,10 @@ import { paymentService } from "../../api/paymentService";
 import DataTable from "../../components/DataTable";
 import CustomDropdown from "../../components/ui/CustomDropdown";
 import RichDateRangePicker from "../../components/inputs/RichDateRangePicker";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 const PendingPayments = () => {
+  const pp = usePagePermissions("pendingPayments");
   const dispatch = useDispatch();
 
   // Redux Data
@@ -548,30 +550,35 @@ const PendingPayments = () => {
     {
       header: "PARKING",
       accessor: "vehicle.parking_no",
+      key: "parking",
       className: "text-xs font-bold text-slate-600",
       render: (r) => r.vehicle?.parking_no || "-",
     },
     {
       header: "REG NO",
       accessor: "vehicle.registration_no",
+      key: "regNo",
       className: "text-xs font-mono font-bold text-slate-700",
       render: (r) => r.vehicle?.registration_no || "-",
     },
     {
       header: "BUILDING",
       accessor: "building.name",
+      key: "building",
       className: "text-xs font-medium text-slate-600",
       render: (r) => r.building?.name || r.customer?.building?.name || "-",
     },
     {
       header: "AMOUNT",
       accessor: "balance",
+      key: "amount",
       className: "text-right text-xs font-bold text-red-600",
       render: (r) => (r.total_amount - r.amount_paid).toFixed(2),
     },
     {
       header: "DUE DATE",
       accessor: "createdAt",
+      key: "dueDate",
       className: "text-right text-xs text-slate-500",
       render: (r) => {
         const d = new Date(r.createdAt);
@@ -592,7 +599,7 @@ const PendingPayments = () => {
           <div className="flex items-center gap-2 text-slate-500 font-bold uppercase text-xs tracking-wider">
             <Filter className="w-4 h-4" /> Filter Pending Payments
           </div>
-          <div className="flex bg-slate-100 p-1 rounded-lg">
+          {pp.isToolbarVisible("filterMode") && (<div className="flex bg-slate-100 p-1 rounded-lg">
             <button
               onClick={() => setFilterMode("date_range")}
               className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${filterMode === "date_range" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
@@ -605,13 +612,13 @@ const PendingPayments = () => {
             >
               Month Wise
             </button>
-          </div>
+          </div>)}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 items-end">
           <div className="lg:col-span-2">
             {filterMode === "date_range" ? (
-              <div className="w-full">
+              pp.isToolbarVisible("dateRange") && (<div className="w-full">
                 <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">
                   Select Dates
                 </label>
@@ -620,10 +627,10 @@ const PendingPayments = () => {
                   endDate={filters.endDate}
                   onChange={handleDateRangeChange}
                 />
-              </div>
+              </div>)
             ) : (
               <div className="flex gap-3">
-                <div className="flex-1">
+                {pp.isToolbarVisible("monthFilter") && (<div className="flex-1">
                   <CustomDropdown
                     label="Select Month"
                     value={filters.month}
@@ -631,8 +638,8 @@ const PendingPayments = () => {
                     options={monthOptions}
                     icon={Calendar}
                   />
-                </div>
-                <div className="w-32">
+                </div>)}
+                {pp.isToolbarVisible("yearFilter") && (<div className="w-32">
                   <CustomDropdown
                     label="Select Year"
                     value={filters.year}
@@ -640,12 +647,12 @@ const PendingPayments = () => {
                     options={yearOptions}
                     icon={Calendar}
                   />
-                </div>
+                </div>)}
               </div>
             )}
           </div>
 
-          <div className="xl:col-span-1">
+          {pp.isToolbarVisible("buildingFilter") && (<div className="xl:col-span-1">
             <CustomDropdown
               label="Building"
               value={filters.building}
@@ -654,8 +661,8 @@ const PendingPayments = () => {
               icon={Building}
               searchable
             />
-          </div>
-          <div className="xl:col-span-1">
+          </div>)}
+          {pp.isToolbarVisible("workerFilter") && (<div className="xl:col-span-1">
             <CustomDropdown
               label="Worker"
               value={filters.worker}
@@ -664,10 +671,10 @@ const PendingPayments = () => {
               icon={User}
               searchable
             />
-          </div>
+          </div>)}
 
           <div className="xl:col-span-2 flex gap-2">
-            <button
+            {pp.isToolbarVisible("exportExcel") && (<button
               onClick={handleDownloadExcel}
               disabled={excelLoading}
               className="flex-1 h-[42px] bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-bold rounded-xl shadow-lg hover:shadow-green-200 transition-all flex items-center justify-center gap-2 disabled:opacity-70 text-xs"
@@ -678,8 +685,8 @@ const PendingPayments = () => {
                 <FileSpreadsheet className="w-4 h-4" />
               )}{" "}
               Excel
-            </button>
-            <button
+            </button>)}
+            {pp.isToolbarVisible("exportPdf") && (<button
               onClick={handleDownloadPDF}
               disabled={pdfLoading}
               className="flex-1 h-[42px] bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold rounded-xl shadow-lg hover:shadow-red-200 transition-all flex items-center justify-center gap-2 disabled:opacity-70 text-xs"
@@ -690,14 +697,14 @@ const PendingPayments = () => {
                 <FileText className="w-4 h-4" />
               )}{" "}
               PDF
-            </button>
+            </button>)}
           </div>
         </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
         <DataTable
-          columns={columns}
+          columns={pp.filterColumns(columns)}
           data={data}
           loading={loading}
           pagination={pagination}

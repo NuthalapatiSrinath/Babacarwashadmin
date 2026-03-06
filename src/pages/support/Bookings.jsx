@@ -17,6 +17,7 @@ import toast from "react-hot-toast";
 // Components
 import DataTable from "../../components/DataTable";
 import AssignWorkerModal from "../../components/modals/AssignWorkerModal";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 // Redux
 import {
@@ -31,6 +32,7 @@ import {
 const Bookings = () => {
   // Redux State
   const dispatch = useDispatch();
+  const pp = usePagePermissions("bookings");
   const { bookings, loading, error, total, currentPage, totalPages } =
     useSelector((state) => state.booking);
 
@@ -152,6 +154,7 @@ const Bookings = () => {
     {
       header: "Customer",
       accessor: "customer",
+      key: "customer",
       render: (row) => (
         <span className="font-bold text-sm text-slate-800">
           {row.customer?.mobile || "Unknown"}
@@ -161,6 +164,7 @@ const Bookings = () => {
     {
       header: "Date",
       accessor: "date",
+      key: "date",
       render: (row) => {
         const dateObj = row.date ? new Date(row.date) : null;
         return (
@@ -182,6 +186,7 @@ const Bookings = () => {
     {
       header: "Time",
       accessor: "time",
+      key: "time",
       render: (row) => {
         const dateObj = row.date ? new Date(row.date) : null;
         const timeStr =
@@ -206,6 +211,7 @@ const Bookings = () => {
     {
       header: "Vehicle",
       accessor: "vehicle",
+      key: "vehicle",
       render: (row) => {
         const v = row.vehicle || {};
         const regNo = v.registration_no || "-";
@@ -223,6 +229,7 @@ const Bookings = () => {
     {
       header: "Parking No",
       accessor: "parking_no",
+      key: "parking",
       render: (row) => {
         const parking = row.vehicle?.parking_no || row.parking_no || "-";
         return (
@@ -235,6 +242,7 @@ const Bookings = () => {
     {
       header: "Location",
       accessor: "premise",
+      key: "location",
       // ✅ CHANGED: Removed max-width restriction for wrapping
       className: "min-w-[180px] max-w-[280px]",
       render: (row) => {
@@ -265,6 +273,7 @@ const Bookings = () => {
     {
       header: "Worker",
       accessor: "worker",
+      key: "worker",
       // ✅ CHANGED: Added width constraints to force wrap if too long
       className: "min-w-[120px] max-w-[200px]",
       render: (row) => (
@@ -290,6 +299,7 @@ const Bookings = () => {
     {
       header: "Status",
       accessor: "status",
+      key: "status",
       className: "text-center",
       render: (row) => {
         const status = (row.status || "PENDING").toUpperCase();
@@ -314,15 +324,15 @@ const Bookings = () => {
         "text-right w-28 sticky right-0 bg-white shadow-[-5px_0_10px_-5px_rgba(0,0,0,0.05)]",
       render: (row) => (
         <div className="flex items-center justify-end gap-1 px-2">
-          <button
+          {pp.isActionVisible("assignWorker") && (<button
             onClick={() => handleOpenAssign(row)}
             className="p-1.5 hover:bg-blue-50 rounded text-slate-400 hover:text-blue-600 transition-colors"
             title="Assign Worker"
           >
             <UserPlus className="w-4 h-4" />
-          </button>
+          </button>)}
 
-          {row.status !== "accepted" && (
+          {pp.isActionVisible("accept") && row.status !== "accepted" && (
             <button
               onClick={() => handleAccept(row)}
               className="p-1.5 hover:bg-emerald-50 rounded text-slate-400 hover:text-emerald-600 transition-colors"
@@ -332,13 +342,13 @@ const Bookings = () => {
             </button>
           )}
 
-          <button
+          {pp.isActionVisible("delete") && (<button
             onClick={() => handleDelete(row)}
             className="p-1.5 hover:bg-red-50 rounded text-slate-400 hover:text-red-600 transition-colors"
             title="Delete"
           >
             <Trash2 className="w-4 h-4" />
-          </button>
+          </button>)}
         </div>
       ),
     },
@@ -350,7 +360,7 @@ const Bookings = () => {
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden flex flex-col flex-1">
         <DataTable
           title="Bookings"
-          columns={columns}
+          columns={pp.filterColumns(columns)}
           data={filteredBookings}
           loading={loading}
           pagination={{

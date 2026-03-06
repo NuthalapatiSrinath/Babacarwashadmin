@@ -14,11 +14,13 @@ import toast from "react-hot-toast";
 // Components
 import DataTable from "../../components/DataTable";
 import PricingModal from "../../components/modals/PricingModal";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 // API
 import { pricingService } from "../../api/pricingService";
 
 const Pricing = () => {
+  const pp = usePagePermissions("pricing");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
 
@@ -91,6 +93,7 @@ const Pricing = () => {
 
   const columns = [
     {
+      key: "serviceDetails",
       header: "Service Details",
       accessor: "service_type",
       className: "w-64 align-top py-4",
@@ -138,6 +141,7 @@ const Pricing = () => {
     },
 
     {
+      key: "pricingStructure",
       header: "Pricing Structure",
       accessor: "pricing",
       className: "align-top py-4",
@@ -207,25 +211,26 @@ const Pricing = () => {
     },
 
     {
+      key: "actions",
       header: "Actions",
       className: "text-right w-24 align-top py-4",
       render: (row) => (
         <div className="flex justify-end gap-2">
-          <button
+          {pp.isActionVisible("edit") && <button
             onClick={() => handleEdit(row)}
             className="p-2 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white border border-indigo-100 transition-all shadow-sm"
             title="Edit"
           >
             <Edit2 className="w-4 h-4" />
-          </button>
+          </button>}
 
-          <button
+          {pp.isActionVisible("delete") && <button
             onClick={() => handleDelete(row)}
             className="p-2 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white border border-rose-100 transition-all shadow-sm"
             title="Delete"
           >
             <Trash2 className="w-4 h-4" />
-          </button>
+          </button>}
         </div>
       ),
     },
@@ -250,19 +255,19 @@ const Pricing = () => {
           </div>
         </div>
       </div> */}
-      <button
+      {pp.isToolbarVisible("addPrice") && <button
         onClick={handleCreate}
         className="h-11 px-6 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl font-bold text-sm flex items-center gap-2 shadow-md hover:shadow-xl transition-all active:scale-95"
       >
         <Plus className="w-5 h-5" />
         <span>Add New Price</span>
-      </button>
+      </button>}
       {/* </div> */}
 
       {/* TABLE SECTION */}
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
         <DataTable
-          columns={columns}
+          columns={pp.filterColumns(columns)}
           data={data}
           loading={loading}
           hideSearch={true}

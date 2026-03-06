@@ -41,6 +41,7 @@ import EditPaymentAmountModal from "../../components/modals/EditPaymentAmountMod
 import PaymentHistoryModal from "../../components/modals/PaymentHistoryModal";
 import RichDateRangePicker from "../../components/inputs/RichDateRangePicker";
 import CustomDropdown from "../../components/ui/CustomDropdown"; // Import CustomDropdown
+import usePagePermissions from "../../utils/usePagePermissions";
 
 // API
 import { buildingService } from "../../api/buildingService";
@@ -62,6 +63,7 @@ import { paymentService } from "../../api/paymentService";
 const ResidencePayments = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const pp = usePagePermissions("payments_residence");
 
   const { payments, stats, loading, total } = useSelector(
     (state) => state.residencePayment,
@@ -768,6 +770,7 @@ Are you sure you want to proceed?`;
   // --- COLUMNS ---
   const columns = [
     {
+      key: "receipt",
       header: "Rcpt#", // Receipt Number
       accessor: "receipt_no",
       className: "w-20 text-center",
@@ -797,6 +800,7 @@ Are you sure you want to proceed?`;
       },
     },
     {
+      key: "billDate",
       header: "Bill Date",
       accessor: "createdAt",
       className: "w-28",
@@ -822,6 +826,7 @@ Are you sure you want to proceed?`;
       },
     },
     {
+      key: "paidDate",
       header: "Paid Date",
       accessor: "collectedDate",
       className: "w-28",
@@ -939,6 +944,7 @@ Are you sure you want to proceed?`;
       },
     },
     {
+      key: "vehicle",
       header: "Vehicle Info",
       accessor: "vehicle.registration_no",
       render: (row) => (
@@ -953,6 +959,7 @@ Are you sure you want to proceed?`;
       ),
     },
     {
+      key: "building",
       header: "Building",
       accessor: "building.name",
       render: (row) => (
@@ -965,6 +972,7 @@ Are you sure you want to proceed?`;
       ),
     },
     {
+      key: "subscription",
       header: "Subscription Amount",
       accessor: "amount_charged",
       className: "text-right",
@@ -975,6 +983,7 @@ Are you sure you want to proceed?`;
       ),
     },
     {
+      key: "previousDue",
       header: "Previous Payment Due",
       accessor: "old_balance",
       className: "text-right",
@@ -983,6 +992,7 @@ Are you sure you want to proceed?`;
       ),
     },
     {
+      key: "totalDue",
       header: "Total Amount Due",
       accessor: "total_amount",
       className: "text-right",
@@ -994,6 +1004,7 @@ Are you sure you want to proceed?`;
       ),
     },
     {
+      key: "paid",
       header: "Paid",
       accessor: "amount_paid",
       className: "text-right",
@@ -1005,6 +1016,7 @@ Are you sure you want to proceed?`;
       ),
     },
     {
+      key: "balance",
       header: "Balance",
       accessor: "balance",
       className: "text-right",
@@ -1038,6 +1050,7 @@ Are you sure you want to proceed?`;
       },
     },
     {
+      key: "mode",
       header: "Mode",
       accessor: "payment_mode",
       className: "text-center",
@@ -1049,6 +1062,7 @@ Are you sure you want to proceed?`;
         ) : null,
     },
     {
+      key: "status",
       header: "Status",
       accessor: "status",
       className: "text-center w-24",
@@ -1068,6 +1082,7 @@ Are you sure you want to proceed?`;
       },
     },
     {
+      key: "settle",
       header: "Settle",
       accessor: "settled",
       className: "text-center w-24",
@@ -1085,6 +1100,7 @@ Are you sure you want to proceed?`;
       },
     },
     {
+      key: "worker",
       header: "Worker",
       accessor: "worker.name",
       render: (row) => {
@@ -1105,6 +1121,7 @@ Are you sure you want to proceed?`;
       },
     },
     {
+      key: "remarks",
       header: "Remarks",
       accessor: "notes",
       className: "max-w-[200px]",
@@ -1127,6 +1144,7 @@ Are you sure you want to proceed?`;
       ),
     },
     {
+      key: "customerNotes",
       header: "Customer Notes",
       accessor: "customer.notes",
       className: "max-w-[250px]",
@@ -1156,6 +1174,7 @@ Are you sure you want to proceed?`;
     },
     // ✅ Use receipt_no from backend
     {
+      key: "invoice",
       header: "Invoice",
       className: "text-center w-16",
       render: (row, idx) => {
@@ -1172,6 +1191,7 @@ Are you sure you want to proceed?`;
     },
     // ✅ Receipt only if Completed, use receipt_no from backend
     {
+      key: "receiptLink",
       header: "Receipt",
       className: "text-center w-16",
       render: (row, idx) => {
@@ -1190,37 +1210,38 @@ Are you sure you want to proceed?`;
       },
     },
     {
+      key: "actions",
       header: "Actions",
       className:
         "text-right w-24 sticky right-4 bg-white shadow-[-5px_0_10px_-5px_rgba(0,0,0,0.05)]",
       render: (row) => (
         <div className="flex items-center justify-end gap-1 px-2">
-          <button
+          {pp.isActionVisible("view") && <button
             onClick={() => handleViewDetails(row)}
             className="p-1.5 hover:bg-blue-50 rounded-lg text-slate-400 hover:text-blue-600 transition-colors"
           >
             <Eye className="w-3.5 h-3.5" />
-          </button>
-          <button
+          </button>}
+          {pp.isActionVisible("edit") && <button
             onClick={() => handleEdit(row)}
             className="p-1.5 hover:bg-indigo-50 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors"
             title="Collect Payment"
           >
             <Edit2 className="w-3.5 h-3.5" />
-          </button>
-          <button
+          </button>}
+          {pp.isActionVisible("editAmount") && <button
             onClick={() => handleEditAmount(row)}
             className="p-1.5 hover:bg-amber-50 rounded-lg text-slate-400 hover:text-amber-600 transition-colors"
             title="Edit Amount"
           >
             <Calculator className="w-3.5 h-3.5" />
-          </button>
-          <button
+          </button>}
+          {pp.isActionVisible("delete") && <button
             onClick={() => handleDelete(row)}
             className="p-1.5 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-600 transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          </button>}
         </div>
       ),
     },
@@ -1291,7 +1312,7 @@ Are you sure you want to proceed?`;
               </div>
 
               {/* GENERATE INVOICES BUTTON */}
-              <button
+              {pp.isToolbarVisible("invoiceModal") && <button
                 onClick={handleOpenInvoiceModal}
                 disabled={runningInvoice}
                 className={`h-10 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all ${
@@ -1309,10 +1330,10 @@ Are you sure you want to proceed?`;
                     Generate Invoices
                   </>
                 )}
-              </button>
+              </button>}
 
               {/* MARK ALL PAID BUTTON */}
-              <button
+              {pp.isToolbarVisible("bulkMarkPaid") && <button
                 onClick={handleBulkMarkPaid}
                 disabled={isMarkingPaid}
                 className={`h-10 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all ${
@@ -1321,10 +1342,10 @@ Are you sure you want to proceed?`;
               >
                 <CheckSquare className="w-4 h-4" />
                 {isMarkingPaid ? "Updating..." : `Mark Status This Page Paid`}
-              </button>
+              </button>}
 
               {/* MONTH-END CLOSE BUTTON */}
-              <button
+              {pp.isToolbarVisible("monthEndClose") && <button
                 onClick={handleMonthCloseClick}
                 disabled={isClosingMonth}
                 className={`h-10 px-4 bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all ${
@@ -1334,18 +1355,18 @@ Are you sure you want to proceed?`;
               >
                 <Calendar className="w-4 h-4" />
                 {isClosingMonth ? "Closing..." : "Month-End Close"}
-              </button>
+              </button>}
 
               {/* EDIT HISTORY BUTTON */}
-              <button
+              {pp.isToolbarVisible("editHistory") && <button
                 onClick={() => navigate("/payments/edit-history")}
                 className="h-10 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
               >
                 <Clock className="w-4 h-4" /> Edit History
-              </button>
+              </button>}
 
               {/* SETTLE ALL BUTTON */}
-              <button
+              {pp.isToolbarVisible("bulkSettle") && <button
                 onClick={handleBulkSettle}
                 disabled={isSettling}
                 className={`h-10 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all ${
@@ -1354,22 +1375,22 @@ Are you sure you want to proceed?`;
               >
                 <CheckCircle2 className="w-4 h-4" />
                 {isSettling ? "Settling..." : `Mark Settle This Page Payments `}
-              </button>
+              </button>}
 
-              <button
+              {pp.isToolbarVisible("exportExcel") && <button
                 onClick={handleExport}
                 className="h-10 px-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
               >
                 <Download className="w-4 h-4" /> Export Excel
-              </button>
+              </button>}
 
               {/* PDF EXPORT BUTTON */}
-              <button
+              {pp.isToolbarVisible("exportPdf") && <button
                 onClick={handleExportPDF}
                 className="h-10 px-4 bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
               >
                 <FileText className="w-4 h-4" /> Export PDF
-              </button>
+              </button>}
             </div>
           </div>
 
@@ -1445,7 +1466,7 @@ Are you sure you want to proceed?`;
 
             <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
               {/* Building Dropdown */}
-              <div>
+              {pp.isToolbarVisible("buildingFilter") && <div>
                 <CustomDropdown
                   label="Building"
                   value={filters.building}
@@ -1461,10 +1482,10 @@ Are you sure you want to proceed?`;
                   placeholder="All Buildings"
                   searchable={true}
                 />
-              </div>
+              </div>}
 
               {/* Payment Status Dropdown (CustomDropdown) */}
-              <div>
+              {pp.isToolbarVisible("statusFilter") && <div>
                 <CustomDropdown
                   label="Payment Status"
                   value={filters.status}
@@ -1473,10 +1494,10 @@ Are you sure you want to proceed?`;
                   icon={Filter}
                   placeholder="All Status"
                 />
-              </div>
+              </div>}
 
               {/* Payment Mode Dropdown */}
-              <div>
+              {pp.isToolbarVisible("paymentModeFilter") && <div>
                 <CustomDropdown
                   label="Payment Mode"
                   value={filters.payment_mode}
@@ -1492,10 +1513,10 @@ Are you sure you want to proceed?`;
                   icon={CreditCard}
                   placeholder="All Modes"
                 />
-              </div>
+              </div>}
 
               {/* Assigned Worker Dropdown (CustomDropdown) */}
-              <div>
+              {pp.isToolbarVisible("workerFilter") && <div>
                 <CustomDropdown
                   label="Assigned Worker"
                   value={filters.worker}
@@ -1505,10 +1526,10 @@ Are you sure you want to proceed?`;
                   placeholder="All Workers"
                   searchable={true}
                 />
-              </div>
+              </div>}
             </div>
 
-            <div className="w-full xl:w-64 relative">
+            {pp.isToolbarVisible("search") && <div className="w-full xl:w-64 relative">
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">
                 Search
               </label>
@@ -1522,14 +1543,14 @@ Are you sure you want to proceed?`;
                   className="w-full h-11 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all"
                 />
               </div>
-            </div>
+            </div>}
           </div>
         </div>
 
         {/* --- TABLE --- */}
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden flex flex-col flex-1">
           <DataTable
-            columns={columns}
+            columns={pp.filterColumns(columns)}
             data={filteredPayments}
             loading={loading}
             pagination={pagination}

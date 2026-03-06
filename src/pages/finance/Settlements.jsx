@@ -11,6 +11,7 @@ import {
 } from "lucide-react"; // Removed extra Search icon import
 import toast from "react-hot-toast";
 import DataTable from "../../components/DataTable";
+import usePagePermissions from "../../utils/usePagePermissions";
 import {
   fetchSettlements,
   approveSettlement,
@@ -20,6 +21,7 @@ import {
 
 const Settlements = () => {
   const dispatch = useDispatch();
+  const pp = usePagePermissions("settlements");
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [currency, setCurrency] = useState("AED"); // Default Currency
   const [searchTerm, setSearchTerm] = useState(""); // Search State
@@ -191,7 +193,7 @@ const Settlements = () => {
       render: (row) => (
         <div className="flex justify-end">
           {row.status !== "completed" ? (
-            <button
+            pp.isActionVisible("approve") && <button
               onClick={() => handleApproveClick(row)}
               className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-md hover:shadow-lg transition-all active:scale-95 flex items-center gap-1"
             >
@@ -213,7 +215,7 @@ const Settlements = () => {
       {/* TABLE with Built-in Search */}
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
         <DataTable
-          columns={columns}
+          columns={pp.filterColumns(columns)}
           data={filteredSettlements}
           loading={loading}
           pagination={{

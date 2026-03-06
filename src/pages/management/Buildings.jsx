@@ -17,8 +17,10 @@ import DeleteModal from "../../components/modals/DeleteModal";
 
 // API
 import { buildingService } from "../../api/buildingService";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 const Buildings = () => {
+  const pp = usePagePermissions("buildings");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [currency, setCurrency] = useState("AED"); // Default currency state
@@ -140,6 +142,7 @@ const Buildings = () => {
   // --- Columns ---
   const columns = [
     {
+      key: "name",
       header: "Building Name",
       accessor: "name",
       render: (row) => (
@@ -152,6 +155,7 @@ const Buildings = () => {
       ),
     },
     {
+      key: "location",
       header: "Location",
       accessor: "location",
       render: (row) => (
@@ -169,6 +173,7 @@ const Buildings = () => {
       ),
     },
     {
+      key: "amount",
       header: "Amount",
       accessor: "amount",
       render: (row) => (
@@ -182,6 +187,7 @@ const Buildings = () => {
       ),
     },
     {
+      key: "cardCharges",
       header: "Card Charges",
       accessor: "card_charges",
       render: (row) => (
@@ -191,6 +197,7 @@ const Buildings = () => {
       ),
     },
     {
+      key: "scheduled",
       header: "Scheduled",
       accessor: "schedule_today",
       render: (row) =>
@@ -205,11 +212,13 @@ const Buildings = () => {
         ),
     },
     {
+      key: "actions",
       header: "Actions",
       className:
         "text-right w-24 sticky right-0 bg-white shadow-[-5px_0_10px_-5px_rgba(0,0,0,0.05)]",
       render: (row) => (
         <div className="flex justify-end gap-1.5 pr-2">
+          {pp.isActionVisible("edit") && (
           <button
             onClick={() => handleEdit(row)}
             className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg transition-all"
@@ -217,6 +226,8 @@ const Buildings = () => {
           >
             <Edit2 className="w-4 h-4" />
           </button>
+          )}
+          {pp.isActionVisible("delete") && (
           <button
             onClick={() => openDeleteModal(row)}
             className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-all"
@@ -224,6 +235,7 @@ const Buildings = () => {
           >
             <Trash2 className="w-4 h-4" />
           </button>
+          )}
         </div>
       ),
     },
@@ -235,7 +247,7 @@ const Buildings = () => {
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
         <DataTable
           title="Buildings Management"
-          columns={columns}
+          columns={pp.filterColumns(columns)}
           data={getDisplayData()}
           loading={loading}
           pagination={pagination}
@@ -244,7 +256,7 @@ const Buildings = () => {
           }
           onLimitChange={(newLimit) => fetchData(1, newLimit, currentSearch)}
           onSearch={(term) => fetchData(1, pagination.limit, term)}
-          actionButton={
+          actionButton={pp.isToolbarVisible("addBuilding") ?
             <button
               onClick={handleAdd}
               className="h-10 px-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all active:scale-95 whitespace-nowrap"
@@ -252,7 +264,7 @@ const Buildings = () => {
               <Plus className="w-4 h-4" />
               Add Building
             </button>
-          }
+          : null}
         />
       </div>
 

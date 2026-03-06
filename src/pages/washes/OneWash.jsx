@@ -28,8 +28,10 @@ import CustomDropdown from "../../components/ui/CustomDropdown";
 
 import { oneWashService } from "../../api/oneWashService";
 import { workerService } from "../../api/workerService";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 const OneWash = () => {
+  const pp = usePagePermissions("washes_onewash");
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [data, setData] = useState([]);
@@ -355,6 +357,7 @@ const OneWash = () => {
   // --- COLUMNS ---
   const columns = [
     {
+      key: "date",
       header: "Date",
       accessor: "createdAt",
       render: (row) => (
@@ -370,6 +373,7 @@ const OneWash = () => {
       ),
     },
     {
+      key: "vehicleNo",
       header: "Vehicle No",
       accessor: "registration_no",
       render: (row) => (
@@ -379,6 +383,7 @@ const OneWash = () => {
       ),
     },
     {
+      key: "parkingNo",
       header: "Parking No",
       accessor: "parking_no",
       render: (row) => (
@@ -388,6 +393,7 @@ const OneWash = () => {
       ),
     },
     {
+      key: "serviceType",
       header: "Service Type",
       accessor: "display_service_type",
       className: "text-center",
@@ -422,6 +428,7 @@ const OneWash = () => {
       },
     },
     {
+      key: "originalAmount",
       header: "Original Amount",
       accessor: "original_amount",
       render: (row) => (
@@ -434,6 +441,7 @@ const OneWash = () => {
       ),
     },
     {
+      key: "tip",
       header: "Tip",
       accessor: "tip_amount",
       className: "text-right",
@@ -450,6 +458,7 @@ const OneWash = () => {
       },
     },
     {
+      key: "totalAmount",
       header: "Total Amount",
       accessor: "amount",
       render: (row) => (
@@ -462,6 +471,7 @@ const OneWash = () => {
       ),
     },
     {
+      key: "paymentMode",
       header: "Payment Mode",
       accessor: "payment_mode",
       render: (row) => (
@@ -471,6 +481,7 @@ const OneWash = () => {
       ),
     },
     {
+      key: "status",
       header: "Status",
       accessor: "status",
       render: (row) => (
@@ -484,6 +495,7 @@ const OneWash = () => {
       ),
     },
     {
+      key: "mallBuilding",
       header: "Mall/Building",
       accessor: "location",
       render: (row) => {
@@ -493,6 +505,7 @@ const OneWash = () => {
       },
     },
     {
+      key: "worker",
       header: "Worker",
       accessor: "worker.name",
       render: (row) => (
@@ -502,10 +515,12 @@ const OneWash = () => {
       ),
     },
     {
+      key: "actions",
       header: "Actions",
       className: "text-right w-24 sticky right-0 bg-white",
       render: (row) => (
         <div className="flex justify-end gap-2 pr-2">
+          {pp.isActionVisible("edit") && (
           <button
             onClick={() => handleEdit(row)}
             className="hover:text-indigo-600 text-slate-400 transition-colors"
@@ -513,6 +528,8 @@ const OneWash = () => {
           >
             <Edit2 className="w-4 h-4" />
           </button>
+          )}
+          {pp.isActionVisible("delete") && (
           <button
             onClick={() => handleDelete(row._id)}
             className="hover:text-red-600 text-slate-400 transition-colors"
@@ -520,6 +537,7 @@ const OneWash = () => {
           >
             <Trash2 className="w-4 h-4" />
           </button>
+          )}
         </div>
       ),
     },
@@ -629,6 +647,7 @@ const OneWash = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          {pp.isToolbarVisible("export") && (
           <button
             onClick={handleExport}
             disabled={exporting}
@@ -641,17 +660,21 @@ const OneWash = () => {
             )}{" "}
             Export
           </button>
+          )}
+          {pp.isToolbarVisible("addJob") && (
           <button
             onClick={handleCreate}
             className="h-11 px-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transition-all active:scale-95 flex items-center gap-2"
           >
             <Plus className="w-4 h-4" /> New Job
           </button>
+          )}
         </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden flex flex-col">
         <div className="p-4 border-b border-gray-100 bg-slate-50/50 flex flex-col xl:flex-row gap-4 items-end">
+          {pp.isToolbarVisible("dateRange") && (
           <div className="w-full xl:w-auto">
             <span className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
               Date Range
@@ -662,8 +685,10 @@ const OneWash = () => {
               onChange={handleDateChange}
             />
           </div>
+          )}
 
           <div className="flex-[2] grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
+            {pp.isToolbarVisible("serviceTypeFilter") && (
             <div>
               <CustomDropdown
                 label="Service Type"
@@ -676,6 +701,8 @@ const OneWash = () => {
                 placeholder="All Services"
               />
             </div>
+            )}
+            {pp.isToolbarVisible("paymentModeFilter") && (
             <div>
               <CustomDropdown
                 label="Payment Mode"
@@ -693,6 +720,8 @@ const OneWash = () => {
                 placeholder="All Modes"
               />
             </div>
+            )}
+            {pp.isToolbarVisible("washTypeFilter") && (
             <div>
               <CustomDropdown
                 label="Wash Type"
@@ -707,6 +736,8 @@ const OneWash = () => {
                 placeholder="All Types"
               />
             </div>
+            )}
+            {pp.isToolbarVisible("workerFilter") && (
             <div>
               <CustomDropdown
                 label="Worker"
@@ -718,8 +749,10 @@ const OneWash = () => {
                 searchable={true}
               />
             </div>
+            )}
           </div>
 
+          {pp.isToolbarVisible("search") && (
           <div className="w-full xl:w-48">
             <span className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
               Search
@@ -735,10 +768,11 @@ const OneWash = () => {
               />
             </div>
           </div>
+          )}
         </div>
 
         <DataTable
-          columns={columns}
+          columns={pp.filterColumns(columns)}
           data={data.filter((row) => {
             // Re-implement search logic here because filteredData variable was removed
             // to simplify the flow and rely on 'data' state which is updated by fetchData

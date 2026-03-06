@@ -23,9 +23,11 @@ import { downloadCollectionSheet } from "../../redux/slices/collectionSheetSlice
 // Custom Components
 import CustomDropdown from "../../components/ui/CustomDropdown";
 import { paymentService } from "../../api/paymentService";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 const CollectionSheet = () => {
   const dispatch = useDispatch();
+  const pp = usePagePermissions("collectionSheet");
 
   const { buildings } = useSelector((state) => state.building);
   const { workers } = useSelector((state) => state.worker);
@@ -406,7 +408,7 @@ const CollectionSheet = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 items-end">
-            <div className="md:col-span-1">
+            {pp.isToolbarVisible("serviceTypeFilter") && (<div className="md:col-span-1">
               <CustomDropdown
                 label="Service Type"
                 value={filters.serviceType}
@@ -417,8 +419,8 @@ const CollectionSheet = () => {
                 ]}
                 icon={Layers}
               />
-            </div>
-            <div className="md:col-span-1 xl:col-span-1">
+            </div>)}
+            {pp.isToolbarVisible("buildingFilter") && (<div className="md:col-span-1 xl:col-span-1">
               <CustomDropdown
                 label="Building"
                 value={filters.building}
@@ -427,8 +429,8 @@ const CollectionSheet = () => {
                 icon={Building}
                 searchable
               />
-            </div>
-            <div className="md:col-span-1 xl:col-span-1">
+            </div>)}
+            {pp.isToolbarVisible("workerFilter") && (<div className="md:col-span-1 xl:col-span-1">
               <CustomDropdown
                 label="Worker"
                 value={filters.worker}
@@ -437,8 +439,8 @@ const CollectionSheet = () => {
                 icon={User}
                 searchable
               />
-            </div>
-            <div className="md:col-span-1">
+            </div>)}
+            {pp.isToolbarVisible("monthFilter") && (<div className="md:col-span-1">
               <CustomDropdown
                 label="Month"
                 value={filters.month}
@@ -447,18 +449,18 @@ const CollectionSheet = () => {
                 icon={Calendar}
                 disabled={availableMonths.length === 0}
               />
-            </div>
-            <div className="md:col-span-1">
+            </div>)}
+            {pp.isToolbarVisible("yearFilter") && (<div className="md:col-span-1">
               <CustomDropdown
                 label="Year"
                 value={filters.year}
                 onChange={(val) => handleFilterChange("year", Number(val))}
-                options={yearOptions} // ✅ This is the variable that was missing before
+                options={yearOptions}
                 icon={Calendar}
               />
-            </div>
+            </div>)}
             <div className="md:col-span-1 flex gap-2">
-              <button
+              {pp.isToolbarVisible("exportExcel") && (<button
                 onClick={handleDownloadExcel}
                 disabled={
                   downloading ||
@@ -473,8 +475,8 @@ const CollectionSheet = () => {
                   <FileSpreadsheet className="w-4 h-4" />
                 )}{" "}
                 Excel
-              </button>
-              <button
+              </button>)}
+              {pp.isToolbarVisible("exportPdf") && (<button
                 onClick={handleDownloadPDF}
                 disabled={
                   pdfLoading ||
@@ -489,7 +491,7 @@ const CollectionSheet = () => {
                   <FileText className="w-4 h-4" />
                 )}{" "}
                 PDF
-              </button>
+              </button>)}
             </div>
           </div>
         </div>

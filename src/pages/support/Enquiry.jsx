@@ -22,6 +22,7 @@ import DataTable from "../../components/DataTable";
 import EnquiryModal from "../../components/modals/EnquiryModal";
 import DeleteModal from "../../components/modals/DeleteModal";
 import RichDateRangePicker from "../../components/inputs/RichDateRangePicker";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 // Redux
 import {
@@ -36,6 +37,7 @@ import { fetchWorkers } from "../../redux/slices/workerSlice";
 const Enquiry = () => {
   // Redux State
   const dispatch = useDispatch();
+  const pp = usePagePermissions("enquiry");
   const { enquiries, loading, error, total, currentPage, totalPages } =
     useSelector((state) => state.enquiry);
   const { workers } = useSelector((state) => state.worker);
@@ -217,6 +219,7 @@ const Enquiry = () => {
     {
       header: "Date & Time",
       accessor: "createdAt",
+      key: "dateTime",
       render: (row) => {
         const dateObj = new Date(row.createdAt);
         return (
@@ -242,6 +245,7 @@ const Enquiry = () => {
     {
       header: "Customer Mobile",
       accessor: "mobile",
+      key: "customer",
       render: (row) => (
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
@@ -256,6 +260,7 @@ const Enquiry = () => {
     {
       header: "Vehicle Details",
       accessor: "registration_no",
+      key: "vehicle",
       render: (row) => {
         // Debug logging
         console.log("🚗 Row data:", {
@@ -300,6 +305,7 @@ const Enquiry = () => {
     {
       header: "Worker",
       accessor: "worker",
+      key: "worker",
       render: (row) => {
         // Show first vehicle's worker or "Unassigned"
         const firstVehicle =
@@ -323,6 +329,7 @@ const Enquiry = () => {
     {
       header: "Status",
       accessor: "status",
+      key: "status",
       render: (row) => {
         const status = (row.status || "pending").toLowerCase();
 
@@ -363,20 +370,20 @@ const Enquiry = () => {
         "text-right w-24 sticky right-0 bg-white shadow-[-5px_0_10px_-5px_rgba(0,0,0,0.05)]",
       render: (row) => (
         <div className="flex justify-end gap-1.5 pr-2">
-          <button
+          {pp.isActionVisible("edit") && (<button
             onClick={() => handleEdit(row)}
             className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg transition-all"
             title="View/Edit Enquiry"
           >
             <Plus className="w-4 h-4" />
-          </button>
-          <button
+          </button>)}
+          {pp.isActionVisible("delete") && (<button
             onClick={() => openDeleteModal(row)}
             className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-all"
             title="Delete"
           >
             <Trash2 className="w-4 h-4" />
-          </button>
+          </button>)}
         </div>
       ),
     },
@@ -390,7 +397,7 @@ const Enquiry = () => {
         <div className="border-b border-gray-100 bg-slate-50/50 p-5">
           <div className="flex flex-col lg:flex-row gap-4 items-end">
             {/* 1. Date Range Picker */}
-            <div className="w-full lg:w-auto min-w-[280px]">
+            {pp.isToolbarVisible("dateRange") && (<div className="w-full lg:w-auto min-w-[280px]">
               <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
                 Date Range
               </label>
@@ -399,12 +406,12 @@ const Enquiry = () => {
                 endDate={filters.endDate}
                 onChange={handleDateChange}
               />
-            </div>
+            </div>)}
 
             {/* 2. Filters Wrapper */}
             <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
               {/* Status Filter */}
-              <div className="relative group">
+              {pp.isToolbarVisible("statusFilter") && (<div className="relative group">
                 <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
                   Status
                 </label>
@@ -422,10 +429,10 @@ const Enquiry = () => {
                   </select>
                   <Filter className="absolute right-3.5 top-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
                 </div>
-              </div>
+              </div>)}
 
               {/* Worker Filter */}
-              <div className="relative group">
+              {pp.isToolbarVisible("workerFilter") && (<div className="relative group">
                 <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
                   Assigned Worker
                 </label>
@@ -445,11 +452,11 @@ const Enquiry = () => {
                   </select>
                   <User className="absolute right-3.5 top-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
                 </div>
-              </div>
+              </div>)}
             </div>
 
             {/* 3. Search Bar */}
-            <div className="w-full lg:w-72">
+            {pp.isToolbarVisible("search") && (<div className="w-full lg:w-72">
               <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
                 Search Table
               </label>
@@ -463,14 +470,14 @@ const Enquiry = () => {
                   className="w-full h-11 pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all"
                 />
               </div>
-            </div>
+            </div>)}
           </div>
         </div>
 
         {/* --- DATATABLE --- */}
         <DataTable
           title="Enquiries"
-          columns={columns}
+          columns={pp.filterColumns(columns)}
           data={filteredData}
           loading={loading}
           pagination={{
@@ -483,6 +490,7 @@ const Enquiry = () => {
           onLimitChange={handleLimitChange}
           hideSearch={true}
           actionButton={
+            pp.isToolbarVisible("addEnquiry") ? (
             <button
               onClick={handleCreate}
               className="h-10 px-5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all active:scale-95 whitespace-nowrap"
@@ -490,6 +498,7 @@ const Enquiry = () => {
               <Plus className="w-4 h-4" />
               New Enquiry
             </button>
+            ) : null
           }
         />
       </div>

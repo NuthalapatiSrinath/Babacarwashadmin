@@ -35,9 +35,11 @@ import CustomDropdown from "../../components/ui/CustomDropdown";
 
 // API
 import { staffService } from "../../api/staffService";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 const Staff = () => {
   const navigate = useNavigate();
+  const pp = usePagePermissions("staff");
   const fileInputRef = useRef(null);
 
   // --- STATE ---
@@ -321,6 +323,7 @@ const Staff = () => {
 
   const columns = [
     {
+      key: "name",
       header: "Staff Member",
       className: "min-w-[280px]",
       render: (r) => (
@@ -365,6 +368,7 @@ const Staff = () => {
       ),
     },
     {
+      key: "mobile",
       header: "Mobile",
       render: (r) => (
         <span className="text-sm font-bold text-slate-600 font-mono tracking-tight">
@@ -373,6 +377,7 @@ const Staff = () => {
       ),
     },
     {
+      key: "company",
       header: "Company",
       render: (r) => (
         <div className="flex items-center gap-3">
@@ -387,6 +392,7 @@ const Staff = () => {
     },
     // ✅ NEW: Assigned Locations (Site & Mall)
     {
+      key: "site",
       header: "Assigned Locations",
       render: (r) => (
         <div className="flex flex-col gap-1.5">
@@ -419,6 +425,7 @@ const Staff = () => {
       ),
     },
     {
+      key: "documents",
       header: "Passport Expiry",
       render: (r) => {
         const style = getDocStatusStyle(r.passportExpiry);
@@ -433,6 +440,7 @@ const Staff = () => {
       },
     },
     {
+      key: "documents",
       header: "Visa Expiry",
       render: (r) => {
         const style = getDocStatusStyle(r.visaExpiry);
@@ -447,6 +455,7 @@ const Staff = () => {
       },
     },
     {
+      key: "documents",
       header: "EID Expiry",
       render: (r) => {
         const style = getDocStatusStyle(r.emiratesIdExpiry);
@@ -461,16 +470,20 @@ const Staff = () => {
       },
     },
     {
+      key: "actions",
       header: "Actions",
       className: "text-right",
       render: (r) => (
         <div className="flex justify-end gap-2 pr-2 items-center h-full">
+          {pp.isActionVisible("view") && (
           <button
             onClick={() => navigate(`/workers/staff/${r._id}`)}
             className="p-2 bg-indigo-50 border border-indigo-100 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl transition-all shadow-sm"
           >
             <Eye className="w-4 h-4" />
           </button>
+          )}
+          {pp.isActionVisible("edit") && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -481,6 +494,8 @@ const Staff = () => {
           >
             <Edit2 className="w-4 h-4" />
           </button>
+          )}
+          {pp.isActionVisible("delete") && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -491,6 +506,7 @@ const Staff = () => {
           >
             <Trash2 className="w-4 h-4" />
           </button>
+          )}
         </div>
       ),
     },
@@ -506,6 +522,7 @@ const Staff = () => {
       />
       <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 mb-6 relative z-20">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+          {pp.isToolbarVisible("search") && (
           <div className="relative w-full lg:w-96 group">
             <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
             <input
@@ -516,8 +533,10 @@ const Staff = () => {
               className="w-full h-12 pl-12 pr-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all shadow-inner"
             />
           </div>
+          )}
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
             <div className="flex bg-slate-50 p-1 rounded-2xl border border-slate-100">
+              {pp.isToolbarVisible("export") && (
               <button
                 onClick={handleExportData}
                 className="h-10 px-4 text-slate-600 hover:text-blue-600 rounded-xl text-[11px] font-black uppercase tracking-tighter flex items-center gap-2 transition-all hover:bg-white hover:shadow-sm"
@@ -525,6 +544,8 @@ const Staff = () => {
                 <Download className="w-3.5 h-3.5" />{" "}
                 <span className="hidden sm:inline">Export</span>
               </button>
+              )}
+              {pp.isToolbarVisible("export") && (
               <button
                 onClick={handleDownloadTemplate}
                 className="h-10 px-4 text-slate-600 hover:text-emerald-600 rounded-xl text-[11px] font-black uppercase tracking-tighter flex items-center gap-2 transition-all hover:bg-white hover:shadow-sm"
@@ -532,6 +553,8 @@ const Staff = () => {
                 <FileSpreadsheet className="w-3.5 h-3.5" />{" "}
                 <span className="hidden sm:inline">Template</span>
               </button>
+              )}
+              {pp.isToolbarVisible("import") && (
               <button
                 onClick={() => fileInputRef.current.click()}
                 className="h-10 px-4 text-slate-600 hover:text-indigo-600 rounded-xl text-[11px] font-black uppercase tracking-tighter flex items-center gap-2 transition-all hover:bg-white hover:shadow-sm"
@@ -543,7 +566,9 @@ const Staff = () => {
                 )}{" "}
                 <span className="hidden sm:inline">Import</span>
               </button>
+              )}
             </div>
+            {pp.isToolbarVisible("addStaff") && (
             <button
               onClick={() => {
                 setSelectedStaff(null);
@@ -553,6 +578,7 @@ const Staff = () => {
             >
               <Plus className="w-4 h-4" /> Add Staff
             </button>
+            )}
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -635,7 +661,7 @@ const Staff = () => {
       )}
       <div className="bg-white rounded-[32px] shadow-2xl shadow-slate-200/50 border border-slate-100/60 overflow-hidden relative z-10">
         <DataTable
-          columns={columns}
+          columns={pp.filterColumns(columns)}
           data={filteredData}
           loading={loading}
           pagination={pagination}

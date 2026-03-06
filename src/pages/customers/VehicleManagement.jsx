@@ -15,10 +15,12 @@ import toast from "react-hot-toast";
 import { vehicleCatalogService } from "../../api/vehicleCatalogService";
 import ModalManager from "../../components/modals/ModalManager";
 import DeleteModal from "../../components/modals/DeleteModal";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 const API_BASE = "https://api.babacarwash.com";
 
 const VehicleManagement = () => {
+  const pp = usePagePermissions("vehicles");
   // ============== STATE ==============
   const [brands, setBrands] = useState([]);
   const [models, setModels] = useState([]);
@@ -213,6 +215,7 @@ const VehicleManagement = () => {
         </div>
         <div className="flex items-center gap-3">
           {/* Search brands */}
+          {pp.isToolbarVisible("search") && (
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
             <input
@@ -222,7 +225,9 @@ const VehicleManagement = () => {
               className="pl-9 pr-4 py-2.5 bg-white border rounded-lg text-sm w-[200px] outline-none focus:border-indigo-500 transition-colors"
             />
           </div>
+          )}
           {/* Type filter */}
+          {pp.isToolbarVisible("typeFilter") && (
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
@@ -232,6 +237,7 @@ const VehicleManagement = () => {
             <option value="4wheeler">4 Wheeler</option>
             <option value="2wheeler">2 Wheeler</option>
           </select>
+          )}
           <span className="text-sm font-medium text-slate-600 bg-white px-3 py-2.5 rounded-lg border">
             Total Models: {totalModels}
           </span>
@@ -244,12 +250,14 @@ const VehicleManagement = () => {
         <div className="w-[300px] bg-white rounded-2xl shadow-xl border border-slate-200 flex flex-col overflow-hidden">
           <div className="p-4 border-b flex items-center justify-between">
             <h2 className="font-bold text-slate-800">Brands</h2>
+            {pp.isToolbarVisible("addBrand") && (
             <button
               onClick={openAddBrand}
               className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
             >
               <Plus className="w-3 h-3" /> Add Brand
             </button>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -319,6 +327,7 @@ const VehicleManagement = () => {
                   </div>
 
                   {/* Actions */}
+                  {(pp.isActionVisible("edit") || pp.isActionVisible("delete")) && (
                   <div
                     className={`flex gap-1 ${
                       selectedBrand?._id === brand._id
@@ -326,6 +335,7 @@ const VehicleManagement = () => {
                         : "opacity-0 group-hover:opacity-100"
                     } transition-opacity`}
                   >
+                    {pp.isActionVisible("edit") && (
                     <button
                       onClick={(e) => openEditBrand(brand, e)}
                       className={`p-1 rounded ${
@@ -336,6 +346,8 @@ const VehicleManagement = () => {
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
+                    )}
+                    {pp.isActionVisible("delete") && (
                     <button
                       onClick={(e) => openDeleteBrand(brand, e)}
                       className={`p-1 rounded ${
@@ -346,7 +358,9 @@ const VehicleManagement = () => {
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
+                    )}
                   </div>
+                  )}
                 </div>
               ))
             )}
@@ -373,12 +387,14 @@ const VehicleManagement = () => {
                       className="pl-9 pr-4 py-2 bg-slate-50 border rounded-lg text-sm w-[200px] outline-none focus:border-indigo-500"
                     />
                   </div>
+                  {pp.isToolbarVisible("addModel") && (
                   <button
                     onClick={openAddModel}
                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors shadow-lg shadow-indigo-600/20"
                   >
                     <Plus className="w-4 h-4" /> Add Model
                   </button>
+                  )}
                 </>
               )}
             </div>
@@ -412,24 +428,36 @@ const VehicleManagement = () => {
                 <table className="min-w-full text-left">
                   <thead>
                     <tr className="bg-slate-50 border-b">
+                      {pp.isColumnVisible("image") && (
                       <th className="px-4 py-3 text-xs font-bold uppercase text-slate-600 tracking-wider">
                         Image
                       </th>
+                      )}
+                      {pp.isColumnVisible("modelName") && (
                       <th className="px-4 py-3 text-xs font-bold uppercase text-slate-600 tracking-wider">
                         Model Name
                       </th>
+                      )}
+                      {pp.isColumnVisible("type") && (
                       <th className="px-4 py-3 text-xs font-bold uppercase text-slate-600 tracking-wider">
                         Type
                       </th>
+                      )}
+                      {pp.isColumnVisible("category") && (
                       <th className="px-4 py-3 text-xs font-bold uppercase text-slate-600 tracking-wider">
                         Category
                       </th>
+                      )}
+                      {pp.isColumnVisible("status") && (
                       <th className="px-4 py-3 text-xs font-bold uppercase text-slate-600 tracking-wider">
                         Status
                       </th>
+                      )}
+                      {(pp.isActionVisible("edit") || pp.isActionVisible("delete")) && (
                       <th className="px-4 py-3 text-xs font-bold uppercase text-slate-600 tracking-wider text-right">
                         Actions
                       </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -438,6 +466,7 @@ const VehicleManagement = () => {
                         key={model._id}
                         className="hover:bg-slate-50 transition-colors"
                       >
+                        {pp.isColumnVisible("image") && (
                         <td className="px-4 py-3">
                           <div className="w-16 h-12 rounded-lg bg-slate-100 overflow-hidden flex items-center justify-center">
                             {model.image ? (
@@ -451,9 +480,13 @@ const VehicleManagement = () => {
                             )}
                           </div>
                         </td>
+                        )}
+                        {pp.isColumnVisible("modelName") && (
                         <td className="px-4 py-3 font-medium text-slate-800">
                           {model.name}
                         </td>
+                        )}
+                        {pp.isColumnVisible("type") && (
                         <td className="px-4 py-3">
                           <span
                             className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -467,6 +500,8 @@ const VehicleManagement = () => {
                               : "2 Wheeler"}
                           </span>
                         </td>
+                        )}
+                        {pp.isColumnVisible("category") && (
                         <td className="px-4 py-3">
                           <span
                             className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${getCategoryColor(model.category)}`}
@@ -474,6 +509,8 @@ const VehicleManagement = () => {
                             {model.category}
                           </span>
                         </td>
+                        )}
+                        {pp.isColumnVisible("status") && (
                         <td className="px-4 py-3">
                           <span
                             className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -485,22 +522,29 @@ const VehicleManagement = () => {
                             {model.status === "active" ? "Active" : "Inactive"}
                           </span>
                         </td>
+                        )}
+                        {(pp.isActionVisible("edit") || pp.isActionVisible("delete")) && (
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">
+                            {pp.isActionVisible("edit") && (
                             <button
                               onClick={() => openEditModel(model)}
                               className="p-1.5 rounded-lg hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition-all"
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
+                            )}
+                            {pp.isActionVisible("delete") && (
                             <button
                               onClick={() => openDeleteModel(model)}
                               className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-all"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
+                            )}
                           </div>
                         </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

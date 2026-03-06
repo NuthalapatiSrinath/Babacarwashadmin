@@ -18,6 +18,7 @@ import { downloadWorkRecordsStatement } from "../../redux/slices/workRecordsSlic
 import { fetchWorkers } from "../../redux/slices/workerSlice";
 import { workRecordsService } from "../../api/workRecordsService";
 import CustomDropdown from "../../components/ui/CustomDropdown";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 // Helper to load images
 const loadImage = (url) => {
@@ -31,6 +32,7 @@ const loadImage = (url) => {
 
 const WorkRecords = () => {
   const dispatch = useDispatch();
+  const pp = usePagePermissions("workRecords");
   const { workers: workersList } = useSelector((state) => state.worker);
 
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -132,7 +134,8 @@ const WorkRecords = () => {
         );
 
         // Handle new format { data, total, ... } or old format (array)
-        const data = response?.data || (Array.isArray(response) ? response : []);
+        const data =
+          response?.data || (Array.isArray(response) ? response : []);
 
         if (data && data.length > 0) {
           // Extract unique worker IDs and names from the data
@@ -187,13 +190,16 @@ const WorkRecords = () => {
         );
 
         // Handle new format { data, total, columnTotals, ... } or old format (array)
-        const data = response?.data || (Array.isArray(response) ? response : []);
-        const totals = response?.columnTotals ? {
-          columnTotals: response.columnTotals,
-          grandTotal: response.grandTotal || 0,
-          totalTips: response.totalTips || 0,
-          total: response.total || data.length,
-        } : null;
+        const data =
+          response?.data || (Array.isArray(response) ? response : []);
+        const totals = response?.columnTotals
+          ? {
+              columnTotals: response.columnTotals,
+              grandTotal: response.grandTotal || 0,
+              totalTips: response.totalTips || 0,
+              total: response.total || data.length,
+            }
+          : null;
         setBackendTotals(totals);
 
         console.log("📊 Raw API Response:", response);
@@ -737,7 +743,10 @@ const WorkRecords = () => {
 
                       // Calculate total SCHEDULED days from dailyMarks
                       const totalScheduledDays = car.dailyMarks
-                        ? car.dailyMarks.reduce((sum, mark) => sum + (mark || 0), 0)
+                        ? car.dailyMarks.reduce(
+                            (sum, mark) => sum + (mark || 0),
+                            0,
+                          )
                         : 0;
 
                       // Check if vehicle is deactivated (ended before this month)
@@ -811,7 +820,10 @@ const WorkRecords = () => {
                                 );
 
                                 // Use the dailyMarks from backend instead of recalculating
-                                const mark = car.dailyMarks && car.dailyMarks[dayIndex] ? car.dailyMarks[dayIndex] : 0;
+                                const mark =
+                                  car.dailyMarks && car.dailyMarks[dayIndex]
+                                    ? car.dailyMarks[dayIndex]
+                                    : 0;
                                 const isScheduled = mark > 0;
 
                                 return (
@@ -906,7 +918,8 @@ const WorkRecords = () => {
                           : viewData.reduce(
                               (sum, car) =>
                                 sum +
-                                ((car.dailyMarks && car.dailyMarks[dayIndex]) || 0),
+                                ((car.dailyMarks && car.dailyMarks[dayIndex]) ||
+                                  0),
                               0,
                             );
                         return (
@@ -919,36 +932,38 @@ const WorkRecords = () => {
                         );
                       })}
                       <td className="border border-slate-300 p-1 text-center font-bold text-blue-600">
-                        {backendTotals?.grandTotal ?? viewData.reduce((sum, car) => {
-                          const monthStart = new Date(
-                            filters.year,
-                            filters.month - 1,
-                            1,
-                          );
-                          const isDeactivated =
-                            car.endDate && new Date(car.endDate) < monthStart;
-                          if (isDeactivated) return sum;
+                        {backendTotals?.grandTotal ??
+                          viewData.reduce((sum, car) => {
+                            const monthStart = new Date(
+                              filters.year,
+                              filters.month - 1,
+                              1,
+                            );
+                            const isDeactivated =
+                              car.endDate && new Date(car.endDate) < monthStart;
+                            if (isDeactivated) return sum;
 
-                          const totalDays = car.dailyMarks
-                            ? car.dailyMarks.reduce(
-                                (s, mark) => s + (mark || 0),
-                                0,
-                              )
-                            : 0;
-                          return sum + totalDays;
-                        }, 0)}
+                            const totalDays = car.dailyMarks
+                              ? car.dailyMarks.reduce(
+                                  (s, mark) => s + (mark || 0),
+                                  0,
+                                )
+                              : 0;
+                            return sum + totalDays;
+                          }, 0)}
                       </td>
                       <td className="border border-slate-300 p-1 text-center font-bold text-blue-600">
-                        {backendTotals?.totalTips ?? viewData.reduce((sum, car) => {
-                          const monthStart = new Date(
-                            filters.year,
-                            filters.month - 1,
-                            1,
-                          );
-                          const isDeactivated =
-                            car.endDate && new Date(car.endDate) < monthStart;
-                          return sum + (isDeactivated ? 0 : car.tips || 0);
-                        }, 0)}
+                        {backendTotals?.totalTips ??
+                          viewData.reduce((sum, car) => {
+                            const monthStart = new Date(
+                              filters.year,
+                              filters.month - 1,
+                              1,
+                            );
+                            const isDeactivated =
+                              car.endDate && new Date(car.endDate) < monthStart;
+                            return sum + (isDeactivated ? 0 : car.tips || 0);
+                          }, 0)}
                       </td>
                     </tr>
                   ) : (
@@ -966,7 +981,8 @@ const WorkRecords = () => {
                           : viewData.reduce(
                               (sum, w) =>
                                 sum +
-                                ((w.dailyCounts && w.dailyCounts[dayIndex]) || 0),
+                                ((w.dailyCounts && w.dailyCounts[dayIndex]) ||
+                                  0),
                               0,
                             );
                         return (
@@ -979,17 +995,22 @@ const WorkRecords = () => {
                         );
                       })}
                       <td className="border border-slate-300 p-1 text-center text-blue-600">
-                        {backendTotals?.grandTotal ?? viewData.reduce(
-                          (sum, w) =>
-                            sum +
-                            (w.dailyCounts || []).reduce((s, c) => s + c, 0),
-                          0,
-                        )}
+                        {backendTotals?.grandTotal ??
+                          viewData.reduce(
+                            (sum, w) =>
+                              sum +
+                              (w.dailyCounts || []).reduce((s, c) => s + c, 0),
+                            0,
+                          )}
                       </td>
                       <td className="border border-slate-300 p-1 text-center">
-                        {backendTotals?.totalTips ?? (filters.serviceType === "onewash"
-                          ? viewData.reduce((sum, w) => sum + (w.tips || 0), 0)
-                          : 0)}
+                        {backendTotals?.totalTips ??
+                          (filters.serviceType === "onewash"
+                            ? viewData.reduce(
+                                (sum, w) => sum + (w.tips || 0),
+                                0,
+                              )
+                            : 0)}
                       </td>
                     </tr>
                   )}
@@ -1042,7 +1063,7 @@ const WorkRecords = () => {
             <Filter className="w-4 h-4" /> Statement Parameters
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-end">
-            <div>
+            {pp.isToolbarVisible("serviceTypeFilter") && (<div>
               <CustomDropdown
                 label="Service Type"
                 value={filters.serviceType}
@@ -1053,8 +1074,8 @@ const WorkRecords = () => {
                 icon={Layers}
                 placeholder="Select Service"
               />
-            </div>
-            <div>
+            </div>)}
+            {pp.isToolbarVisible("yearFilter") && (<div>
               <CustomDropdown
                 label="Year"
                 value={filters.year}
@@ -1065,8 +1086,8 @@ const WorkRecords = () => {
                 icon={Calendar}
                 placeholder="Select Year"
               />
-            </div>
-            <div>
+            </div>)}
+            {pp.isToolbarVisible("monthFilter") && (<div>
               <CustomDropdown
                 label="Month"
                 value={filters.month}
@@ -1082,8 +1103,8 @@ const WorkRecords = () => {
                 }
                 disabled={availableMonths.length === 0}
               />
-            </div>
-            {filters.serviceType === "residence" && (
+            </div>)}
+            {pp.isToolbarVisible("workerFilter") && filters.serviceType === "residence" && (
               <div>
                 <CustomDropdown
                   label="Worker (Optional)"
@@ -1100,14 +1121,14 @@ const WorkRecords = () => {
               </div>
             )}
             <div className="flex gap-2">
-              <button
+              {pp.isToolbarVisible("exportExcel") && (<button
                 onClick={handleDownloadExcel}
                 disabled={pdfLoading || availableMonths.length === 0}
                 className="flex-1 h-[42px] bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 text-xs"
               >
                 <FileSpreadsheet className="w-4 h-4" /> Excel
-              </button>
-              <button
+              </button>)}
+              {pp.isToolbarVisible("exportPdf") && (<button
                 onClick={() => setShowPdfModal(true)}
                 disabled={pdfLoading || availableMonths.length === 0}
                 className="flex-1 h-[42px] bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 text-xs"
@@ -1118,7 +1139,7 @@ const WorkRecords = () => {
                   <FileText className="w-4 h-4" />
                 )}{" "}
                 PDF
-              </button>
+              </button>)}
             </div>
           </div>
         </div>

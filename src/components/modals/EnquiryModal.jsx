@@ -76,18 +76,37 @@ const EnquiryModal = ({ isOpen, onClose, enquiry, onSuccess }) => {
     status: "pending",
   });
 
+  // --- Helper: Normalize day name to proper case ---
+  const normalizeDayName = (d) => {
+    const map = {
+      sun: "Sun",
+      mon: "Mon",
+      tue: "Tue",
+      wed: "Wed",
+      thu: "Thu",
+      fri: "Fri",
+      sat: "Sat",
+    };
+    return map[d.trim().toLowerCase()] || d.trim();
+  };
+
   // --- Helper: Convert schedule_days to string (handles all formats) ---
   const getScheduleDaysString = (scheduleDays) => {
     if (!scheduleDays) return "";
-    if (typeof scheduleDays === "string") return scheduleDays;
+    if (typeof scheduleDays === "string")
+      return scheduleDays
+        .split(",")
+        .filter(Boolean)
+        .map(normalizeDayName)
+        .join(",");
     if (Array.isArray(scheduleDays)) {
       return scheduleDays
-        .map((d) => (typeof d === "object" ? d.day : d))
+        .map((d) => normalizeDayName(typeof d === "object" ? d.day : String(d)))
         .filter(Boolean)
         .join(",");
     }
     if (typeof scheduleDays === "object" && scheduleDays.day) {
-      return scheduleDays.day;
+      return normalizeDayName(scheduleDays.day);
     }
     return "";
   };

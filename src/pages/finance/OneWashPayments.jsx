@@ -37,6 +37,7 @@ import DeleteModal from "../../components/modals/DeleteModal";
 import EditPaymentAmountModal from "../../components/modals/EditPaymentAmountModal";
 import RichDateRangePicker from "../../components/inputs/RichDateRangePicker";
 import CustomDropdown from "../../components/ui/CustomDropdown";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 // Redux
 import { exportPayments } from "../../redux/slices/paymentSlice";
@@ -46,6 +47,7 @@ import { fetchOneWash, deleteOneWash } from "../../redux/slices/oneWashSlice";
 const OneWashPayments = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const pp = usePagePermissions("payments_onewash");
 
   // Redux State
   const { oneWashJobs, stats, total, loading } = useSelector(
@@ -344,6 +346,7 @@ const OneWashPayments = () => {
 
   const columns = [
     {
+      key: "date",
       header: "Date",
       accessor: "createdAt",
       className: "w-32",
@@ -366,6 +369,7 @@ const OneWashPayments = () => {
       ),
     },
     {
+      key: "vehicle",
       header: "Vehicle",
       accessor: "registration_no",
       render: (row) => (
@@ -378,6 +382,7 @@ const OneWashPayments = () => {
       ),
     },
     {
+      key: "parking",
       header: "Parking",
       accessor: "parking_no",
       className: "text-center",
@@ -388,6 +393,7 @@ const OneWashPayments = () => {
       ),
     },
     {
+      key: "serviceType",
       header: "Service Type",
       accessor: "display_service_type",
       className: "text-center",
@@ -422,6 +428,7 @@ const OneWashPayments = () => {
       },
     },
     {
+      key: "amount",
       header: "Original Amount",
       accessor: "original_amount",
       className: "text-right",
@@ -433,6 +440,7 @@ const OneWashPayments = () => {
       ),
     },
     {
+      key: "tip",
       header: "Tip",
       accessor: "tip_amount",
       className: "text-center",
@@ -443,6 +451,7 @@ const OneWashPayments = () => {
       ),
     },
     {
+      key: "total",
       header: "Total Amount",
       accessor: "amount",
       className: "text-right",
@@ -454,6 +463,7 @@ const OneWashPayments = () => {
       ),
     },
     {
+      key: "paymentMode",
       header: "Mode",
       accessor: "payment_mode",
       className: "text-center",
@@ -464,6 +474,7 @@ const OneWashPayments = () => {
       ),
     },
     {
+      key: "status",
       header: "Status",
       accessor: "status",
       className: "text-center w-28",
@@ -488,6 +499,7 @@ const OneWashPayments = () => {
       },
     },
     {
+      key: "worker",
       header: "Worker",
       accessor: "worker.name",
       render: (row) => {
@@ -505,6 +517,7 @@ const OneWashPayments = () => {
       },
     },
     {
+      key: "receipt",
       header: "Receipt",
       className: "text-center w-16",
       render: (row) => {
@@ -522,25 +535,26 @@ const OneWashPayments = () => {
       },
     },
     {
+      key: "actions",
       header: "Actions",
       className:
         "text-right sticky right-0 bg-white shadow-[-10px_0_10px_-10px_rgba(0,0,0,0.1)] min-w-[80px]",
       render: (row) => (
         <div className="flex items-center justify-end gap-1">
-          <button
+          {pp.isActionVisible("view") && <button
             onClick={() => handleViewDetails(row)}
             className="p-1.5 hover:bg-blue-50 rounded text-slate-400 hover:text-blue-600"
           >
             <Eye className="w-4 h-4" />
-          </button>
-          <button
+          </button>}
+          {pp.isActionVisible("editAmount") && <button
             onClick={() => setEditAmountPayment(row)}
             className="p-1.5 hover:bg-amber-50 rounded text-slate-400 hover:text-amber-600"
             title="Edit Amount"
           >
             <Calculator className="w-4 h-4" />
-          </button>
-          {(row.status || "").toLowerCase() === "completed" && (
+          </button>}
+          {pp.isActionVisible("receipt") && (row.status || "").toLowerCase() === "completed" && (
             <button
               onClick={() => handleViewReceipt(row)}
               className="p-1.5 hover:bg-indigo-50 rounded text-slate-400 hover:text-indigo-600"
@@ -572,7 +586,7 @@ const OneWashPayments = () => {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="relative">
+            {pp.isToolbarVisible("search") && <div className="relative">
               <input
                 type="text"
                 placeholder="Search vehicle, worker, parking..."
@@ -581,8 +595,8 @@ const OneWashPayments = () => {
                 className="w-52 h-10 bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 text-xs outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all"
               />
               <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-            </div>
-            <div className="bg-slate-100 p-1 rounded-xl flex">
+            </div>}
+            {pp.isToolbarVisible("dateRange") && <div className="bg-slate-100 p-1 rounded-xl flex">
               <button
                 onClick={() => handleTabChange("today")}
                 className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
@@ -613,26 +627,26 @@ const OneWashPayments = () => {
               >
                 {lastMonth}
               </button>
-            </div>
-            <button
+            </div>}
+            {pp.isToolbarVisible("addNew") && <button
               onClick={handleAddNew}
               className="h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition-all active:scale-95"
               title="Add New Payment"
             >
               <Plus className="w-5 h-5" /> New
-            </button>
-            <button
+            </button>}
+            {pp.isToolbarVisible("export") && <button
               onClick={handleExport}
               className="h-10 px-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md"
             >
               <Download className="w-4 h-4" /> Export
-            </button>
-            <button
+            </button>}
+            {pp.isToolbarVisible("editHistory") && <button
               onClick={() => navigate("/payments/edit-history")}
               className="h-10 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
             >
               <Clock className="w-4 h-4" /> Edit History
-            </button>
+            </button>}
           </div>
         </div>
 
@@ -795,7 +809,7 @@ const OneWashPayments = () => {
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
+            {pp.isToolbarVisible("statusFilter") && <div>
               <CustomDropdown
                 label="Status"
                 value={filters.status}
@@ -804,8 +818,8 @@ const OneWashPayments = () => {
                 icon={Filter}
                 placeholder="All Status"
               />
-            </div>
-            <div>
+            </div>}
+            {pp.isToolbarVisible("paymentModeFilter") && <div>
               <CustomDropdown
                 label="Payment Mode"
                 value={filters.payment_mode}
@@ -821,8 +835,8 @@ const OneWashPayments = () => {
                 icon={CreditCard}
                 placeholder="All Modes"
               />
-            </div>
-            <div>
+            </div>}
+            {pp.isToolbarVisible("washTypeFilter") && <div>
               <CustomDropdown
                 label="Wash Type"
                 value={filters.wash_type}
@@ -835,8 +849,8 @@ const OneWashPayments = () => {
                 icon={Droplets}
                 placeholder="All Types"
               />
-            </div>
-            <div>
+            </div>}
+            {pp.isToolbarVisible("workerFilter") && <div>
               <CustomDropdown
                 label="Worker"
                 value={filters.worker}
@@ -846,14 +860,14 @@ const OneWashPayments = () => {
                 placeholder="All Workers"
                 searchable={true}
               />
-            </div>
+            </div>}
           </div>
         </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden flex flex-col flex-1">
         <DataTable
-          columns={columns}
+          columns={pp.filterColumns(columns)}
           data={filteredPayments}
           loading={loading}
           pagination={pagination}

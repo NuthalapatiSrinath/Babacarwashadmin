@@ -51,8 +51,10 @@ import {
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import DataTable from "../../components/DataTable";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 const Dashboard = () => {
+  const pp = usePagePermissions("dashboard");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -509,6 +511,7 @@ const Dashboard = () => {
             )}
           </div>
           <div className="flex items-center gap-3">
+            {pp.isToolbarVisible("exportData") && (
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -519,6 +522,8 @@ const Dashboard = () => {
               <FileDown className="w-4 h-4" />
               Export
             </motion.button>
+            )}
+            {pp.isToolbarVisible("refresh") && (
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -531,6 +536,8 @@ const Dashboard = () => {
               />
               Refresh
             </motion.button>
+            )}
+            {pp.isToolbarVisible("advancedCharts") && (
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -540,6 +547,7 @@ const Dashboard = () => {
               <BarChart3 className="w-4 h-4" />
               {showAdvancedCharts ? "Hide" : "Show"} Charts
             </motion.button>
+            )}
           </div>
         </motion.div>
         {/* Comparative Stats - Period Over Period */}

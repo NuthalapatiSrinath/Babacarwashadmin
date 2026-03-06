@@ -23,8 +23,10 @@ import { attendanceService } from "../../api/attendanceService";
 import { mallService } from "../../api/mallService";
 import { siteService } from "../../api/siteService";
 import { buildingService } from "../../api/buildingService";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 const Attendance = () => {
+  const pp = usePagePermissions("attendance");
   // --- DATE HELPERS ---
   const formatDateLocal = (date) => {
     const year = date.getFullYear();
@@ -373,6 +375,7 @@ const Attendance = () => {
   // --- COLUMNS ---
   const columns = [
     {
+      key: "date",
       header: "Date",
       accessor: "date",
       className: "w-32",
@@ -388,6 +391,7 @@ const Attendance = () => {
       ),
     },
     {
+      key: "employee",
       header: "Employee Details",
       accessor: "worker",
       render: (row) => {
@@ -417,6 +421,7 @@ const Attendance = () => {
       },
     },
     {
+      key: "attendance",
       header: "Attendance",
       accessor: "present",
       className: "w-40",
@@ -448,6 +453,7 @@ const Attendance = () => {
       ),
     },
     {
+      key: "remark",
       header: "Remark / Notes",
       accessor: "notes",
       render: (row) => {
@@ -524,6 +530,7 @@ const Attendance = () => {
                 ))}
               </div>
             </div>
+            {pp.isToolbarVisible("export") && (
             <button
               onClick={handleExport}
               className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm transition-all active:scale-95"
@@ -531,6 +538,7 @@ const Attendance = () => {
               <Download className="w-4 h-4 text-emerald-600" />
               <span>Export Excel</span>
             </button>
+            )}
 
             <div className="w-full xl:w-auto">
               <span className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
@@ -599,7 +607,7 @@ const Attendance = () => {
 
         {/* --- DATA TABLE --- */}
         <DataTable
-          columns={columns}
+          columns={pp.filterColumns(columns)}
           data={displayedData}
           loading={loading}
           pagination={pagination}

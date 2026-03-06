@@ -42,10 +42,12 @@ import CustomDropdown from "../../components/ui/CustomDropdown";
 
 // API
 import { workerService } from "../../api/workerService";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 const Workers = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  const pp = usePagePermissions("workers");
 
   // --- STATE ---
   const [loading, setLoading] = useState(false);
@@ -420,6 +422,7 @@ const Workers = () => {
 
   const columns = [
     {
+      key: "name",
       header: "Worker",
       className: "min-w-[280px]",
       render: (r) => (
@@ -501,6 +504,7 @@ const Workers = () => {
       ),
     },
     {
+      key: "mobile",
       header: "Mobile",
       render: (r) => (
         <div className="flex items-center gap-2 text-slate-600 text-sm font-medium">
@@ -512,6 +516,7 @@ const Workers = () => {
       ),
     },
     {
+      key: "company",
       header: "Company",
       render: (r) => (
         <div className="flex items-center gap-3">
@@ -525,6 +530,7 @@ const Workers = () => {
       ),
     },
     {
+      key: "assignments",
       header: "Assignments",
       className: "min-w-[250px] max-w-[450px]",
       render: (r) => {
@@ -574,6 +580,7 @@ const Workers = () => {
       },
     },
     {
+      key: "quickLinks",
       header: "Quick Links",
       className: "text-center",
       render: (r) => (
@@ -607,6 +614,7 @@ const Workers = () => {
       ),
     },
     {
+      key: "status",
       header: "Status",
       accessor: "status",
       className: "text-center w-24",
@@ -625,11 +633,13 @@ const Workers = () => {
       ),
     },
     {
+      key: "actions",
       header: "Actions",
       className:
         "text-right w-36 sticky right-0 bg-white shadow-[-5px_0_10px_-5px_rgba(0,0,0,0.05)]",
       render: (row) => (
         <div className="flex justify-end gap-1.5 pr-2">
+          {pp.isActionVisible("view") && (
           <button
             onClick={() => navigate(`/workers/${row._id}`)}
             className="p-2 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-lg transition-all"
@@ -637,14 +647,15 @@ const Workers = () => {
           >
             <Eye className="w-4 h-4" />
           </button>
+          )}
 
+          {pp.isActionVisible("view") && (
           <button
             onClick={() =>
               navigate("/workers/monthly", {
-                // ✅ PASS FULL WORKER OBJECT + ID
                 state: {
                   workerId: row._id,
-                  worker: row, // Pass full row to populate header immediately
+                  worker: row,
                 },
               })
             }
@@ -653,7 +664,9 @@ const Workers = () => {
           >
             <FileText className="w-4 h-4" />
           </button>
+          )}
 
+          {pp.isActionVisible("edit") && (
           <button
             onClick={() => {
               setSelectedWorker(row);
@@ -664,6 +677,8 @@ const Workers = () => {
           >
             <Edit2 className="w-4 h-4" />
           </button>
+          )}
+          {pp.isActionVisible("delete") && (
           <button
             onClick={() => {
               setWorkerToDelete(row);
@@ -674,6 +689,7 @@ const Workers = () => {
           >
             <Trash2 className="w-4 h-4" />
           </button>
+          )}
         </div>
       ),
     },
@@ -718,6 +734,7 @@ const Workers = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
+            {pp.isToolbarVisible("search") && (
             <div className="relative w-full lg:w-64 group mr-2">
               <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
               <input
@@ -728,7 +745,9 @@ const Workers = () => {
                 className="w-full h-12 pl-12 pr-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all shadow-inner"
               />
             </div>
+            )}
             <div className="flex bg-slate-50 p-1 rounded-2xl border border-slate-100">
+              {pp.isToolbarVisible("export") && (
               <button
                 onClick={handleExportData}
                 className="h-10 px-4 text-slate-600 hover:text-blue-600 rounded-xl text-[11px] font-black uppercase tracking-tighter flex items-center gap-2 transition-all hover:bg-white hover:shadow-sm"
@@ -736,6 +755,8 @@ const Workers = () => {
                 <Download className="w-3.5 h-3.5" />{" "}
                 <span className="hidden sm:inline">Export</span>
               </button>
+              )}
+              {pp.isToolbarVisible("template") && (
               <button
                 onClick={handleDownloadTemplate}
                 className="h-10 px-4 text-slate-600 hover:text-emerald-600 rounded-xl text-[11px] font-black uppercase tracking-tighter flex items-center gap-2 transition-all hover:bg-white hover:shadow-sm"
@@ -743,6 +764,8 @@ const Workers = () => {
                 <FileSpreadsheet className="w-3.5 h-3.5" />{" "}
                 <span className="hidden sm:inline">Template</span>
               </button>
+              )}
+              {pp.isToolbarVisible("import") && (
               <button
                 onClick={() => fileInputRef.current.click()}
                 className="h-10 px-4 text-slate-600 hover:text-indigo-600 rounded-xl text-[11px] font-black uppercase tracking-tighter flex items-center gap-2 transition-all hover:bg-white hover:shadow-sm"
@@ -754,7 +777,9 @@ const Workers = () => {
                 )}{" "}
                 <span className="hidden sm:inline">Import</span>
               </button>
+              )}
             </div>
+            {pp.isToolbarVisible("addWorker") && (
             <button
               onClick={() => {
                 setSelectedWorker(null);
@@ -764,6 +789,7 @@ const Workers = () => {
             >
               <Plus className="w-4 h-4" /> Add Worker
             </button>
+            )}
           </div>
         </div>
 
@@ -898,7 +924,7 @@ const Workers = () => {
 
       <div className="bg-white rounded-3xl shadow-2xl shadow-slate-200/50 border border-slate-100/60 overflow-hidden relative z-10">
         <DataTable
-          columns={columns}
+          columns={pp.filterColumns(columns)}
           data={filteredData}
           loading={loading}
           pagination={{

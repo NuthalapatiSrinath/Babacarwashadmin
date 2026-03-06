@@ -142,7 +142,7 @@ const SupervisorOneWashPayments = () => {
 
         const dataArray = result.data || [];
         const backendTotal = result.total || dataArray.length || 0;
-        
+
         setPayments(dataArray);
         setStats(result.counts || stats);
         setTotal(backendTotal);

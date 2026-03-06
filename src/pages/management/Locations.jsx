@@ -9,8 +9,10 @@ import DeleteModal from "../../components/modals/DeleteModal";
 
 // APId
 import { locationService } from "../../api/locationService";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 const Locations = () => {
+  const pp = usePagePermissions("locations");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
 
@@ -117,6 +119,7 @@ const Locations = () => {
   // --- Columns ---
   const columns = [
     {
+      key: "locationDetails",
       header: "Location Details",
       accessor: "name", // Using name as key accessor, but render uses both
       render: (row) => (
@@ -150,11 +153,13 @@ const Locations = () => {
       ),
     },
     {
+      key: "actions",
       header: "Actions",
       className:
         "text-right w-24 sticky right-0 bg-white shadow-[-5px_0_10px_-5px_rgba(0,0,0,0.05)]",
       render: (row) => (
         <div className="flex justify-end gap-1.5 pr-2">
+          {pp.isActionVisible("edit") && (
           <button
             onClick={() => handleEdit(row)}
             className="p-2 hover:bg-teal-50 text-slate-400 hover:text-teal-600 rounded-lg transition-all"
@@ -162,6 +167,8 @@ const Locations = () => {
           >
             <Edit2 className="w-4 h-4" />
           </button>
+          )}
+          {pp.isActionVisible("delete") && (
           <button
             onClick={() => openDeleteModal(row)}
             className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-all"
@@ -169,6 +176,7 @@ const Locations = () => {
           >
             <Trash2 className="w-4 h-4" />
           </button>
+          )}
         </div>
       ),
     },
@@ -180,7 +188,7 @@ const Locations = () => {
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
         <DataTable
           title="Location List"
-          columns={columns}
+          columns={pp.filterColumns(columns)}
           data={getDisplayData()}
           loading={loading}
           pagination={pagination}
@@ -192,7 +200,7 @@ const Locations = () => {
           // Search Handler
           onSearch={(term) => fetchData(1, pagination.limit, term)}
           // Add Button
-          actionButton={
+          actionButton={pp.isToolbarVisible("addLocation") ?
             <button
               onClick={handleAdd}
               className="h-10 px-5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all active:scale-95"
@@ -200,7 +208,7 @@ const Locations = () => {
               <Plus className="w-4 h-4" />
               Add Location
             </button>
-          }
+          : null}
         />
       </div>
 

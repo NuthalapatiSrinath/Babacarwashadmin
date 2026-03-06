@@ -19,8 +19,10 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 const Notifications = () => {
+  const pp = usePagePermissions("notifications");
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all"); // all, unread, read
@@ -148,7 +150,7 @@ const Notifications = () => {
               </span>
             </div>
           )}
-          {unreadCount > 0 && (
+          {unreadCount > 0 && pp.isToolbarVisible("markAllRead") && (
             <button
               onClick={markAllAsRead}
               className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors font-medium"
@@ -161,6 +163,7 @@ const Notifications = () => {
       </div>
 
       {/* Filters */}
+      {pp.isToolbarVisible("filterTabs") && (
       <div className="flex gap-3">
         {["all", "unread", "read"].map((f) => (
           <button
@@ -181,6 +184,7 @@ const Notifications = () => {
           </button>
         ))}
       </div>
+      )}
 
       {/* Notifications List */}
       {filteredNotifications.length === 0 ? (

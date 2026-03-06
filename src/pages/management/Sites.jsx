@@ -9,8 +9,10 @@ import DeleteModal from "../../components/modals/DeleteModal";
 
 // API
 import { siteService } from "../../api/siteService";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 const Sites = () => {
+  const pp = usePagePermissions("sites");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
 
@@ -129,6 +131,7 @@ const Sites = () => {
   // --- Columns ---
   const columns = [
     {
+      key: "name",
       header: "Site Name",
       accessor: "name",
       render: (row) => (
@@ -141,11 +144,13 @@ const Sites = () => {
       ),
     },
     {
+      key: "actions",
       header: "Actions",
       className:
         "text-right w-24 sticky right-0 bg-white shadow-[-5px_0_10px_-5px_rgba(0,0,0,0.05)]",
       render: (row) => (
         <div className="flex justify-end gap-1.5 pr-2">
+          {pp.isActionVisible("edit") && (
           <button
             onClick={() => handleEdit(row)}
             className="p-2 hover:bg-purple-50 text-slate-400 hover:text-purple-600 rounded-lg transition-all"
@@ -153,6 +158,8 @@ const Sites = () => {
           >
             <Edit2 className="w-4 h-4" />
           </button>
+          )}
+          {pp.isActionVisible("delete") && (
           <button
             onClick={() => openDeleteModal(row)}
             className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-all"
@@ -160,6 +167,7 @@ const Sites = () => {
           >
             <Trash2 className="w-4 h-4" />
           </button>
+          )}
         </div>
       ),
     },
@@ -171,7 +179,7 @@ const Sites = () => {
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
         <DataTable
           title="Manage Sites"
-          columns={columns}
+          columns={pp.filterColumns(columns)}
           data={getDisplayData()}
           loading={loading}
           pagination={pagination}
@@ -183,7 +191,7 @@ const Sites = () => {
           // Search Handler (Integrated into Table Header)
           onSearch={(term) => fetchData(1, pagination.limit, term)}
           // Add Button (Integrated into Table Header)
-          actionButton={
+          actionButton={pp.isToolbarVisible("addSite") ?
             <button
               onClick={handleAdd}
               className="h-10 px-5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-95 whitespace-nowrap"
@@ -191,7 +199,7 @@ const Sites = () => {
               <Plus className="w-4 h-4" />
               Add Site
             </button>
-          }
+          : null}
         />
       </div>
 

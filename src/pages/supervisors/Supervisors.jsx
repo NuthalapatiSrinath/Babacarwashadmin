@@ -16,6 +16,7 @@ import toast from "react-hot-toast";
 import DataTable from "../../components/DataTable";
 import SupervisorModal from "../../components/modals/SupervisorModal";
 import DeleteModal from "../../components/modals/DeleteModal";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 // Redux
 import {
@@ -29,6 +30,7 @@ import {
 const Supervisors = () => {
   // Redux State
   const dispatch = useDispatch();
+  const pp = usePagePermissions("supervisors");
   const { supervisors, loading, error, total, currentPage, totalPages } =
     useSelector((state) => state.supervisor);
 
@@ -118,6 +120,7 @@ const Supervisors = () => {
   // --- Columns Configuration ---
   const columns = [
     {
+      key: "serviceType",
       header: "Service Type",
       accessor: "role",
       render: (row) => {
@@ -141,6 +144,7 @@ const Supervisors = () => {
       },
     },
     {
+      key: "name",
       header: "Name",
       accessor: "name",
       render: (row) => (
@@ -153,6 +157,7 @@ const Supervisors = () => {
       ),
     },
     {
+      key: "phone",
       header: "Mobile",
       accessor: "number",
       render: (row) => (
@@ -167,11 +172,13 @@ const Supervisors = () => {
       ),
     },
     {
+      key: "actions",
       header: "Actions",
       className:
         "text-right w-24 sticky right-0 bg-white shadow-[-5px_0_10px_-5px_rgba(0,0,0,0.05)]",
       render: (row) => (
         <div className="flex justify-end gap-1.5 pr-2">
+          {pp.isActionVisible("edit") && (
           <button
             onClick={() => handleEdit(row)}
             className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg transition-all"
@@ -179,6 +186,8 @@ const Supervisors = () => {
           >
             <Edit2 className="w-4 h-4" />
           </button>
+          )}
+          {pp.isActionVisible("delete") && (
           <button
             onClick={() => handleDeleteAction(row)}
             className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-all"
@@ -186,6 +195,7 @@ const Supervisors = () => {
           >
             <Trash2 className="w-4 h-4" />
           </button>
+          )}
         </div>
       ),
     },
@@ -233,7 +243,7 @@ const Supervisors = () => {
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
         <DataTable
           title="Supervisors"
-          columns={columns}
+          columns={pp.filterColumns(columns)}
           data={supervisors}
           loading={loading}
           // Pagination props
@@ -247,7 +257,7 @@ const Supervisors = () => {
           onLimitChange={handleLimitChange}
           // Header Actions
           onSearch={handleSearch}
-          actionButton={
+          actionButton={pp.isToolbarVisible("addSupervisor") ?
             <button
               onClick={handleAdd}
               className="h-10 px-5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all active:scale-95 whitespace-nowrap"
@@ -255,7 +265,7 @@ const Supervisors = () => {
               <Plus className="w-4 h-4" />
               Add Supervisor
             </button>
-          }
+          : null}
           // Expanded Row
           renderExpandedRow={renderDetailsRow}
         />

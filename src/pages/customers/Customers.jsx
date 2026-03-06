@@ -36,10 +36,20 @@ import { customerService } from "../../api/customerService";
 import { workerService } from "../../api/workerService";
 import { buildingService } from "../../api/buildingService";
 import api from "../../api/axiosInstance";
+import usePagePermissions from "../../utils/usePagePermissions";
+import AccessRequestModal from "../../components/AccessRequestModal";
 
 const Customers = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  const pp = usePagePermissions("customers");
+
+  const [accessModal, setAccessModal] = useState({
+    isOpen: false,
+    elementType: "",
+    elementKey: "",
+    elementLabel: "",
+  });
 
   const [loading, setLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
@@ -106,89 +116,48 @@ const Customers = () => {
 
   // --- Fetch Workers and Buildings for Filters ---
   useEffect(() => {
-    console.log("🚀 ========== useEffect for FILTERS TRIGGERED ==========");
     const fetchFiltersData = async () => {
-      console.log("🚀 Starting fetchFiltersData function...");
       setLoadingFilters(true);
       try {
-        console.log("🔄 Fetching workers and buildings for filters...");
+        // Fetch workers, buildings, and filter counts independently
+        // so a permission error on one doesn't block the others
+        const [workersRes, buildingsRes, countsRes] = await Promise.allSettled([
+          workerService.list(1, 1000, "", 1),
+          buildingService.list(1, 1000, ""),
+          api.get("/customers/filter-counts"),
+        ]);
 
-        // Fetch all workers (active status)
-        const workersRes = await workerService.list(1, 1000, "", 1);
-        console.log("👷 Workers response:", workersRes);
+        // Workers (may fail if user lacks workers.view permission)
+        if (workersRes.status === "fulfilled") {
+          setWorkers(workersRes.value?.data || []);
+        }
 
-        const workerData = workersRes?.data || [];
-        console.log("👷 Workers data:", workerData.length, "workers");
-        setWorkers(workerData);
+        // Buildings
+        if (buildingsRes.status === "fulfilled") {
+          setBuildings(buildingsRes.value?.data || []);
+        }
 
-        // Fetch all buildings
-        const buildingsRes = await buildingService.list(1, 1000, "");
-        console.log("🏢 Buildings response:", buildingsRes);
-
-        const buildingData = buildingsRes?.data || [];
-        console.log("🏢 Buildings data:", buildingData.length, "buildings");
-        setBuildings(buildingData);
-
-        // ⚡ FAST: Fetch filter counts using dedicated endpoint (no pending dues calculation)
-        console.log(
-          "📊 ========== FETCHING FILTER COUNTS (FAST ENDPOINT) ==========",
-        );
-        const countsRes = await api.get("/customers/filter-counts");
-        console.log("✅ Filter counts response:", countsRes.data);
-
-        if (countsRes.data?.data) {
+        // Filter counts
+        if (countsRes.status === "fulfilled" && countsRes.value?.data?.data) {
           const {
             workerCounts,
             buildingCounts,
             totalCustomersWithWorkers,
             totalCustomersWithBuildings,
-          } = countsRes.data.data;
+          } = countsRes.value.data.data;
 
-          // Store counts directly instead of loading all customers
           setWorkerCountsState(workerCounts || {});
           setBuildingCountsState(buildingCounts || {});
           setTotalWorkersCount(totalCustomersWithWorkers || 0);
           setTotalBuildingsCount(totalCustomersWithBuildings || 0);
-
-          console.log("✅ Filter counts loaded:");
-          console.log(
-            "   - Worker counts:",
-            Object.keys(workerCounts || {}).length,
-            "workers",
-          );
-          console.log(
-            "   - Building counts:",
-            Object.keys(buildingCounts || {}).length,
-            "buildings",
-          );
-          console.log("   - Total with workers:", totalCustomersWithWorkers);
-          console.log(
-            "   - Total with buildings:",
-            totalCustomersWithBuildings,
-          );
         }
 
-        // Set filters loaded flag AFTER state is updated
-        console.log("✅ Setting filtersDataLoaded to true...");
         setFiltersDataLoaded(true);
-        console.log("✅ Filters data loaded flag set to true");
       } catch (error) {
-        console.error("❌ ========== ERROR FETCHING FILTER DATA ==========");
-        console.error("❌ Error object:", error);
-        console.error("❌ Error message:", error.message);
-        console.error("❌ Error response:", error.response);
-        console.error(
-          "❌ Error details:",
-          error.response?.data || error.message,
-        );
-        toast.error("Failed to load filters");
-        // Still set to true even on error, but with empty data
+        console.error("Error fetching filter data:", error);
         setFiltersDataLoaded(true);
       } finally {
         setLoadingFilters(false);
-        console.log(
-          "✅ Filter loading complete. filtersDataLoaded should now be true",
-        );
       }
     };
 
@@ -993,6 +962,7 @@ const Customers = () => {
   const columns = [
     // ✅ COMBINED COLUMN (Name Top, Mobile Bottom)
     {
+      key: "name",
       header: "Customer",
       accessor: "customer.mobile",
       className: "min-w-[200px]",
@@ -1021,6 +991,7 @@ const Customers = () => {
       },
     },
     {
+      key: "vehicleInfo",
       header: "Vehicle Info",
       accessor: "registration_no",
       className: "min-w-[120px]",
@@ -1041,6 +1012,7 @@ const Customers = () => {
       },
     },
     {
+      key: "parkingNo",
       header: "Parking No",
       accessor: "parking_no",
       className: "min-w-[100px]",
@@ -1058,6 +1030,7 @@ const Customers = () => {
       },
     },
     {
+      key: "building",
       header: "Building",
       accessor: "customer.building",
       className: "min-w-[150px]",
@@ -1074,6 +1047,7 @@ const Customers = () => {
       ),
     },
     {
+      key: "flatNo",
       header: "Flat No",
       accessor: "customer.flat_no",
       className: "min-w-[80px]",
@@ -1087,6 +1061,7 @@ const Customers = () => {
       ),
     },
     {
+      key: "paymentStatus",
       header: "Payment Status",
       accessor: "vehicles",
       className: "min-w-[180px]",
@@ -1158,6 +1133,7 @@ const Customers = () => {
       },
     },
     {
+      key: "customerStatus",
       header: "Customer",
       accessor: "customer.status",
       className: "min-w-[120px] text-center",
@@ -1185,6 +1161,7 @@ const Customers = () => {
       ),
     },
     {
+      key: "vehicleStatus",
       header: "Vehicle Status",
       accessor: "vehicles",
       className: "min-w-[140px] text-center",
@@ -1232,39 +1209,50 @@ const Customers = () => {
       },
     },
     {
+      key: "actions",
       header: "Actions",
       className:
         "text-right sticky right-0 bg-white shadow-[-10px_0_10px_-10px_rgba(0,0,0,0.1)] min-w-[170px]",
       render: (row) => (
         <div className="flex items-center justify-end gap-1.5 pr-2">
-          <button
-            onClick={() => navigate(`/customers/${row.customer._id}/activity`)}
-            className="p-2 rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-600 hover:text-white border border-violet-100 transition-all shadow-sm hover:shadow-md"
-            title="Activity Tracking"
-          >
-            <Activity className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => handleEdit(row.customer)}
-            className="p-2 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white border border-indigo-100 transition-all shadow-sm hover:shadow-md"
-            title="Edit"
-          >
-            <Edit2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => handleArchive(row.customer._id)}
-            className="p-2 rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-500 hover:text-white border border-orange-100 transition-all shadow-sm hover:shadow-md"
-            title="Archive"
-          >
-            <Archive className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => handleDelete(row.customer._id)}
-            className="p-2 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white border border-rose-100 transition-all shadow-sm hover:shadow-md"
-            title="Delete"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          {pp.isActionVisible("activity") && (
+            <button
+              onClick={() =>
+                navigate(`/customers/${row.customer._id}/activity`)
+              }
+              className="p-2 rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-600 hover:text-white border border-violet-100 transition-all shadow-sm hover:shadow-md"
+              title="Activity Tracking"
+            >
+              <Activity className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {pp.isActionVisible("edit") && (
+            <button
+              onClick={() => handleEdit(row.customer)}
+              className="p-2 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white border border-indigo-100 transition-all shadow-sm hover:shadow-md"
+              title="Edit"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {pp.isActionVisible("archive") && (
+            <button
+              onClick={() => handleArchive(row.customer._id)}
+              className="p-2 rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-500 hover:text-white border border-orange-100 transition-all shadow-sm hover:shadow-md"
+              title="Archive"
+            >
+              <Archive className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {pp.isActionVisible("delete") && (
+            <button
+              onClick={() => handleDelete(row.customer._id)}
+              className="p-2 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white border border-rose-100 transition-all shadow-sm hover:shadow-md"
+              title="Delete"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       ),
     },
@@ -1460,193 +1448,211 @@ const Customers = () => {
           {/* LEFT SIDE: All Filters */}
           <div className="flex flex-wrap gap-3 items-end flex-1">
             {/* Customer Status Filter */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide px-1">
-                Customer Status
-              </span>
-              <div className="flex p-1 bg-gray-100 rounded-xl">
-                <button
-                  onClick={() => handleTabChange(1)}
-                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all shadow-sm ${
-                    activeTab === 1
-                      ? "bg-white text-blue-600 shadow"
-                      : "bg-transparent text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  Active
-                </button>
-                <button
-                  onClick={() => handleTabChange(2)}
-                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all shadow-sm ${
-                    activeTab === 2
-                      ? "bg-white text-red-600 shadow"
-                      : "bg-transparent text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  Inactive
-                </button>
+            {pp.isToolbarVisible("statusFilter") && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide px-1">
+                  Customer Status
+                </span>
+                <div className="flex p-1 bg-gray-100 rounded-xl">
+                  <button
+                    onClick={() => handleTabChange(1)}
+                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-all shadow-sm ${
+                      activeTab === 1
+                        ? "bg-white text-blue-600 shadow"
+                        : "bg-transparent text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    Active
+                  </button>
+                  <button
+                    onClick={() => handleTabChange(2)}
+                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-all shadow-sm ${
+                      activeTab === 2
+                        ? "bg-white text-red-600 shadow"
+                        : "bg-transparent text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    Inactive
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Vehicle Status Filter */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide px-1">
-                Vehicle Status
-              </span>
-              <div className="flex p-1 bg-gray-100 rounded-xl">
-                <button
-                  onClick={() => setVehicleStatusFilter("all")}
-                  className={`px-3 py-2 text-xs font-bold rounded-lg transition-all shadow-sm ${
-                    vehicleStatusFilter === "all"
-                      ? "bg-white text-indigo-600 shadow"
-                      : "bg-transparent text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => setVehicleStatusFilter("active")}
-                  className={`px-3 py-2 text-xs font-bold rounded-lg transition-all shadow-sm ${
-                    vehicleStatusFilter === "active"
-                      ? "bg-white text-emerald-600 shadow"
-                      : "bg-transparent text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  Active
-                </button>
-                <button
-                  onClick={() => setVehicleStatusFilter("inactive")}
-                  className={`px-3 py-2 text-xs font-bold rounded-lg transition-all shadow-sm ${
-                    vehicleStatusFilter === "inactive"
-                      ? "bg-white text-red-600 shadow"
-                      : "bg-transparent text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  Inactive
-                </button>
+            {pp.isToolbarVisible("vehicleStatusFilter") && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide px-1">
+                  Vehicle Status
+                </span>
+                <div className="flex p-1 bg-gray-100 rounded-xl">
+                  <button
+                    onClick={() => setVehicleStatusFilter("all")}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg transition-all shadow-sm ${
+                      vehicleStatusFilter === "all"
+                        ? "bg-white text-indigo-600 shadow"
+                        : "bg-transparent text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setVehicleStatusFilter("active")}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg transition-all shadow-sm ${
+                      vehicleStatusFilter === "active"
+                        ? "bg-white text-emerald-600 shadow"
+                        : "bg-transparent text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    Active
+                  </button>
+                  <button
+                    onClick={() => setVehicleStatusFilter("inactive")}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg transition-all shadow-sm ${
+                      vehicleStatusFilter === "inactive"
+                        ? "bg-white text-red-600 shadow"
+                        : "bg-transparent text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    Inactive
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Worker Filter */}
-            <div className="w-48 relative z-50">
-              <CustomDropdown
-                key={`worker-${workerVehicleCounts.totalVehicles}-${selectedBuilding}`}
-                label={`Filter by Worker (${workers.length})`}
-                value={selectedWorker}
-                onChange={(value) => {
-                  console.log("🔄 Worker filter changed:", value);
-                  setSelectedWorker(value);
-                  setPagination((prev) => ({ ...prev, page: 1 }));
-                }}
-                options={[
-                  {
-                    value: "__ANY_WORKER__",
-                    label: `All Workers (${workerVehicleCounts.totalVehicles})`,
-                  },
-                  ...workers.map((worker) => {
-                    const vehicleCount =
-                      workerVehicleCounts.counts[worker._id] || 0;
-                    const name =
-                      worker.name ||
-                      `${worker.firstName || ""} ${worker.lastName || ""}`.trim() ||
-                      "Unknown Worker";
-                    return {
-                      value: worker._id,
-                      label: `${name} (${vehicleCount})`,
-                    };
-                  }),
-                ]}
-                placeholder="All Workers"
-                icon={Users}
-                searchable={true}
-                disabled={loadingFilters}
-              />
-            </div>
+            {pp.isToolbarVisible("workerFilter") && (
+              <div className="w-48 relative z-50">
+                <CustomDropdown
+                  key={`worker-${workerVehicleCounts.totalVehicles}-${selectedBuilding}`}
+                  label={`Filter by Worker (${workers.length})`}
+                  value={selectedWorker}
+                  onChange={(value) => {
+                    console.log("🔄 Worker filter changed:", value);
+                    setSelectedWorker(value);
+                    setPagination((prev) => ({ ...prev, page: 1 }));
+                  }}
+                  options={[
+                    {
+                      value: "__ANY_WORKER__",
+                      label: `All Workers (${workerVehicleCounts.totalVehicles})`,
+                    },
+                    ...workers.map((worker) => {
+                      const vehicleCount =
+                        workerVehicleCounts.counts[worker._id] || 0;
+                      const name =
+                        worker.name ||
+                        `${worker.firstName || ""} ${worker.lastName || ""}`.trim() ||
+                        "Unknown Worker";
+                      return {
+                        value: worker._id,
+                        label: `${name} (${vehicleCount})`,
+                      };
+                    }),
+                  ]}
+                  placeholder="All Workers"
+                  icon={Users}
+                  searchable={true}
+                  disabled={loadingFilters}
+                />
+              </div>
+            )}
 
             {/* Building Filter */}
-            <div className="w-48 relative z-50">
-              <CustomDropdown
-                key={`building-${totalCustomersWithBuildings}-${selectedWorker}`}
-                label={`Filter by Building (${buildings.length})`}
-                value={selectedBuilding}
-                onChange={(value) => {
-                  console.log("🔄 Building filter changed:", value);
-                  setSelectedBuilding(value);
-                  setPagination((prev) => ({ ...prev, page: 1 }));
-                }}
-                options={[
-                  {
-                    value: "",
-                    label: `All Buildings (${totalCustomersWithBuildings})`,
-                  },
-                  ...buildings.map((building) => {
-                    const count = buildingCounts[building._id] || 0;
-                    const name = building.name || "Unknown Building";
-                    return {
-                      value: building._id,
-                      label: `${name} (${count})`,
-                    };
-                  }),
-                ]}
-                placeholder="All Buildings"
-                icon={Building}
-                searchable={true}
-                disabled={loadingFilters}
-              />
-            </div>
+            {pp.isToolbarVisible("buildingFilter") && (
+              <div className="w-48 relative z-50">
+                <CustomDropdown
+                  key={`building-${totalCustomersWithBuildings}-${selectedWorker}`}
+                  label={`Filter by Building (${buildings.length})`}
+                  value={selectedBuilding}
+                  onChange={(value) => {
+                    console.log("🔄 Building filter changed:", value);
+                    setSelectedBuilding(value);
+                    setPagination((prev) => ({ ...prev, page: 1 }));
+                  }}
+                  options={[
+                    {
+                      value: "",
+                      label: `All Buildings (${totalCustomersWithBuildings})`,
+                    },
+                    ...buildings.map((building) => {
+                      const count = buildingCounts[building._id] || 0;
+                      const name = building.name || "Unknown Building";
+                      return {
+                        value: building._id,
+                        label: `${name} (${count})`,
+                      };
+                    }),
+                  ]}
+                  placeholder="All Buildings"
+                  icon={Building}
+                  searchable={true}
+                  disabled={loadingFilters}
+                />
+              </div>
+            )}
           </div>
 
           {/* RIGHT SIDE: Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={handleDownloadTemplate}
-              className="h-10 px-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span className="hidden xl:inline">Template</span>
-            </button>
+            {pp.isToolbarVisible("template") && (
+              <button
+                onClick={handleDownloadTemplate}
+                className="h-10 px-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span className="hidden xl:inline">Template</span>
+              </button>
+            )}
 
-            <button
-              onClick={() => navigate("/customers/import-history")}
-              className="h-10 px-4 bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
-            >
-              <History className="w-4 h-4" />
-              <span className="hidden sm:inline">Import History</span>
-            </button>
+            {pp.isToolbarVisible("importHistory") && (
+              <button
+                onClick={() => navigate("/customers/import-history")}
+                className="h-10 px-4 bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
+              >
+                <History className="w-4 h-4" />
+                <span className="hidden sm:inline">Import History</span>
+              </button>
+            )}
 
-            <button
-              onClick={handleExport}
-              disabled={exporting}
-              className="h-10 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all disabled:opacity-70"
-            >
-              {exporting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Download className="w-4 h-4" />
-              )}
-              <span className="hidden sm:inline">Export</span>
-            </button>
+            {pp.isToolbarVisible("export") && (
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                className="h-10 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all disabled:opacity-70"
+              >
+                {exporting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">Export</span>
+              </button>
+            )}
 
-            <button
-              onClick={handleImportClick}
-              disabled={importLoading}
-              className="h-10 px-4 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all disabled:opacity-60"
-            >
-              {importLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <UploadCloud className="w-4 h-4" />
-              )}
-              <span className="hidden sm:inline">Import</span>
-            </button>
+            {pp.isToolbarVisible("import") && (
+              <button
+                onClick={handleImportClick}
+                disabled={importLoading}
+                className="h-10 px-4 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all disabled:opacity-60"
+              >
+                {importLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <UploadCloud className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">Import</span>
+              </button>
+            )}
 
-            <button
-              onClick={handleCreate}
-              className="h-10 px-5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg hover:shadow-xl transition-all active:scale-95"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Add Customer</span>
-            </button>
+            {pp.isToolbarVisible("addCustomer") && (
+              <button
+                onClick={handleCreate}
+                className="h-10 px-5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg hover:shadow-xl transition-all active:scale-95"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Add Customer</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1677,7 +1683,7 @@ const Customers = () => {
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden relative z-10">
         <DataTable
           key={activeTab}
-          columns={columns}
+          columns={pp.filterColumns(columns)}
           data={flattenedData}
           loading={loading}
           pagination={{
@@ -1889,6 +1895,23 @@ const Customers = () => {
         title={`Reactivate ${reactivationModal.type === "customer" ? "Customer" : "Vehicle"}`}
         entityName={reactivationModal.entityName}
         type={reactivationModal.type}
+      />
+
+      <AccessRequestModal
+        isOpen={accessModal.isOpen}
+        onClose={() =>
+          setAccessModal({
+            isOpen: false,
+            elementType: "",
+            elementKey: "",
+            elementLabel: "",
+          })
+        }
+        page="customers"
+        pageLabel="Customers"
+        elementType={accessModal.elementType}
+        elementKey={accessModal.elementKey}
+        elementLabel={accessModal.elementLabel}
       />
     </div>
   );

@@ -33,8 +33,10 @@ import { jobService } from "../../api/jobService";
 import { workerService } from "../../api/workerService";
 import { buildingService } from "../../api/buildingService";
 import { customerService } from "../../api/customerService";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 const Residence = () => {
+  const pp = usePagePermissions("washes_residence");
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [data, setData] = useState([]);
@@ -457,6 +459,7 @@ const Residence = () => {
   // --- Columns ---
   const columns = [
     {
+      key: "date",
       header: "Date",
       accessor: "assignedDate",
       render: (row) => (
@@ -472,6 +475,7 @@ const Residence = () => {
       ),
     },
     {
+      key: "completed",
       header: "Completed",
       accessor: "completedDate",
       render: (row) => (
@@ -482,6 +486,7 @@ const Residence = () => {
       ),
     },
     {
+      key: "status",
       header: "Status",
       accessor: "status",
       className: "w-24 text-center",
@@ -537,6 +542,7 @@ const Residence = () => {
       },
     },
     {
+      key: "customer",
       header: "Customer",
       accessor: "customer.mobile",
       render: (row) => (
@@ -551,6 +557,7 @@ const Residence = () => {
       ),
     },
     {
+      key: "vehicleDetails",
       header: "Vehicle Details",
       accessor: "vehicle.registration_no",
       render: (row) => (
@@ -583,6 +590,7 @@ const Residence = () => {
       ),
     },
     {
+      key: "building",
       header: "Building",
       accessor: "building.name",
       render: (row) => (
@@ -595,6 +603,7 @@ const Residence = () => {
       ),
     },
     {
+      key: "worker",
       header: "Worker",
       accessor: "worker.name",
       render: (row) => (
@@ -611,22 +620,100 @@ const Residence = () => {
       ),
     },
     {
+      key: "createdBy",
+      header: "Created By",
+      accessor: "createdSource",
+      render: (row) => {
+        const source = row.createdSource || "";
+        const name = row.createdByName || row.createdBy || "—";
+        const sourceConfig = {
+          "Cron Job": {
+            bg: "bg-slate-100",
+            text: "text-slate-600",
+            border: "border-slate-200",
+            label: "Cron Job",
+          },
+          "Admin Panel": {
+            bg: "bg-indigo-50",
+            text: "text-indigo-600",
+            border: "border-indigo-200",
+            label: "Admin Panel",
+          },
+          "Admin Panel (Run Scheduler)": {
+            bg: "bg-emerald-50",
+            text: "text-emerald-600",
+            border: "border-emerald-200",
+            label: "Run Scheduler",
+          },
+          "Staff App": {
+            bg: "bg-purple-50",
+            text: "text-purple-600",
+            border: "border-purple-200",
+            label: "Staff App",
+          },
+          "Customer App": {
+            bg: "bg-amber-50",
+            text: "text-amber-600",
+            border: "border-amber-200",
+            label: "Customer App",
+          },
+        }[source] || {
+          bg: "bg-gray-50",
+          text: "text-gray-500",
+          border: "border-gray-200",
+          label: source || "System",
+        };
+
+        const displayName = [
+          "Cron Scheduler",
+          "Manual Scheduler",
+          "Customer Booking",
+          "Cron Job",
+        ].includes(name)
+          ? ""
+          : name;
+
+        return (
+          <div className="flex flex-col gap-1">
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border w-fit ${sourceConfig.bg} ${sourceConfig.text} ${sourceConfig.border}`}
+            >
+              {sourceConfig.label}
+            </span>
+            {displayName && (
+              <span
+                className="text-[10px] text-slate-500 truncate max-w-[120px]"
+                title={displayName}
+              >
+                {displayName}
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "actions",
       header: "Actions",
       className: "text-right w-24 sticky right-0 bg-white",
       render: (row) => (
         <div className="flex justify-end gap-1.5 pr-2">
+          {pp.isActionVisible("edit") && (
           <button
             onClick={() => handleEdit(row)}
             className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg transition-all"
           >
             <Edit2 className="w-4 h-4" />
           </button>
+          )}
+          {pp.isActionVisible("delete") && (
           <button
             onClick={() => handleDelete(row._id)}
             className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-all"
           >
             <Trash2 className="w-4 h-4" />
           </button>
+          )}
         </div>
       ),
     },
@@ -652,6 +739,7 @@ const Residence = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          {pp.isToolbarVisible("runScheduler") && (
           <button
             onClick={handleRunScheduler}
             disabled={runningScheduler}
@@ -664,6 +752,8 @@ const Residence = () => {
             )}{" "}
             Run Scheduler
           </button>
+          )}
+          {pp.isToolbarVisible("export") && (
           <button
             onClick={handleExport}
             disabled={exporting}
@@ -676,17 +766,21 @@ const Residence = () => {
             )}{" "}
             Export
           </button>
+          )}
+          {pp.isToolbarVisible("addJob") && (
           <button
             onClick={handleCreate}
             className="h-11 px-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transition-all active:scale-95 flex items-center gap-2"
           >
             <Plus className="w-4 h-4" /> Schedule Job
           </button>
+          )}
         </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden flex flex-col">
         <div className="p-4 border-b border-gray-100 bg-slate-50/50 flex flex-col xl:flex-row gap-4 items-end">
+          {pp.isToolbarVisible("dateRange") && (
           <div className="w-full xl:w-auto">
             <span className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
               Date Range
@@ -697,8 +791,10 @@ const Residence = () => {
               onChange={handleDateChange}
             />
           </div>
+          )}
 
           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+            {pp.isToolbarVisible("statusFilter") && (
             <div>
               <CustomDropdown
                 label="Status"
@@ -709,6 +805,8 @@ const Residence = () => {
                 placeholder="All Status"
               />
             </div>
+            )}
+            {pp.isToolbarVisible("buildingFilter") && (
             <div>
               <CustomDropdown
                 label="Building"
@@ -720,6 +818,8 @@ const Residence = () => {
                 searchable={true}
               />
             </div>
+            )}
+            {pp.isToolbarVisible("workerFilter") && (
             <div>
               <CustomDropdown
                 label="Worker"
@@ -731,7 +831,9 @@ const Residence = () => {
                 searchable={true}
               />
             </div>
+            )}
 
+            {pp.isToolbarVisible("search") && (
             <div className="relative">
               <span className="text-xs font-bold text-slate-500 uppercase mb-1.5 block ml-1">
                 Search
@@ -747,11 +849,12 @@ const Residence = () => {
                 />
               </div>
             </div>
+            )}
           </div>
         </div>
 
         <DataTable
-          columns={columns}
+          columns={pp.filterColumns(columns)}
           data={filteredData}
           loading={loading}
           pagination={pagination}

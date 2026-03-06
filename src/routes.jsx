@@ -80,6 +80,11 @@ import Notifications from "./pages/notifications/Notifications";
 // Activity Tracking
 import AdminTracking from "./pages/tracking/AdminTracking";
 
+// Admin Staff Management
+import AdminStaff from "./pages/admin-staff/AdminStaff";
+import StaffPermissions from "./pages/admin-staff/StaffPermissions";
+import AccessRequests from "./pages/admin-staff/AccessRequests";
+
 export const routes = [
   // --- OVERVIEW ---
   {
@@ -335,6 +340,24 @@ export const routes = [
     path: "/tracking",
     title: "Activity Tracking",
     component: <AdminTracking />,
+  },
+
+  // --- ADMIN STAFF MANAGEMENT ---
+  {
+    path: "/admin-staff",
+    title: "Admin Staff",
+    component: <AdminStaff />,
+    icon: Shield,
+  },
+  {
+    path: "/admin-staff/:id/page-permissions",
+    title: "Page Permissions",
+    component: <StaffPermissions />,
+  },
+  {
+    path: "/admin-staff/access-requests",
+    title: "Access Requests",
+    component: <AccessRequests />,
   },
 
   // --- SUPERVISOR SECTION ---

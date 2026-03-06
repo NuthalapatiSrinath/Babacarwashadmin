@@ -21,6 +21,9 @@ import TermsOfService from "./pages/legal/TermsOfService";
 // Activity Tracker
 import adminTracker from "./utils/adminActivityTracker";
 
+// Permissions
+import { PERMISSION_MODULES } from "./utils/usePermissions";
+
 // --- Route Change Tracker (must be inside BrowserRouter) ---
 const RouteTracker = () => {
   const location = useLocation();
@@ -127,6 +130,23 @@ const ProtectedRouteContent = ({ route }) => {
     !supervisorAllowedAdminRoutes.includes(route.path)
   ) {
     return <Navigate to="/supervisor/dashboard" replace />;
+  }
+
+  // BLOCK: Manager (admin staff) accessing admin-only routes
+  if (userRole === "manager") {
+    // Admin Staff page is admin-only
+    if (route.path === "/admin-staff") {
+      return <Navigate to="/" replace />;
+    }
+
+    // Check permission for the route's module
+    const moduleName = PERMISSION_MODULES[route.path];
+    if (moduleName) {
+      const modulePerms = user.permissions?.[moduleName];
+      if (!modulePerms?.view) {
+        return <Navigate to="/" replace />;
+      }
+    }
   }
 
   // ALLOW: Route access granted

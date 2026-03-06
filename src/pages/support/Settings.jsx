@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { configurationService } from "../../api/configurationService";
+import usePagePermissions from "../../utils/usePagePermissions";
 
 // --- DEFAULT CONFIGURATION (Original Blue/Red) ---
 const DEFAULT_GRAPH_SETTINGS = {
@@ -79,6 +80,7 @@ const CURRENCY_OPTIONS = [
 ];
 
 const Settings = () => {
+  const pp = usePagePermissions("settings");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -329,6 +331,7 @@ const Settings = () => {
 
       <form onSubmit={handleSubmit} className="max-w-6xl grid gap-8">
         {/* --- 1. GENERAL SETTINGS --- */}
+        {(pp.isToolbarVisible("contactNumber") || pp.isToolbarVisible("currency")) && (
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm max-w-4xl">
           <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
             <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
@@ -341,6 +344,7 @@ const Settings = () => {
 
           <div className="grid gap-6 md:grid-cols-2">
             {/* Contact Number Field */}
+            {pp.isToolbarVisible("contactNumber") && (
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Support Contact Number
@@ -360,8 +364,10 @@ const Settings = () => {
                 />
               </div>
             </div>
+            )}
 
             {/* ✅ NEW: Currency Selector */}
+            {pp.isToolbarVisible("currency") && (
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Global Currency Symbol
@@ -392,10 +398,13 @@ const Settings = () => {
                 tables.
               </p>
             </div>
+            )}
           </div>
         </div>
+        )}
 
         {/* --- 2. GRAPH APPEARANCE (Untouched logic) --- */}
+        {pp.isToolbarVisible("graphColors") && (
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm max-w-4xl">
           <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
             <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
@@ -464,8 +473,10 @@ const Settings = () => {
             ))}
           </div>
         </div>
+        )}
 
         {/* --- 3. THEME COLORS (Split View) --- */}
+        {pp.isToolbarVisible("theme") && (
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
             <div className="flex items-center gap-3">
@@ -632,8 +643,10 @@ const Settings = () => {
             </div>
           </div>
         </div>
+        )}
 
         {/* --- ACTIONS BUTTONS --- */}
+        {pp.isToolbarVisible("save") && (
         <div className="flex justify-end pt-4 gap-3 max-w-4xl">
           <button
             type="button"
@@ -660,6 +673,7 @@ const Settings = () => {
             )}
           </button>
         </div>
+        )}
       </form>
     </div>
   );
