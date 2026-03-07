@@ -17,6 +17,7 @@ import autoTable from "jspdf-autotable";
 import { downloadWorkRecordsStatement } from "../../redux/slices/workRecordsSlice";
 import { fetchWorkers } from "../../redux/slices/workerSlice";
 import { workRecordsService } from "../../api/workRecordsService";
+import { supervisorService } from "../../api/supervisorService";
 import CustomDropdown from "../../components/ui/CustomDropdown";
 import usePagePermissions from "../../utils/usePagePermissions";
 
@@ -34,6 +35,10 @@ const WorkRecords = () => {
   const dispatch = useDispatch();
   const pp = usePagePermissions("workRecords");
   const { workers: workersList } = useSelector((state) => state.worker);
+  const userString = localStorage.getItem("user");
+  const user = userString ? JSON.parse(userString) : null;
+  const isSupervisor = user?.role === "supervisor";
+  const [teamWorkerIds, setTeamWorkerIds] = useState(null);
 
   const [pdfLoading, setPdfLoading] = useState(false);
   const [viewData, setViewData] = useState(null);
@@ -47,6 +52,23 @@ const WorkRecords = () => {
   const [backendTotals, setBackendTotals] = useState(null);
 
   const today = new Date();
+
+  // Load team worker IDs for supervisor
+  useEffect(() => {
+    if (!isSupervisor) return;
+    const loadTeam = async () => {
+      try {
+        const res = await supervisorService.getTeam({ limit: 1000 });
+        const ids = (res.data || []).map((w) => w._id);
+        setTeamWorkerIds(ids);
+      } catch (error) {
+        console.error("Failed to load team", error);
+        setTeamWorkerIds([]);
+      }
+    };
+    loadTeam();
+  }, [isSupervisor]);
+
   const currentMonth = today.getMonth() + 1;
   const currentYear = today.getFullYear();
   const maxValidYear = currentMonth === 1 ? currentYear - 1 : currentYear;
@@ -129,6 +151,9 @@ const WorkRecords = () => {
         return;
       }
 
+      // Wait for team worker IDs to load for supervisors
+      if (isSupervisor && teamWorkerIds === null) return;
+
       try {
         // Fetch data without worker filter to see all workers with data
         const response = await workRecordsService.getStatementData(
@@ -136,6 +161,7 @@ const WorkRecords = () => {
           filters.month,
           filters.serviceType,
           "", // Empty to get all workers
+          isSupervisor ? teamWorkerIds : null,
         );
 
         // Handle new format { data, total, ... } or old format (array)
@@ -159,16 +185,17 @@ const WorkRecords = () => {
     };
 
     fetchAvailableWorkers();
-  }, [filters.serviceType, filters.year, filters.month, availableMonths]);
+  }, [filters.serviceType, filters.year, filters.month, availableMonths, teamWorkerIds]);
 
   const workersOptions = useMemo(() => {
-    // Always show all workers of selected service type, not just those with data
     if (!workersList || workersList.length === 0) return [];
-    // Filter to show only workers matching the selected service type
-    return workersList
-      .filter((w) => w.service_type === filters.serviceType)
-      .map((w) => ({ value: w._id, label: w.name }));
-  }, [workersList, filters.serviceType]);
+    let filtered = workersList.filter((w) => w.service_type === filters.serviceType);
+    // For supervisors, only show their team workers
+    if (isSupervisor && teamWorkerIds && teamWorkerIds.length > 0) {
+      filtered = filtered.filter((w) => teamWorkerIds.includes(w._id));
+    }
+    return filtered.map((w) => ({ value: w._id, label: w.name }));
+  }, [workersList, filters.serviceType, isSupervisor, teamWorkerIds]);
 
   const pageSizeOptions = [
     { value: "a4-landscape", label: "A4 Landscape" },
@@ -184,6 +211,9 @@ const WorkRecords = () => {
         return;
       }
 
+      // Wait for team worker IDs to load for supervisors
+      if (isSupervisor && teamWorkerIds === null) return;
+
       setLoadingView(true);
 
       try {
@@ -194,9 +224,8 @@ const WorkRecords = () => {
           filters.serviceType === "residence" || filters.serviceType === "mall"
             ? filters.workerId
             : "",
+          isSupervisor && !filters.workerId ? teamWorkerIds : null,
         );
-
-        // Handle new format { data, total, columnTotals, ... } or old format (array)
         const data =
           response?.data || (Array.isArray(response) ? response : []);
         const totals = response?.columnTotals
@@ -280,6 +309,7 @@ const WorkRecords = () => {
     filters.year,
     filters.workerId,
     availableMonths.length,
+    teamWorkerIds,
   ]);
 
   const handleDownloadExcel = async () => {
@@ -328,6 +358,7 @@ const WorkRecords = () => {
           filters.serviceType === "residence" || filters.serviceType === "mall"
             ? filters.workerId
             : "",
+          isSupervisor && !filters.workerId ? teamWorkerIds : null,
         );
       }
 
@@ -1135,7 +1166,7 @@ const WorkRecords = () => {
                     }
                     options={[
                       { value: "", label: "All Workers" },
-                      ...workersOptions,
+                      ...availableWorkers,
                     ]}
                     icon={Filter}
                     placeholder="Filter by Worker"

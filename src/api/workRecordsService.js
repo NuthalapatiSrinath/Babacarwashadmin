@@ -22,14 +22,14 @@ export const workRecordsService = {
 
     const response = await api.get(`${baseUrl}/export/statement/monthly`, {
       params,
-      responseType: "blob", // Forces response to be a file
+      responseType: "blob",
     });
 
     return response.data;
   },
 
   // 2. JSON Data Fetch for Rich PDF (Corrected Route)
-  getStatementData: async (year, month, serviceType, workerId = "") => {
+  getStatementData: async (year, month, serviceType, workerId = "", workers = null) => {
     const baseUrl =
       serviceType === "onewash" || serviceType === "mall"
         ? "/onewash"
@@ -45,6 +45,10 @@ export const workRecordsService = {
 
     if (workerId) {
       params.workerId = workerId;
+    }
+
+    if (workers && workers.length > 0) {
+      params.workers = workers;
     }
 
     // Hits the SAME endpoint but asks for JSON format

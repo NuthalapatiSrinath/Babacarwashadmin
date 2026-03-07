@@ -39,7 +39,6 @@ import EditPaymentAmountModal from "../../components/modals/EditPaymentAmountMod
 import RichDateRangePicker from "../../components/inputs/RichDateRangePicker";
 import CustomDropdown from "../../components/ui/CustomDropdown";
 import usePagePermissions from "../../utils/usePagePermissions";
-import { toShiftRange } from "../../utils/shiftTime";
 
 // Redux
 import { exportPayments } from "../../redux/slices/paymentSlice";
@@ -92,7 +91,7 @@ const OneWashPayments = () => {
         .split("T")[0];
     }
 
-    return toShiftRange(startStr, endStr);
+    return { startDate: startStr, endDate: endStr };
   };
 
   const [activeTab, setActiveTab] = useState("today");
@@ -171,15 +170,7 @@ const OneWashPayments = () => {
   const fetchData = async (page = 1, limit = 100) => {
     try {
       const apiFilters = { ...filters };
-      // If dates are YYYY-MM-DD (from custom picker), convert to shift range
-      if (apiFilters.startDate && apiFilters.startDate.length === 10) {
-        const shiftRange = toShiftRange(
-          apiFilters.startDate,
-          apiFilters.endDate,
-        );
-        apiFilters.startDate = shiftRange.startDate;
-        apiFilters.endDate = shiftRange.endDate;
-      }
+
       const isSearching = searchTerm.trim().length > 0;
       const fetchLimit = isSearching ? 3000 : limit;
 

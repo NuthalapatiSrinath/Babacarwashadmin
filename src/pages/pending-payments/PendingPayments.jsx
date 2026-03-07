@@ -478,14 +478,7 @@ const PendingPayments = () => {
           currentY += 3;
 
           const tableHead = [
-            [
-              "Sl",
-              "Parking",
-              "Reg No",
-              "Building",
-              "Amount",
-              "Due Date",
-            ],
+            ["Sl", "Parking", "Reg No", "Building", "Amount", "Due Date"],
           ];
           let workerTotal = 0;
           const tableBody = workerGroup.payments.map((p, i) => {
@@ -501,14 +494,7 @@ const PendingPayments = () => {
             ];
           });
           // Add total row at bottom
-          tableBody.push([
-            "",
-            "",
-            "",
-            "TOTAL",
-            workerTotal.toFixed(2),
-            "",
-          ]);
+          tableBody.push(["", "", "", "TOTAL", workerTotal.toFixed(2), ""]);
 
           autoTable(doc, {
             startY: currentY,
@@ -800,7 +786,15 @@ const PendingPayments = () => {
             <div className="text-sm font-bold text-slate-700">
               Total Amount Due:{" "}
               <span className="text-red-600 text-base">
-                {data.reduce((sum, r) => sum + (Number(r.total_amount || 0) - Number(r.amount_paid || 0)), 0).toFixed(2)}
+                {data
+                  .reduce(
+                    (sum, r) =>
+                      sum +
+                      (Number(r.total_amount || 0) -
+                        Number(r.amount_paid || 0)),
+                    0,
+                  )
+                  .toFixed(2)}
               </span>
               <span className="text-[10px] text-slate-400 ml-1">AED</span>
             </div>

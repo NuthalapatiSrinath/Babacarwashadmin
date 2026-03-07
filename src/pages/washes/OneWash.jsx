@@ -29,7 +29,6 @@ import CustomDropdown from "../../components/ui/CustomDropdown";
 import { oneWashService } from "../../api/oneWashService";
 import { workerService } from "../../api/workerService";
 import usePagePermissions from "../../utils/usePagePermissions";
-import { toShiftRange } from "../../utils/shiftTime";
 
 const OneWash = () => {
   const pp = usePagePermissions("washes_onewash");
@@ -138,19 +137,16 @@ const OneWash = () => {
         return;
       }
 
-      const shiftRange = toShiftRange(
-        filters.startDate.length > 10
-          ? start.toISOString().split("T")[0]
-          : filters.startDate,
-        filters.endDate.length > 10
-          ? end.toISOString().split("T")[0]
-          : filters.endDate,
-      );
-
       const apiFilters = {
         ...filters,
-        startDate: shiftRange.startDate,
-        endDate: shiftRange.endDate,
+        startDate:
+          filters.startDate.length > 10
+            ? start.toISOString().split("T")[0]
+            : filters.startDate,
+        endDate:
+          filters.endDate.length > 10
+            ? end.toISOString().split("T")[0]
+            : filters.endDate,
       };
 
       const res = await oneWashService.list(
@@ -189,19 +185,16 @@ const OneWash = () => {
 
     setExporting(true);
     try {
-      const shiftRange = toShiftRange(
-        filters.startDate.length > 10
-          ? filters.startDate.split("T")[0]
-          : filters.startDate,
-        filters.endDate.length > 10
-          ? filters.endDate.split("T")[0]
-          : filters.endDate,
-      );
-
       const apiFilters = {
         ...filters,
-        startDate: shiftRange.startDate,
-        endDate: shiftRange.endDate,
+        startDate:
+          filters.startDate.length > 10
+            ? filters.startDate.split("T")[0]
+            : filters.startDate,
+        endDate:
+          filters.endDate.length > 10
+            ? filters.endDate.split("T")[0]
+            : filters.endDate,
       };
 
       // 1. Fetch All Data

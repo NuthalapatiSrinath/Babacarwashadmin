@@ -27,7 +27,6 @@ import CustomDropdown from "../../components/ui/CustomDropdown";
 
 import { oneWashService } from "../../api/oneWashService";
 import { supervisorService } from "../../api/supervisorService";
-import { toShiftRange } from "../../utils/shiftTime";
 
 const SupervisorOnewash = () => {
   const [loading, setLoading] = useState(false);
@@ -136,13 +135,8 @@ const SupervisorOnewash = () => {
         return;
       }
 
-      // Convert calendar dates to shift-based range (18:30-18:30 Dubai time)
-      const shiftRange = toShiftRange(filters.startDate, filters.endDate);
-
       const apiFilters = {
         ...filters,
-        startDate: shiftRange.startDate,
-        endDate: shiftRange.endDate,
       };
 
       // Send team worker IDs so only team data is returned
@@ -194,12 +188,8 @@ const SupervisorOnewash = () => {
 
     setExporting(true);
     try {
-      const shiftRange = toShiftRange(filters.startDate, filters.endDate);
-
       const apiFilters = {
         ...filters,
-        startDate: shiftRange.startDate,
-        endDate: shiftRange.endDate,
       };
 
       const res = await oneWashService.list(1, 10000, searchTerm, apiFilters);

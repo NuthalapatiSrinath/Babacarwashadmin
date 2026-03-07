@@ -30,7 +30,6 @@ import ReceiptModal from "../../components/modals/ReceiptModal";
 
 // API
 import { oneWashService } from "../../api/oneWashService";
-import { toShiftRange } from "../../utils/shiftTime";
 
 const SupervisorOneWashPayments = () => {
   const [currency, setCurrency] = useState("AED");
@@ -77,11 +76,9 @@ const SupervisorOneWashPayments = () => {
       start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       end = new Date(today.getFullYear(), today.getMonth(), 0);
     }
-    // Convert calendar dates to shift-based range (18:30-18:30 Dubai time)
     const fmt = (d) =>
       `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    const shiftRange = toShiftRange(fmt(start), fmt(end));
-    return { startDate: shiftRange.startDate, endDate: shiftRange.endDate };
+    return { startDate: fmt(start), endDate: fmt(end) };
   };
 
   const [activeTab, setActiveTab] = useState("today");
@@ -138,17 +135,7 @@ const SupervisorOneWashPayments = () => {
         const isSearching = searchTerm.trim().length > 0;
         const fetchLimit = isSearching ? 3000 : limit;
 
-        // If dates are YYYY-MM-DD (from custom picker), convert to shift range
         let apiFilters = { ...filters };
-        if (
-          filters.startDate &&
-          filters.endDate &&
-          filters.startDate.length === 10
-        ) {
-          const shiftRange = toShiftRange(filters.startDate, filters.endDate);
-          apiFilters.startDate = shiftRange.startDate;
-          apiFilters.endDate = shiftRange.endDate;
-        }
 
         const result = await oneWashService.list(
           page,
