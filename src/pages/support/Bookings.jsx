@@ -44,6 +44,108 @@ const Bookings = () => {
     limit: 100,
   });
 
+  const isObjectIdLike = (value) => {
+    const text = value?.toString?.().trim?.() || "";
+    return /^[a-fA-F0-9]{24}$/.test(text);
+  };
+
+  const getLocationText = (row) => {
+    const serviceType = (row.service_type || "").toString().toLowerCase();
+
+    if (row.service_type === "mall" && row.mall?.name) {
+      return row.mall.name;
+    }
+
+    const locationName =
+      row.location_name?.toString?.().trim?.() ||
+      row.location?.address?.toString?.().trim?.() ||
+      row.location?.name?.toString?.().trim?.() ||
+      row.customer?.location?.address?.toString?.().trim?.() ||
+      row.customer?.location?.name?.toString?.().trim?.() ||
+      "";
+
+    const buildingName =
+      row.building_name?.toString?.().trim?.() ||
+      row.building?.name?.toString?.().trim?.() ||
+      row.customer?.building?.name?.toString?.().trim?.() ||
+      "";
+
+    const flatNo =
+      row.flat_no?.toString?.().trim?.() ||
+      row.customer?.flat_no?.toString?.().trim?.() ||
+      "";
+
+    const composed = [
+      !isObjectIdLike(locationName) ? locationName : "",
+      !isObjectIdLike(buildingName) ? buildingName : "",
+      flatNo ? `Flat ${flatNo}` : "",
+    ]
+      .filter(Boolean)
+      .join(" • ");
+
+    if (composed) {
+      return composed;
+    }
+
+    const locationTextCandidates = [
+      serviceType === "mobile" ? row.address : "",
+      row.location?.address,
+      row.location?.name,
+      row.customer?.location?.address,
+      row.customer?.location?.name,
+      row.building?.name,
+      row.customer?.building?.name,
+      row.customer?.city,
+      row.customer?.address,
+    ];
+
+    for (const value of locationTextCandidates) {
+      const text = value?.toString?.().trim?.() || "";
+      if (text && !isObjectIdLike(text)) {
+        return text;
+      }
+    }
+
+    return "";
+  };
+
+  const getBuildingText = (row) => {
+    const candidates = [
+      row.building_name,
+      row.building?.name,
+      row.customer?.building?.name,
+      row.customer?.building,
+    ];
+
+    for (const value of candidates) {
+      const text = value?.toString?.().trim?.() || "";
+      if (text && !isObjectIdLike(text)) return text;
+    }
+    return "";
+  };
+
+  const getAddressText = (row) => {
+    const serviceType = (row.service_type || "").toString().toLowerCase();
+    if (serviceType !== "mobile") return "";
+
+    const flat =
+      row.flat_no?.toString?.().trim?.() ||
+      row.customer?.flat_no?.toString?.().trim?.() ||
+      "";
+    const parking =
+      row.parking_no?.toString?.().trim?.() ||
+      row.vehicle?.parking_no?.toString?.().trim?.() ||
+      "";
+
+    const parts = [
+      row.address?.toString?.().trim?.() || "",
+      flat ? `Flat ${flat}` : "",
+      parking ? `Parking ${parking}` : "",
+    ].filter(Boolean);
+
+    return parts.join(" • ");
+  };
+
   // Fetch data on mount and when pagination changes
   useEffect(() => {
     dispatch(
@@ -75,18 +177,9 @@ const Bookings = () => {
       const worker = row.worker?.name?.toLowerCase() || "";
 
       // 2. Resolve Location Logic for Search
-      let location = "";
-      if (row.service_type === "mall" && row.mall) {
-        location = row.mall.name?.toLowerCase() || "";
-      } else {
-        location = (
-          row.address ||
-          row.customer?.location ||
-          row.customer?.building ||
-          row.customer?.city ||
-          ""
-        ).toLowerCase();
-      }
+      const location = getLocationText(row).toLowerCase();
+      const building = getBuildingText(row).toLowerCase();
+      const address = getAddressText(row).toLowerCase();
 
       // 3. Check match
       return (
@@ -94,6 +187,8 @@ const Bookings = () => {
         vehicle.includes(lowerTerm) ||
         parking.includes(lowerTerm) ||
         location.includes(lowerTerm) ||
+        building.includes(lowerTerm) ||
+        address.includes(lowerTerm) ||
         worker.includes(lowerTerm)
       );
     });
@@ -241,30 +336,51 @@ const Bookings = () => {
     },
     {
       header: "Location",
-      accessor: "premise",
+      accessor: "location",
       key: "location",
-      // ✅ CHANGED: Removed max-width restriction for wrapping
-      className: "min-w-[180px] max-w-[280px]",
+      className: "min-w-[150px] max-w-[220px]",
       render: (row) => {
-        let premiseName = null;
-        if (row.service_type === "mall" && row.mall) {
-          premiseName = row.mall.name;
-        } else {
-          premiseName =
-            row.address ||
-            row.customer?.location ||
-            row.customer?.building ||
-            row.customer?.city;
-        }
+        const locationName = getLocationText(row);
 
-        return premiseName ? (
+        return locationName ? (
           <div className="flex items-start gap-1.5">
             <MapPin className="w-3.5 h-3.5 mt-1 shrink-0 text-red-500" />
-            {/* ✅ CHANGED: whitespace-normal allows wrapping */}
             <span className="text-sm leading-snug text-slate-600 whitespace-normal break-words">
-              {premiseName}
+              {locationName}
             </span>
           </div>
+        ) : (
+          <span className="text-slate-400 text-xs">-</span>
+        );
+      },
+    },
+    {
+      header: "Building",
+      accessor: "building",
+      key: "building",
+      className: "min-w-[140px] max-w-[220px]",
+      render: (row) => {
+        const text = getBuildingText(row);
+        return text ? (
+          <span className="text-sm leading-snug text-slate-600 whitespace-normal break-words">
+            {text}
+          </span>
+        ) : (
+          <span className="text-slate-400 text-xs">-</span>
+        );
+      },
+    },
+    {
+      header: "Address",
+      accessor: "address",
+      key: "address",
+      className: "min-w-[190px] max-w-[300px]",
+      render: (row) => {
+        const text = getAddressText(row);
+        return text ? (
+          <span className="text-sm leading-snug text-slate-600 whitespace-normal break-words">
+            {text}
+          </span>
         ) : (
           <span className="text-slate-400 text-xs">-</span>
         );
@@ -322,39 +438,53 @@ const Bookings = () => {
       header: "Actions",
       className:
         "text-right w-28 sticky right-0 bg-white shadow-[-5px_0_10px_-5px_rgba(0,0,0,0.05)]",
-      render: (row) => (
-        <div className="flex items-center justify-end gap-1 px-2">
-          {pp.isActionVisible("assignWorker") && (
-            <button
-              onClick={() => handleOpenAssign(row)}
-              className="p-1.5 hover:bg-blue-50 rounded text-slate-400 hover:text-blue-600 transition-colors"
-              title="Assign Worker"
-            >
-              <UserPlus className="w-4 h-4" />
-            </button>
-          )}
+      render: (row) => {
+        const normalizedStatus = (row.status || "").toString().toLowerCase();
+        const isFinalStatus = [
+          "accepted",
+          "completed",
+          "rejected",
+          "cancelled",
+          "canceled",
+        ].includes(normalizedStatus);
+        const canAssign = pp.isActionVisible("assignWorker") && !isFinalStatus;
+        const canAccept =
+          pp.isActionVisible("accept") && !isFinalStatus && !!row.worker;
 
-          {pp.isActionVisible("accept") && row.status !== "accepted" && (
-            <button
-              onClick={() => handleAccept(row)}
-              className="p-1.5 hover:bg-emerald-50 rounded text-slate-400 hover:text-emerald-600 transition-colors"
-              title="Accept"
-            >
-              <CheckCircle className="w-4 h-4" />
-            </button>
-          )}
+        return (
+          <div className="flex items-center justify-end gap-1 px-2">
+            {canAssign && (
+              <button
+                onClick={() => handleOpenAssign(row)}
+                className="p-1.5 hover:bg-blue-50 rounded text-slate-400 hover:text-blue-600 transition-colors"
+                title="Assign Worker"
+              >
+                <UserPlus className="w-4 h-4" />
+              </button>
+            )}
 
-          {pp.isActionVisible("delete") && (
-            <button
-              onClick={() => handleDelete(row)}
-              className="p-1.5 hover:bg-red-50 rounded text-slate-400 hover:text-red-600 transition-colors"
-              title="Delete"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      ),
+            {canAccept && (
+              <button
+                onClick={() => handleAccept(row)}
+                className="p-1.5 hover:bg-emerald-50 rounded text-slate-400 hover:text-emerald-600 transition-colors"
+                title="Accept"
+              >
+                <CheckCircle className="w-4 h-4" />
+              </button>
+            )}
+
+            {pp.isActionVisible("delete") && (
+              <button
+                onClick={() => handleDelete(row)}
+                className="p-1.5 hover:bg-red-50 rounded text-slate-400 hover:text-red-600 transition-colors"
+                title="Delete"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 

@@ -40,6 +40,25 @@ import usePagePermissions from "../../utils/usePagePermissions";
 import AccessRequestModal from "../../components/AccessRequestModal";
 
 const Customers = () => {
+  const formatMobileWithCountry = (mobile) => {
+    const raw = String(mobile || "").trim();
+    if (!raw) return "-";
+
+    // Legacy local auto format had one extra zero: 2000000xxx.
+    // Display both old/new formats in unified UAE style (+971200000xxx).
+    if (/^2000000\d{3}$/.test(raw)) return `+971200000${raw.slice(7)}`;
+    if (/^200000\d{3,}$/.test(raw)) return `+971${raw}`;
+
+    // Keep full international numbers readable with explicit + prefix.
+    if (raw.startsWith("971")) return `+${raw}`;
+
+    // Normalize UAE local formats for display only.
+    if (/^05\d{8}$/.test(raw)) return `+971${raw.slice(1)}`;
+    if (/^5\d{8}$/.test(raw)) return `+971${raw}`;
+
+    return raw.startsWith("+") ? raw : `+${raw}`;
+  };
+
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const pp = usePagePermissions("customers");
@@ -983,7 +1002,7 @@ const Customers = () => {
                 )}
               </span>
               <span className="text-xs text-slate-500 font-mono flex items-center gap-1">
-                <Phone className="w-3 h-3" /> {row.customer?.mobile}
+                <Phone className="w-3 h-3" /> {formatMobileWithCountry(row.customer?.mobile)}
               </span>
             </div>
           </div>

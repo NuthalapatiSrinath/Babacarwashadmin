@@ -3,6 +3,7 @@ import { useDispatch } from "react-redux";
 import { X, User, MapPin, Loader2, Building, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
+import CustomDropdown from "../ui/CustomDropdown";
 
 // APIs
 import { attendanceService } from "../../api/attendanceService";
@@ -29,17 +30,46 @@ const AssignWorkerModal = ({ isOpen, onClose, booking, onSuccess }) => {
     building: "",
   });
 
+  const toId = (value) => {
+    if (!value) return "";
+    if (typeof value === "string") return value.trim();
+    const raw = value?._id || value?.id || "";
+    return raw ? String(raw).trim() : "";
+  };
+
+  const normalizeText = (value) =>
+    (value || "").toString().trim().toLowerCase();
+
+  const normalizeServiceType = (value) => {
+    const t = normalizeText(value);
+    if (["mobile", "residence", "mall"].includes(t)) return t;
+    return "";
+  };
+
+  const getWorkerServiceType = (worker) => {
+    const direct = normalizeServiceType(
+      worker?.service_type || worker?.serviceType || worker?.type,
+    );
+    if (direct) return direct;
+
+    if (Array.isArray(worker?.malls) && worker.malls.length > 0) return "mall";
+    if (Array.isArray(worker?.buildings) && worker.buildings.length > 0) {
+      return "residence";
+    }
+    return "";
+  };
+
+  const extractList = (res) => {
+    if (Array.isArray(res)) return res;
+    if (Array.isArray(res?.data)) return res.data;
+    if (Array.isArray(res?.data?.data)) return res.data.data;
+    return [];
+  };
+
   // --- Load Data ---
   useEffect(() => {
     if (isOpen) {
       setDataLoading(true);
-
-      // Pre-fill form
-      setFormData({
-        worker: booking?.worker?._id || "",
-        location: booking?.customer?.location || "",
-        building: booking?.customer?.building || "",
-      });
 
       const loadData = async () => {
         try {
@@ -52,21 +82,75 @@ const AssignWorkerModal = ({ isOpen, onClose, booking, onSuccess }) => {
 
           // 1. Workers
           const workerList = (workersRes.data || []).filter(
-            (u) => u.role === "worker" || !u.role
+            (u) => u.role === "worker" || !u.role,
           );
           setWorkers(workerList);
 
-          // 2. Locations (Handle {data: []} vs [])
-          const rawLocs = locRes.data || locRes;
-          const locList = Array.isArray(rawLocs) ? rawLocs : rawLocs.data || [];
+          // 2. Locations (supports [], {data: []}, {data: {data: []}})
+          const locList = extractList(locRes);
           setLocations(locList);
 
-          // 3. Buildings
-          const rawBuilds = buildRes.data || buildRes;
-          const buildList = Array.isArray(rawBuilds)
-            ? rawBuilds
-            : rawBuilds.data || [];
+          // 3. Buildings (supports [], {data: []}, {data: {data: []}})
+          const buildList = extractList(buildRes);
           setAllBuildings(buildList);
+
+          // 4. Prefill selected worker/location/building after dropdown data is loaded
+          const initialWorkerId = toId(booking?.worker);
+
+          const bookingLocationId =
+            toId(booking?.location) || toId(booking?.customer?.location);
+          const bookingLocationName =
+            booking?.location_name ||
+            booking?.location?.address ||
+            booking?.location?.name ||
+            booking?.customer?.location?.address ||
+            booking?.customer?.location?.name ||
+            "";
+
+          let initialLocationId = bookingLocationId;
+          const hasLocationInList = locList.some(
+            (l) => toId(l) === initialLocationId,
+          );
+          if (!initialLocationId || !hasLocationInList) {
+            const matchedLocation = locList.find((l) => {
+              const text = normalizeText(l?.address || l?.name || "");
+              return text && text === normalizeText(bookingLocationName);
+            });
+            initialLocationId = toId(matchedLocation);
+          }
+
+          const buildingsForLocation = initialLocationId
+            ? buildList.filter(
+                (b) =>
+                  toId(b?.location_id || b?.location) === initialLocationId,
+              )
+            : [];
+
+          const bookingBuildingId =
+            toId(booking?.building) || toId(booking?.customer?.building);
+          const bookingBuildingName =
+            booking?.building_name ||
+            booking?.building?.name ||
+            booking?.customer?.building?.name ||
+            "";
+
+          let initialBuildingId = bookingBuildingId;
+          const hasBuildingInList = buildingsForLocation.some(
+            (b) => toId(b) === initialBuildingId,
+          );
+          if (!initialBuildingId || !hasBuildingInList) {
+            const matchedBuilding = buildingsForLocation.find(
+              (b) =>
+                normalizeText(b?.name) === normalizeText(bookingBuildingName),
+            );
+            initialBuildingId = toId(matchedBuilding);
+          }
+
+          setFormData({
+            worker: initialWorkerId,
+            location: initialLocationId,
+            building: initialBuildingId,
+          });
         } catch (error) {
           console.error("Failed to load dropdowns", error);
           toast.error("Could not load options");
@@ -79,21 +163,62 @@ const AssignWorkerModal = ({ isOpen, onClose, booking, onSuccess }) => {
   }, [isOpen, booking]);
 
   // --- Cascading Filter ---
+  const targetServiceType = normalizeServiceType(booking?.service_type);
+
+  const filteredWorkers = useMemo(() => {
+    if (!targetServiceType) return workers;
+    return workers.filter((w) => getWorkerServiceType(w) === targetServiceType);
+  }, [workers, targetServiceType]);
+
+  const workerOptions = useMemo(
+    () =>
+      filteredWorkers.map((w) => ({
+        value: toId(w),
+        label: `${w.name || "Unknown"}${w.mobile ? ` (${w.mobile})` : ""}`,
+      })),
+    [filteredWorkers],
+  );
+
+  const locationOptions = useMemo(
+    () =>
+      locations.map((loc) => ({
+        value: toId(loc),
+        label: loc.address || loc.name || "Unknown Location",
+      })),
+    [locations],
+  );
+
   const filteredBuildings = useMemo(() => {
     if (!formData.location) return [];
 
     return allBuildings.filter((b) => {
-      // Check ID or Populated Object
-      const bLocId = b.location_id || b.location?._id || b.location;
+      const bLocId = toId(b.location_id || b.location);
       return bLocId === formData.location;
     });
   }, [formData.location, allBuildings]);
 
+  const buildingOptions = useMemo(
+    () =>
+      filteredBuildings.map((b) => ({
+        value: toId(b),
+        label: b.name || "Unknown Building",
+      })),
+    [filteredBuildings],
+  );
+
+  useEffect(() => {
+    if (!formData.worker) return;
+    const exists = filteredWorkers.some((w) => toId(w) === formData.worker);
+    if (!exists) {
+      setFormData((prev) => ({ ...prev, worker: "" }));
+    }
+  }, [filteredWorkers, formData.worker]);
+
   // --- Handlers ---
-  const handleLocationChange = (e) => {
+  const handleLocationChange = (value) => {
     setFormData((prev) => ({
       ...prev,
-      location: e.target.value,
+      location: value,
       building: "",
     }));
   };
@@ -112,7 +237,7 @@ const AssignWorkerModal = ({ isOpen, onClose, booking, onSuccess }) => {
         assignWorker({
           id: booking._id,
           payload: formData,
-        })
+        }),
       ).unwrap();
       toast.success("Worker assigned successfully");
       onSuccess();
@@ -178,29 +303,25 @@ const AssignWorkerModal = ({ isOpen, onClose, booking, onSuccess }) => {
                     <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
                       Worker
                     </label>
-                    <div className="relative group">
-                      <User className="absolute left-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-                      <select
-                        value={formData.worker}
-                        onChange={(e) =>
-                          setFormData({ ...formData, worker: e.target.value })
-                        }
-                        className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none bg-white cursor-pointer hover:border-slate-300 transition-colors appearance-none"
-                      >
-                        <option value="" className="text-slate-400 bg-white">
-                          Select Worker
-                        </option>
-                        {workers.map((w) => (
-                          <option
-                            key={w._id}
-                            value={w._id}
-                            className="text-slate-800 bg-white"
-                          >
-                            {w.name} ({w.mobile})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <CustomDropdown
+                      value={formData.worker}
+                      onChange={(value) =>
+                        setFormData((prev) => ({ ...prev, worker: value }))
+                      }
+                      options={workerOptions}
+                      placeholder={
+                        targetServiceType
+                          ? `Select ${targetServiceType} worker`
+                          : "Select Worker"
+                      }
+                      icon={User}
+                      searchable
+                    />
+                    {targetServiceType && workerOptions.length === 0 && (
+                      <p className="text-xs text-amber-600 mt-2">
+                        No active {targetServiceType} workers available.
+                      </p>
+                    )}
                   </div>
 
                   {/* Residence Details */}
@@ -216,36 +337,14 @@ const AssignWorkerModal = ({ isOpen, onClose, booking, onSuccess }) => {
                         <label className="block text-xs font-semibold text-slate-600 mb-1.5">
                           Location
                         </label>
-                        <div className="relative group">
-                          <MapPin className="absolute left-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-                          <select
-                            value={formData.location}
-                            onChange={handleLocationChange}
-                            className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none bg-white cursor-pointer appearance-none"
-                          >
-                            <option
-                              value=""
-                              className="text-slate-400 bg-white"
-                            >
-                              Select Location
-                            </option>
-                            {locations.length > 0 ? (
-                              locations.map((loc) => (
-                                <option
-                                  key={loc._id}
-                                  value={loc._id}
-                                  className="text-slate-800 bg-white"
-                                >
-                                  {loc.name}
-                                </option>
-                              ))
-                            ) : (
-                              <option value="" disabled className="bg-white">
-                                No locations found
-                              </option>
-                            )}
-                          </select>
-                        </div>
+                        <CustomDropdown
+                          value={formData.location}
+                          onChange={handleLocationChange}
+                          options={locationOptions}
+                          placeholder="Select Location"
+                          icon={MapPin}
+                          searchable
+                        />
                       </div>
 
                       {/* Building Select */}
@@ -253,46 +352,24 @@ const AssignWorkerModal = ({ isOpen, onClose, booking, onSuccess }) => {
                         <label className="block text-xs font-semibold text-slate-600 mb-1.5">
                           Building
                         </label>
-                        <div className="relative group">
-                          <Building className="absolute left-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-                          <select
-                            value={formData.building}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                building: e.target.value,
-                              })
-                            }
-                            disabled={!formData.location}
-                            className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors cursor-pointer appearance-none"
-                          >
-                            <option
-                              value=""
-                              className="text-slate-400 bg-white"
-                            >
-                              {formData.location
-                                ? "Select Building"
-                                : "Select Location First"}
-                            </option>
-                            {filteredBuildings.length > 0 ? (
-                              filteredBuildings.map((b) => (
-                                <option
-                                  key={b._id}
-                                  value={b._id}
-                                  className="text-slate-800 bg-white"
-                                >
-                                  {b.name}
-                                </option>
-                              ))
-                            ) : (
-                              <option value="" disabled className="bg-white">
-                                {locations.length > 0
-                                  ? "No buildings here"
-                                  : "Loading..."}
-                              </option>
-                            )}
-                          </select>
-                        </div>
+                        <CustomDropdown
+                          value={formData.building}
+                          onChange={(value) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              building: value,
+                            }))
+                          }
+                          options={buildingOptions}
+                          placeholder={
+                            formData.location
+                              ? "Select Building"
+                              : "Select Location First"
+                          }
+                          icon={Building}
+                          searchable
+                          disabled={!formData.location}
+                        />
                       </div>
                     </div>
                   )}

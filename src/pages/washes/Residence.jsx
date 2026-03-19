@@ -223,6 +223,7 @@ const Residence = () => {
     if (!searchTerm) return true;
     const lowerTerm = searchTerm.toLowerCase();
 
+    const jobId = row.id?.toString().toLowerCase() || "";
     const vehicleReg = row.vehicle?.registration_no?.toLowerCase() || "";
     const parkingNo = row.vehicle?.parking_no?.toString().toLowerCase() || "";
     const mobile = row.customer?.mobile?.toLowerCase() || "";
@@ -230,6 +231,7 @@ const Residence = () => {
     const workerName = row.worker?.name?.toLowerCase() || "";
 
     return (
+      jobId.includes(lowerTerm) ||
       vehicleReg.includes(lowerTerm) ||
       parkingNo.includes(lowerTerm) ||
       mobile.includes(lowerTerm) ||

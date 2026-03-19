@@ -30,6 +30,10 @@ import { workerService } from "../../api/workerService";
 import CustomDropdown from "../ui/CustomDropdown";
 
 const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
+  const UAE_CODE = "971";
+  const AUTO_LOCAL_PREFIX = "200000";
+  const AUTO_UAE_PREFIX = `${UAE_CODE}${AUTO_LOCAL_PREFIX}`;
+
   const [loading, setLoading] = useState(false);
   const [currency, setCurrency] = useState("AED"); // Default Currency
   const [isMobileGenerated, setIsMobileGenerated] = useState(false); // Track if mobile is auto-generated
@@ -83,15 +87,15 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
       // Get the total count of customers to generate serial-based number
       const res = await customerService.list(1, 1, "", 1);
       const serialNumber = (res.total || 0) + 1;
-      // Generate 10-digit code: 2000000000 + serial (e.g., 2000000001, 2000000002)
-      const generatedMobile = String(2000000000 + serialNumber);
+      // Generate auto mobile: 971200000 + serial (display local: 200000 + serial)
+      const generatedMobile = `${AUTO_UAE_PREFIX}${String(serialNumber).padStart(3, "0")}`;
       setIsMobileGenerated(true);
       return generatedMobile;
     } catch (error) {
       console.error("Failed to generate mobile number", error);
       // Fallback to timestamp-based generation
-      const timestamp = Date.now().toString().slice(-9);
-      const generatedMobile = "2" + timestamp;
+      const timestamp = Date.now().toString().slice(-3);
+      const generatedMobile = `${AUTO_UAE_PREFIX}${timestamp.padStart(3, "0")}`;
       setIsMobileGenerated(true);
       return generatedMobile;
     }
@@ -229,9 +233,9 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
             })
           : [vehicleTemplate];
 
-      // Check if mobile is auto-generated (starts with 2000000)
+      // Check if mobile is auto-generated UAE format
       const mobile = customer.mobile || "";
-      setIsMobileGenerated(mobile.startsWith("2000000"));
+      setIsMobileGenerated(mobile.startsWith(AUTO_UAE_PREFIX));
 
       setFormData({
         firstName: customer.firstName || "",
@@ -518,7 +522,7 @@ const CustomerModal = ({ isOpen, onClose, customer, onSuccess }) => {
                           }
                         }}
                         className={inputClass}
-                        placeholder="971500000000"
+                        placeholder="9715XXXXXXXX"
                         required
                       />
                       {isMobileGenerated && (
