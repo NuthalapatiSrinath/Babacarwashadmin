@@ -38,19 +38,13 @@ const Attendance = () => {
 
   const getToday = () => formatDateLocal(new Date());
 
-  const getLast10Days = () => {
-    const d = new Date();
-    d.setDate(d.getDate() - 10);
-    return formatDateLocal(d);
-  };
-
   // --- STATE ---
   const [loading, setLoading] = useState(false);
   const [allData, setAllData] = useState([]); // Master list from API
 
   // Filters
   const [dateRange, setDateRange] = useState({
-    startDate: getLast10Days(),
+    startDate: getToday(),
     endDate: getToday(),
   });
   const [activePremise, setActivePremise] = useState("all");
@@ -198,6 +192,73 @@ const Attendance = () => {
     return filteredData.slice(startIndex, startIndex + pagination.limit);
   }, [filteredData, pagination.page, pagination.limit]);
 
+  const attendanceSummary = useMemo(() => {
+    const createEmptyStats = () => ({
+      total: 0,
+      present: 0,
+      absent: 0,
+      weekoff: 0,
+      sick: 0,
+      noDuty: 0,
+      emergencyLeave: 0,
+      paidLeave: 0,
+      unpaidLeave: 0,
+      other: 0,
+    });
+
+    const base = createEmptyStats();
+
+    const companyStats = new Map();
+
+    const ensureCompany = (companyName) => {
+      if (!companyStats.has(companyName)) {
+        companyStats.set(companyName, createEmptyStats());
+      }
+      return companyStats.get(companyName);
+    };
+
+    const applyCount = (stats, row) => {
+      stats.total += 1;
+
+      const typeCode = String(row.type || row.notes || "")
+        .trim()
+        .toUpperCase();
+
+      if (row.present) {
+        stats.present += 1;
+        return;
+      }
+
+      stats.absent += 1;
+
+      if (typeCode === "WO") stats.weekoff += 1;
+      else if (typeCode === "SL") stats.sick += 1;
+      else if (typeCode === "ND") stats.noDuty += 1;
+      else if (typeCode === "EL") stats.emergencyLeave += 1;
+      else if (typeCode === "PL") stats.paidLeave += 1;
+      else if (typeCode === "UL") stats.unpaidLeave += 1;
+      else if (typeCode !== "AB" && typeCode !== "") stats.other += 1;
+    };
+
+    filteredData.forEach((row) => {
+      const companyName =
+        row.worker?.companyName?.trim() ||
+        row.staff?.companyName?.trim() ||
+        "Unassigned Company";
+
+      applyCount(base, row);
+      const company = ensureCompany(companyName);
+      applyCount(company, row);
+    });
+
+    return {
+      overall: base,
+      companyWise: Array.from(companyStats.entries())
+        .map(([company, stats]) => ({ company, ...stats }))
+        .sort((a, b) => b.total - a.total),
+    };
+  }, [filteredData]);
+
   useEffect(() => {
     setPagination((prev) => ({
       ...prev,
@@ -210,7 +271,7 @@ const Attendance = () => {
 
   const handleDateChange = (field, value) => {
     if (field === "clear") {
-      setDateRange({ startDate: getLast10Days(), endDate: getToday() });
+      setDateRange({ startDate: getToday(), endDate: getToday() });
     } else {
       setDateRange((prev) => ({ ...prev, [field]: value }));
     }
@@ -522,6 +583,114 @@ const Attendance = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 font-sans">
+      {/* --- SUMMARY CARDS --- */}
+      <div className="mb-6 space-y-4">
+        <div className="flex flex-wrap gap-3 text-xs font-medium text-slate-600">
+          <div className="bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm flex items-center gap-2">
+            <Users className="w-3.5 h-3.5 text-indigo-500" />
+            <span>
+              Total: <b className="text-slate-800">{attendanceSummary.overall.total}</b>
+            </span>
+          </div>
+          <div className="bg-white px-3 py-2 rounded-lg border border-emerald-200 shadow-sm flex items-center gap-2">
+            <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+            <span>
+              Present: <b className="text-emerald-700">{attendanceSummary.overall.present}</b>
+            </span>
+          </div>
+          <div className="bg-white px-3 py-2 rounded-lg border border-red-200 shadow-sm flex items-center gap-2">
+            <X className="w-3.5 h-3.5 text-red-500" />
+            <span>
+              Absent: <b className="text-red-700">{attendanceSummary.overall.absent}</b>
+            </span>
+          </div>
+          <div className="bg-white px-3 py-2 rounded-lg border border-green-200 shadow-sm flex items-center gap-2">
+            <Calendar className="w-3.5 h-3.5 text-green-600" />
+            <span>
+              Week Off: <b className="text-green-700">{attendanceSummary.overall.weekoff}</b>
+            </span>
+          </div>
+          <div className="bg-white px-3 py-2 rounded-lg border border-orange-200 shadow-sm flex items-center gap-2">
+            <AlertTriangle className="w-3.5 h-3.5 text-orange-500" />
+            <span>
+              Sick: <b className="text-orange-700">{attendanceSummary.overall.sick}</b>
+            </span>
+          </div>
+          <div className="bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm flex items-center gap-2">
+            <span>
+              ND: <b className="text-slate-700">{attendanceSummary.overall.noDuty}</b>
+            </span>
+            <span className="text-slate-300">|</span>
+            <span>
+              EL: <b className="text-slate-700">{attendanceSummary.overall.emergencyLeave}</b>
+            </span>
+            <span className="text-slate-300">|</span>
+            <span>
+              PL: <b className="text-slate-700">{attendanceSummary.overall.paidLeave}</b>
+            </span>
+            <span className="text-slate-300">|</span>
+            <span>
+              UL: <b className="text-slate-700">{attendanceSummary.overall.unpaidLeave}</b>
+            </span>
+          </div>
+        </div>
+
+        {attendanceSummary.companyWise.length > 0 && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3">
+            <div className="text-xs font-bold text-slate-500 uppercase mb-3 px-1">
+              Company-wise Attendance
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {attendanceSummary.companyWise.map((company) => (
+                <div
+                  key={company.company}
+                  className="rounded-xl border border-slate-200 p-3 bg-slate-50/60"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <Building className="w-4 h-4 text-indigo-500" />
+                    <p className="text-sm font-bold text-slate-800 truncate" title={company.company}>
+                      {company.company}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                    <span className="text-slate-600">
+                      Total: <b className="text-slate-800">{company.total}</b>
+                    </span>
+                    <span className="text-emerald-600">
+                      P: <b>{company.present}</b>
+                    </span>
+                    <span className="text-red-600">
+                      A: <b>{company.absent}</b>
+                    </span>
+                    <span className="text-green-700">
+                      WO: <b>{company.weekoff}</b>
+                    </span>
+                    <span className="text-orange-700">
+                      SL: <b>{company.sick}</b>
+                    </span>
+                    <span className="text-slate-600">
+                      ND: <b>{company.noDuty}</b>
+                    </span>
+                    <span className="text-slate-600">
+                      EL: <b>{company.emergencyLeave}</b>
+                    </span>
+                    <span className="text-slate-600">
+                      PL: <b>{company.paidLeave}</b>
+                    </span>
+                    <span className="text-slate-600">
+                      UL: <b>{company.unpaidLeave}</b>
+                    </span>
+                    <span className="text-slate-500">
+                      Other: <b>{company.other}</b>
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* --- HEADER --- */}
 
       {/* --- FILTERS --- */}

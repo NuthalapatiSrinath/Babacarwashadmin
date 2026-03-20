@@ -24,6 +24,9 @@ const toDisplayDate = (isoString) => {
   // If it's already simple YYYY-MM-DD, return it
   if (isoString.length === 10) return isoString;
 
+  // Preserve calendar date from ISO input without local timezone conversion.
+  if (isoString.includes("T")) return isoString.split("T")[0];
+
   // For ISO dates, just extract the date part
   const date = new Date(isoString);
   const year = date.getFullYear();
@@ -37,18 +40,11 @@ const toDisplayDate = (isoString) => {
 const toApiDate = (dateStr, isEndDate) => {
   if (!dateStr) return "";
 
-  // Parse the date string
-  const [year, month, day] = dateStr.split("-").map(Number);
-
-  if (isEndDate) {
-    // End Date: Set to 23:59:59.999 of the selected date
-    const date = new Date(year, month - 1, day, 23, 59, 59, 999);
-    return date.toISOString();
-  } else {
-    // Start Date: Set to 00:00:00.000 of the selected date
-    const date = new Date(year, month - 1, day, 0, 0, 0, 0);
-    return date.toISOString();
-  }
+  // Build UTC boundaries directly from the selected calendar date.
+  // This prevents local timezone offsets from shifting the day range.
+  return isEndDate
+    ? `${dateStr}T23:59:59.999Z`
+    : `${dateStr}T00:00:00.000Z`;
 };
 
 const RichDateRangePicker = ({ startDate, endDate, onChange }) => {

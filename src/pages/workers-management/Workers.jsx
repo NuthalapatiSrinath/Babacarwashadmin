@@ -126,11 +126,29 @@ const Workers = () => {
     try {
       const fetchStatus =
         status !== undefined ? status : activeTab === "active" ? 1 : 2;
+
+      const serverFilters = {
+        ...(selectedCompany ? { companyName: selectedCompany } : null),
+        ...(filterServiceType !== "all"
+          ? { service_type: filterServiceType }
+          : null),
+        ...(filterLocation && filterServiceType === "mall"
+          ? { mall: filterLocation }
+          : null),
+        ...(filterLocation && filterServiceType === "residence"
+          ? { building: filterLocation }
+          : null),
+        ...(filterLocation && filterServiceType === "site"
+          ? { site: filterLocation }
+          : null),
+      };
+
       const response = await workerService.list(
         page,
         limit,
         search,
         fetchStatus,
+        serverFilters,
       );
       setData(response.data || []);
       setPagination({
@@ -159,6 +177,11 @@ const Workers = () => {
     }, 400);
     return () => clearTimeout(timer);
   }, [currentSearch]);
+
+  useEffect(() => {
+    const status = activeTab === "active" ? 1 : 2;
+    fetchData(1, pagination.limit, currentSearch, status);
+  }, [selectedCompany, filterServiceType, filterLocation]);
 
   // --- FILTER LOGIC ---
   const companyOptions = useMemo(() => {
@@ -201,37 +224,6 @@ const Workers = () => {
 
   const filteredData = useMemo(() => {
     return data.filter((item) => {
-      if (selectedCompany && item.companyName !== selectedCompany) return false;
-
-      if (filterServiceType !== "all") {
-        if (item.service_type !== filterServiceType) return false;
-        if (filterLocation) {
-          if (
-            filterServiceType === "mall" &&
-            !item.malls?.some(
-              (m) => (typeof m === "object" ? m._id : m) === filterLocation,
-            )
-          )
-            return false;
-          if (
-            filterServiceType === "residence" &&
-            !item.buildings?.some(
-              (b) => (typeof b === "object" ? b._id : b) === filterLocation,
-            )
-          )
-            return false;
-          if (filterServiceType === "site") {
-            const inSitesArray = item.sites?.some(
-              (s) => (typeof s === "object" ? s._id : s) === filterLocation,
-            );
-            const isSiteSingle =
-              (typeof item.site === "object" ? item.site?._id : item.site) ===
-              filterLocation;
-            if (!inSitesArray && !isSiteSingle) return false;
-          }
-        }
-      }
-
       if (selectedExpiryRange) {
         const dates = [
           item.passportExpiry,
@@ -276,11 +268,7 @@ const Workers = () => {
     });
   }, [
     data,
-    selectedCompany,
-    filterServiceType,
-    filterLocation,
     selectedExpiryRange,
-    currentSearch,
   ]);
 
   const criticalAlerts = useMemo(() => {
@@ -697,11 +685,7 @@ const Workers = () => {
     },
   ];
 
-  const isClientFiltered =
-    selectedCompany ||
-    filterServiceType !== "all" ||
-    filterLocation ||
-    selectedExpiryRange;
+  const isClientFiltered = selectedExpiryRange;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 font-sans">

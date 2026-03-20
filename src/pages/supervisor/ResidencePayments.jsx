@@ -29,7 +29,7 @@ import ReceiptModal from "../../components/modals/ReceiptModal";
 
 // API
 import { paymentService } from "../../api/paymentService";
-import { toShiftRange } from "../../utils/shiftTime";
+import { toCalendarRange } from "../../utils/shiftTime";
 
 const SupervisorResidencePayments = () => {
   const [currency, setCurrency] = useState("AED");
@@ -73,8 +73,11 @@ const SupervisorResidencePayments = () => {
     }
     const fmt = (d) =>
       `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    const shiftRange = toShiftRange(fmt(start), fmt(end));
-    return { startDate: shiftRange.startDate, endDate: shiftRange.endDate };
+    const calendarRange = toCalendarRange(fmt(start), fmt(end));
+    return {
+      startDate: calendarRange.startDate,
+      endDate: calendarRange.endDate,
+    };
   };
 
   const [activeTab, setActiveTab] = useState("today");
@@ -156,9 +159,12 @@ const SupervisorResidencePayments = () => {
           filters.endDate &&
           filters.startDate.length === 10
         ) {
-          const shiftRange = toShiftRange(filters.startDate, filters.endDate);
-          apiFilters.startDate = shiftRange.startDate;
-          apiFilters.endDate = shiftRange.endDate;
+          const calendarRange = toCalendarRange(
+            filters.startDate,
+            filters.endDate,
+          );
+          apiFilters.startDate = calendarRange.startDate;
+          apiFilters.endDate = calendarRange.endDate;
         }
 
         const result = await paymentService.list(

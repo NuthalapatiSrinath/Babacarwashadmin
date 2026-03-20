@@ -27,7 +27,7 @@ export const workerService = {
     return response.data;
   },
   // List
-  list: async (page = 1, limit = 10, search = "", status = 1) => {
+  list: async (page = 1, limit = 10, search = "", status = 1, filters = {}) => {
     console.log(
       `👷 [WorkerService] Fetching list: page=${page}, limit=${limit}, search="${search}", status=${status}`,
     );
@@ -38,6 +38,7 @@ export const workerService = {
         pageSize: limit,
         search,
         status,
+        ...filters,
       };
       const response = await api.get("/workers", { params });
       console.log("✅ [WorkerService] List success:", response.data);

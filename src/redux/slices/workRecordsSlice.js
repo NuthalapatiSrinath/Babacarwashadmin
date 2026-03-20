@@ -4,15 +4,19 @@ import { workRecordsService } from "../../api/workRecordsService";
 // Async thunk for downloading work records statement
 export const downloadWorkRecordsStatement = createAsyncThunk(
   "workRecords/downloadStatement",
-  async ({ serviceType, month, year, workerId = "" }, { rejectWithValue }) => {
+  async (
+    { serviceType, month, year, workerId = "", workers = null },
+    { rejectWithValue },
+  ) => {
     try {
       const blob = await workRecordsService.downloadStatement(
         serviceType,
         month,
         year,
         workerId,
+        workers,
       );
-      return { blob, serviceType, month, year, workerId };
+      return { blob, serviceType, month, year, workerId, workers };
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }

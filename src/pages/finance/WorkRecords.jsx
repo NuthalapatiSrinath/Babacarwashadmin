@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   FileSpreadsheet,
@@ -43,13 +43,14 @@ const WorkRecords = () => {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [viewData, setViewData] = useState(null);
   const [loadingView, setLoadingView] = useState(false);
-  const [availableWorkers, setAvailableWorkers] = useState([]);
   const [showPreview, setShowPreview] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50);
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [pdfPageSize, setPdfPageSize] = useState("a4-landscape");
   const [backendTotals, setBackendTotals] = useState(null);
+  const dataFetchSeq = useRef(0);
+  const recordsCacheRef = useRef(new Map());
 
   const today = new Date();
 
@@ -139,69 +140,33 @@ const WorkRecords = () => {
     }
   }, [dispatch, filters.serviceType]);
 
-  // Fetch workers with data for selected month/year
-  useEffect(() => {
-    const fetchAvailableWorkers = async () => {
-      if (
-        (filters.serviceType !== "residence" &&
-          filters.serviceType !== "mall") ||
-        availableMonths.length === 0
-      ) {
-        setAvailableWorkers([]);
-        return;
-      }
-
-      // Wait for team worker IDs to load for supervisors
-      if (isSupervisor && teamWorkerIds === null) return;
-
-      try {
-        // Fetch data without worker filter to see all workers with data
-        const response = await workRecordsService.getStatementData(
-          filters.year,
-          filters.month,
-          filters.serviceType,
-          "", // Empty to get all workers
-          isSupervisor ? teamWorkerIds : null,
-        );
-
-        // Handle new format { data, total, ... } or old format (array)
-        const data =
-          response?.data || (Array.isArray(response) ? response : []);
-
-        if (data && data.length > 0) {
-          // Extract unique worker IDs and names from the data
-          const workersWithData = data.map((item) => ({
-            value: item.workerId || item._id,
-            label: item.workerName || item.name,
-          }));
-          setAvailableWorkers(workersWithData);
-        } else {
-          setAvailableWorkers([]);
-        }
-      } catch (error) {
-        console.error("Error fetching available workers:", error);
-        setAvailableWorkers([]);
-      }
-    };
-
-    fetchAvailableWorkers();
-  }, [
-    filters.serviceType,
-    filters.year,
-    filters.month,
-    availableMonths,
-    teamWorkerIds,
-  ]);
-
   const workersOptions = useMemo(() => {
     if (!workersList || workersList.length === 0) return [];
-    let filtered = workersList.filter(
-      (w) => w.service_type === filters.serviceType,
-    );
+
+    const normalizeServiceType = (worker) =>
+      String(worker?.service_type || worker?.serviceType || "")
+        .trim()
+        .toLowerCase();
+
+    const isMallWorker = (worker) =>
+      ["onewash", "mall", "mobile", "site"].includes(
+        normalizeServiceType(worker),
+      );
+
+    let filtered = workersList;
+    if (filters.serviceType === "mall") {
+      filtered = filtered.filter(isMallWorker);
+    } else if (filters.serviceType === "residence") {
+      filtered = filtered.filter(
+        (w) => normalizeServiceType(w) === "residence",
+      );
+    }
+
     // For supervisors, only show their team workers
     if (isSupervisor && teamWorkerIds && teamWorkerIds.length > 0) {
       filtered = filtered.filter((w) => teamWorkerIds.includes(w._id));
     }
+
     return filtered.map((w) => ({ value: w._id, label: w.name }));
   }, [workersList, filters.serviceType, isSupervisor, teamWorkerIds]);
 
@@ -221,6 +186,28 @@ const WorkRecords = () => {
 
       // Wait for team worker IDs to load for supervisors
       if (isSupervisor && teamWorkerIds === null) return;
+
+      const workersKey = isSupervisor
+        ? JSON.stringify(teamWorkerIds || [])
+        : "all";
+      const cacheKey = JSON.stringify({
+        year: filters.year,
+        month: filters.month,
+        serviceType: filters.serviceType,
+        workerId: filters.workerId || "",
+        workersKey,
+      });
+
+      const cached = recordsCacheRef.current.get(cacheKey);
+      if (cached) {
+        setBackendTotals(cached.totals);
+        setViewData(cached.normalizedData);
+        setShowPreview(cached.normalizedData.length > 0);
+        setLoadingView(false);
+        return;
+      }
+
+      const requestSeq = ++dataFetchSeq.current;
 
       setLoadingView(true);
 
@@ -244,6 +231,8 @@ const WorkRecords = () => {
               total: response.total || data.length,
             }
           : null;
+
+        if (requestSeq !== dataFetchSeq.current) return;
         setBackendTotals(totals);
 
         console.log("📊 Raw API Response:", response);
@@ -297,15 +286,30 @@ const WorkRecords = () => {
           });
 
           console.log("✅ Normalized Data with Tips:", normalizedData);
+
+          recordsCacheRef.current.set(cacheKey, {
+            normalizedData,
+            totals,
+            cachedAt: Date.now(),
+          });
+
+          // Simple cache cap to prevent memory growth
+          if (recordsCacheRef.current.size > 25) {
+            const firstKey = recordsCacheRef.current.keys().next().value;
+            if (firstKey) recordsCacheRef.current.delete(firstKey);
+          }
+
           setViewData(normalizedData);
           setShowPreview(true);
           setCurrentPage(1);
         }
       } catch (error) {
+        if (requestSeq !== dataFetchSeq.current) return;
         console.error("Error loading data:", error);
         setViewData(null);
         setShowPreview(false);
       } finally {
+        if (requestSeq !== dataFetchSeq.current) return;
         setLoadingView(false);
       }
     };
@@ -333,6 +337,8 @@ const WorkRecords = () => {
             filters.serviceType === "mall"
               ? filters.workerId
               : "",
+          workers:
+            isSupervisor && !filters.workerId ? teamWorkerIds || [] : null,
         }),
       ).unwrap();
       const blob = result.blob;
@@ -359,7 +365,7 @@ const WorkRecords = () => {
     try {
       let data = viewData;
       if (!data) {
-        data = await workRecordsService.getStatementData(
+        const response = await workRecordsService.getStatementData(
           filters.year,
           filters.month,
           filters.serviceType,
@@ -368,6 +374,7 @@ const WorkRecords = () => {
             : "",
           isSupervisor && !filters.workerId ? teamWorkerIds : null,
         );
+        data = response?.data || (Array.isArray(response) ? response : []);
       }
 
       if (!data || data.length === 0) {
@@ -463,8 +470,7 @@ const WorkRecords = () => {
         tableBody = data.map((worker, index) => {
           const counts = worker.dailyCounts || Array(daysInMonth).fill(0);
           const total = counts.reduce((sum, c) => sum + c, 0);
-          // Only show tips for onewash, else 0
-          const tips = filters.serviceType === "onewash" ? worker.tips || 0 : 0;
+          const tips = worker.tips || 0;
           return [
             worker.slNo || index + 1,
             worker.name || "-",
@@ -483,7 +489,7 @@ const WorkRecords = () => {
           const counts = worker.dailyCounts || Array(daysInMonth).fill(0);
           counts.forEach((count, i) => (dailyTotals[i] += count));
           grandTotal += counts.reduce((sum, c) => sum + c, 0);
-          if (filters.serviceType === "onewash") totalTips += worker.tips || 0;
+          totalTips += worker.tips || 0;
         });
 
         tableBody.push([
@@ -910,10 +916,7 @@ const WorkRecords = () => {
                       const counts =
                         worker.dailyCounts || Array(daysInMonth).fill(0);
                       const total = counts.reduce((sum, c) => sum + c, 0);
-                      const tips =
-                        filters.serviceType === "onewash"
-                          ? worker.tips || 0
-                          : 0;
+                      const tips = worker.tips || 0;
                       return (
                         <tr key={globalIndex} className="hover:bg-slate-50">
                           <td className="border border-slate-300 p-2 text-center font-semibold sticky left-0 bg-white">
@@ -1057,12 +1060,7 @@ const WorkRecords = () => {
                       </td>
                       <td className="border border-slate-300 p-1 text-center">
                         {backendTotals?.totalTips ??
-                          (filters.serviceType === "onewash"
-                            ? viewData.reduce(
-                                (sum, w) => sum + (w.tips || 0),
-                                0,
-                              )
-                            : 0)}
+                          viewData.reduce((sum, w) => sum + (w.tips || 0), 0)}
                       </td>
                     </tr>
                   )}
@@ -1121,7 +1119,11 @@ const WorkRecords = () => {
                   label="Service Type"
                   value={filters.serviceType}
                   onChange={(val) =>
-                    setFilters({ ...filters, serviceType: val, workerId: "" })
+                    setFilters((prev) => ({
+                      ...prev,
+                      serviceType: val,
+                      workerId: "",
+                    }))
                   }
                   options={serviceTypeOptions}
                   icon={Layers}
@@ -1135,7 +1137,7 @@ const WorkRecords = () => {
                   label="Year"
                   value={filters.year}
                   onChange={(val) =>
-                    setFilters({ ...filters, year: Number(val) })
+                    setFilters((prev) => ({ ...prev, year: Number(val) }))
                   }
                   options={yearOptions}
                   icon={Calendar}
@@ -1149,7 +1151,7 @@ const WorkRecords = () => {
                   label="Month"
                   value={filters.month}
                   onChange={(val) =>
-                    setFilters({ ...filters, month: Number(val) })
+                    setFilters((prev) => ({ ...prev, month: Number(val) }))
                   }
                   options={availableMonths}
                   icon={Calendar}
@@ -1170,11 +1172,11 @@ const WorkRecords = () => {
                     label="Worker (Optional)"
                     value={filters.workerId}
                     onChange={(val) =>
-                      setFilters({ ...filters, workerId: val })
+                      setFilters((prev) => ({ ...prev, workerId: val }))
                     }
                     options={[
                       { value: "", label: "All Workers" },
-                      ...availableWorkers,
+                      ...workersOptions,
                     ]}
                     icon={Filter}
                     placeholder="Filter by Worker"
@@ -1211,13 +1213,19 @@ const WorkRecords = () => {
         </div>
       </div>
 
-      {loadingView ? (
+      {showPreview && renderCalendarView()}
+
+      {loadingView && !showPreview && (
         <div className="flex flex-col items-center justify-center py-20">
           <Loader2 className="w-12 h-12 text-indigo-500 animate-spin mb-4" />
           <p className="text-slate-500 font-medium">Loading records...</p>
         </div>
-      ) : (
-        showPreview && renderCalendarView()
+      )}
+
+      {loadingView && showPreview && (
+        <div className="max-w-7xl mx-auto mt-4 flex items-center justify-center gap-2 text-indigo-600 text-sm font-medium">
+          <Loader2 className="w-4 h-4 animate-spin" /> Refreshing records...
+        </div>
       )}
 
       {!showPreview && !loadingView && (

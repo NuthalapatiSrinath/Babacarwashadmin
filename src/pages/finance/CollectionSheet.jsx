@@ -158,6 +158,8 @@ const CollectionSheet = () => {
     let newFilters;
     if (name === "building") {
       newFilters = { ...filters, building: value, worker: "all" };
+    } else if (name === "serviceType") {
+      newFilters = { ...filters, serviceType: value, worker: "all" };
     } else {
       newFilters = { ...filters, [name]: value };
     }
@@ -416,9 +418,28 @@ const CollectionSheet = () => {
     const options = [{ value: "all", label: "All Workers" }];
     if (!workers) return options;
 
+    const normalizeServiceType = (worker) =>
+      String(worker?.service_type || worker?.serviceType || "")
+        .trim()
+        .toLowerCase();
+
+    const isMallWorker = (worker) =>
+      ["onewash", "mall", "mobile", "site"].includes(
+        normalizeServiceType(worker),
+      );
+
     let filteredList = workers;
+
+    if (filters.serviceType === "onewash") {
+      filteredList = filteredList.filter(isMallWorker);
+    } else if (filters.serviceType === "residence") {
+      filteredList = filteredList.filter(
+        (w) => normalizeServiceType(w) === "residence",
+      );
+    }
+
     if (filters.building && filters.building !== "all") {
-      filteredList = workers.filter((w) => {
+      filteredList = filteredList.filter((w) => {
         return (
           w.buildings &&
           (w.buildings.includes(filters.building) ||
@@ -431,7 +452,7 @@ const CollectionSheet = () => {
 
     filteredList.forEach((w) => options.push({ value: w._id, label: w.name }));
     return options;
-  }, [workers, filters.building]);
+  }, [workers, filters.building, filters.serviceType]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 font-sans">

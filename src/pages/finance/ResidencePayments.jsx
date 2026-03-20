@@ -43,7 +43,7 @@ import PaymentHistoryModal from "../../components/modals/PaymentHistoryModal";
 import RichDateRangePicker from "../../components/inputs/RichDateRangePicker";
 import CustomDropdown from "../../components/ui/CustomDropdown"; // Import CustomDropdown
 import usePagePermissions from "../../utils/usePagePermissions";
-import { toShiftRange } from "../../utils/shiftTime";
+import { toCalendarRange } from "../../utils/shiftTime";
 
 // API
 import { buildingService } from "../../api/buildingService";
@@ -111,7 +111,7 @@ const ResidencePayments = () => {
         .split("T")[0];
     }
 
-    return toShiftRange(startStr, endStr);
+    return toCalendarRange(startStr, endStr);
   };
 
   const [activeTab, setActiveTab] = useState("this_month");
@@ -209,15 +209,15 @@ const ResidencePayments = () => {
       const isSearching = searchTerm.trim().length > 0;
       const fetchLimit = isSearching ? 3000 : limit;
 
-      // If dates are YYYY-MM-DD (from custom picker), convert to shift range
+      // If dates are YYYY-MM-DD (from custom picker), convert to full-day range
       let apiFilters = { ...filters };
       if (apiFilters.startDate && apiFilters.startDate.length === 10) {
-        const shiftRange = toShiftRange(
+        const calendarRange = toCalendarRange(
           apiFilters.startDate,
           apiFilters.endDate,
         );
-        apiFilters.startDate = shiftRange.startDate;
-        apiFilters.endDate = shiftRange.endDate;
+        apiFilters.startDate = calendarRange.startDate;
+        apiFilters.endDate = calendarRange.endDate;
       }
 
       const result = await dispatch(
@@ -661,13 +661,13 @@ Are you sure you want to proceed?`;
       // Invoices for e.g. February are dated March 1st (1st of next month)
       const invoiceDate = new Date(billingYear, billingMonth + 1, 1);
       const invoiceDateStr = invoiceDate.toISOString().split("T")[0];
-      const shiftRange = toShiftRange(invoiceDateStr, invoiceDateStr);
+      const calendarRange = toCalendarRange(invoiceDateStr, invoiceDateStr);
 
       setActiveTab("custom");
       setFilters((prev) => ({
         ...prev,
-        startDate: shiftRange.startDate,
-        endDate: shiftRange.endDate,
+        startDate: calendarRange.startDate,
+        endDate: calendarRange.endDate,
       }));
     } catch (error) {
       const errorMsg =

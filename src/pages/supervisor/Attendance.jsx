@@ -37,12 +37,6 @@ const SupervisorAttendance = () => {
 
   const getToday = () => formatDateLocal(new Date());
 
-  const getLast10Days = () => {
-    const d = new Date();
-    d.setDate(d.getDate() - 10);
-    return formatDateLocal(d);
-  };
-
   // --- STATE ---
   const [loading, setLoading] = useState(false);
   const [allData, setAllData] = useState([]);
@@ -52,7 +46,7 @@ const SupervisorAttendance = () => {
 
   // Filters
   const [dateRange, setDateRange] = useState({
-    startDate: getLast10Days(),
+    startDate: getToday(),
     endDate: getToday(),
   });
   const [selectedEmployee, setSelectedEmployee] = useState("");
@@ -173,7 +167,7 @@ const SupervisorAttendance = () => {
   // --- 5. HANDLERS ---
   const handleDateChange = (field, value) => {
     if (field === "clear") {
-      setDateRange({ startDate: getLast10Days(), endDate: getToday() });
+      setDateRange({ startDate: getToday(), endDate: getToday() });
     } else {
       setDateRange((prev) => ({ ...prev, [field]: value }));
     }

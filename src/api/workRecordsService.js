@@ -2,7 +2,13 @@ import api from "./axiosInstance";
 
 export const workRecordsService = {
   // 1. Standard Excel Download (Blob)
-  downloadStatement: async (serviceType, month, year, workerId = "") => {
+  downloadStatement: async (
+    serviceType,
+    month,
+    year,
+    workerId = "",
+    workers = null,
+  ) => {
     const baseUrl =
       serviceType === "onewash" || serviceType === "mall"
         ? "/onewash"
@@ -18,6 +24,10 @@ export const workRecordsService = {
 
     if (workerId) {
       params.workerId = workerId;
+    }
+
+    if (workers && workers.length > 0) {
+      params.workers = workers;
     }
 
     const response = await api.get(`${baseUrl}/export/statement/monthly`, {

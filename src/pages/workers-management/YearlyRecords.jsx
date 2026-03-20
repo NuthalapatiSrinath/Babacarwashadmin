@@ -45,6 +45,16 @@ const YearlyRecords = () => {
   const [allWorkers, setAllWorkers] = useState([]);
   const [filteredWorkers, setFilteredWorkers] = useState([]);
 
+  const normalizeServiceType = (worker) =>
+    String(worker?.service_type || worker?.serviceType || "")
+      .trim()
+      .toLowerCase();
+
+  const isMallWorker = (worker) =>
+    ["onewash", "mall", "mobile", "site"].includes(
+      normalizeServiceType(worker),
+    );
+
   const years = [2024, 2025, 2026, 2027];
   const serviceTypes = [
     {
@@ -93,19 +103,22 @@ const YearlyRecords = () => {
       return;
     }
     let filtered = [];
-    if (serviceType === "onewash")
-      filtered = allWorkers.filter((w) =>
-        ["mall", "mobile", "site"].includes(w.service_type),
+    if (serviceType === "onewash") {
+      filtered = allWorkers.filter(isMallWorker);
+    } else {
+      filtered = allWorkers.filter(
+        (w) => normalizeServiceType(w) === "residence",
       );
-    else filtered = allWorkers.filter((w) => w.service_type === "residence");
+    }
+
     setFilteredWorkers(filtered);
 
-    // Only reset selectedWorker if not coming from saved state
-    if (!initialState) {
+    // Keep selection valid for current service type.
+    if (selectedWorker && !filtered.some((w) => w._id === selectedWorker)) {
       setSelectedWorker("");
       setReportData(null);
     }
-  }, [serviceType, allWorkers]);
+  }, [serviceType, allWorkers, selectedWorker]);
 
   useEffect(() => {
     const fetchData = async () => {

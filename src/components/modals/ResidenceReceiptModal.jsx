@@ -32,6 +32,11 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
 
   useEffect(() => {
     if (data) {
+      const paidAmount = Number(data.amount_paid || 0);
+      const invoiceAmount = Number(
+        data.total_amount ?? data.balance ?? data.amount_paid ?? 0,
+      );
+
       setLocalData({
         displayId: formatId(data.id || data._id, data.receipt_no),
         originalId: data.id || data._id,
@@ -54,9 +59,10 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
             const year = billingDate.getFullYear();
             return `For the month of ${month} ${year}`;
           })(),
-        amount: data.amount_paid || 0, // Number for Invoice calculations
+        amount: paidAmount, // Paid amount (used in receipt)
+        invoiceAmount, // Total due amount (used in invoice)
         vat: "-",
-        total: `${data.amount_paid || 0} د.إ`, // String for Receipt View
+        total: `${paidAmount} د.إ`, // String for Receipt View
         tip: `${data.tip || 0} د.إ`,
         balance: `${data.balance || 0} د.إ`,
         receiver: data.worker?.name || "SATYANARAYANA G.",
@@ -364,11 +370,11 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
                 CAR WASH PAYMENT
               </td>
               <td className="py-4 px-4 text-center text-slate-600">
-                {localData.amount}
+                {localData.invoiceAmount}
               </td>
               <td className="py-4 px-4 text-center text-slate-600">1</td>
               <td className="py-4 px-4 text-right font-bold text-slate-800">
-                {localData.amount}
+                {localData.invoiceAmount}
               </td>
             </tr>
           </tbody>
@@ -381,7 +387,7 @@ const ResidenceReceiptModal = ({ isOpen, onClose, data, type = "Receipt" }) => {
                 Total
               </td>
               <td className="py-3 px-4 text-right font-bold text-slate-900">
-                {localData.amount}
+                {localData.invoiceAmount}
               </td>
             </tr>
           </tfoot>
