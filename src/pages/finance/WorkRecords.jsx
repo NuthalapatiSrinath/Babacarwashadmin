@@ -149,9 +149,7 @@ const WorkRecords = () => {
         .toLowerCase();
 
     const isMallWorker = (worker) =>
-      ["onewash", "mall", "mobile", "site"].includes(
-        normalizeServiceType(worker),
-      );
+      normalizeServiceType(worker) === "mall";
 
     let filtered = workersList;
     if (filters.serviceType === "mall") {

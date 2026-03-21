@@ -423,10 +423,12 @@ const CollectionSheet = () => {
         .trim()
         .toLowerCase();
 
+    const hasMallAssignment = (worker) =>
+      (Array.isArray(worker?.malls) && worker.malls.length > 0) ||
+      !!worker?.mall;
+
     const isMallWorker = (worker) =>
-      ["onewash", "mall", "mobile", "site"].includes(
-        normalizeServiceType(worker),
-      );
+      normalizeServiceType(worker) === "mall" && hasMallAssignment(worker);
 
     let filteredList = workers;
 

@@ -25,6 +25,16 @@ export const customerService = {
     return response.data;
   },
 
+  deactivateCustomer: async (id, deactivationData) => {
+    const response = await api.put(`/customers/${id}/deactivate`, deactivationData);
+    return response.data;
+  },
+
+  activateCustomer: async (id, activationData) => {
+    const response = await api.put(`/customers/${id}/activate`, activationData);
+    return response.data;
+  },
+
   // Delete Customer
   delete: async (id) => {
     const response = await api.delete(`/customers/${id}`);

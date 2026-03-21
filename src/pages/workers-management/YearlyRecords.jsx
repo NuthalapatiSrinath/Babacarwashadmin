@@ -50,10 +50,12 @@ const YearlyRecords = () => {
       .trim()
       .toLowerCase();
 
+  const hasMallAssignment = (worker) =>
+    (Array.isArray(worker?.malls) && worker.malls.length > 0) ||
+    !!worker?.mall;
+
   const isMallWorker = (worker) =>
-    ["onewash", "mall", "mobile", "site"].includes(
-      normalizeServiceType(worker),
-    );
+    normalizeServiceType(worker) === "mall" && hasMallAssignment(worker);
 
   const years = [2024, 2025, 2026, 2027];
   const serviceTypes = [

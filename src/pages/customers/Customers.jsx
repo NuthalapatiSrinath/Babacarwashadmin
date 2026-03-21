@@ -462,7 +462,10 @@ const Customers = () => {
 
       // Try to deactivate to get full payment details from backend
       try {
-        await customerService.update(customer._id, { status: 2 });
+        await customerService.deactivateCustomer(customer._id, {
+          deactivateReason: "Stopped",
+          deactivateDate: new Date().toISOString(),
+        });
       } catch (e) {
         if (e.response?.data?.code === "PENDING_DUES") {
           const payments = e.response.data.payments || [];
@@ -559,10 +562,7 @@ const Customers = () => {
     try {
       if (type === "customer") {
         // Deactivate customer with dates and reason
-        await customerService.update(entityId, {
-          status: 2,
-          ...deactivationData,
-        });
+        await customerService.deactivateCustomer(entityId, deactivationData);
         toast.success(`Customer ${entityName} deactivated successfully`, {
           id: loadingToast,
         });
@@ -638,8 +638,7 @@ const Customers = () => {
     try {
       if (type === "customer") {
         // Reactivate customer with restart date
-        await customerService.update(entityId, {
-          status: 1,
+        await customerService.activateCustomer(entityId, {
           restart_date: formData.reactivateDate,
         });
         toast.success(`Customer reactivated successfully!`, {
