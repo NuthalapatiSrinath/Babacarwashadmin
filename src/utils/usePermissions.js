@@ -55,6 +55,8 @@ export const usePermissions = () => {
  */
 export const PERMISSION_MODULES = {
   "/": "dashboard",
+  "/ai/assistant": "aiAssistant",
+  "/ai/noupe": "aiAssistant",
   "/customers": "customers",
   "/customers/vehicle-management": "vehicles",
   "/customers/import-history": "customers",
@@ -93,6 +95,7 @@ export const PERMISSION_MODULES = {
  */
 export const ALL_PERMISSION_MODULES = [
   { key: "dashboard", label: "Dashboard", actions: ["view"] },
+  { key: "aiAssistant", label: "AI Assistant", actions: ["view"] },
   {
     key: "customers",
     label: "Customers",

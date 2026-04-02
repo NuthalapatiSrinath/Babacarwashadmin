@@ -376,8 +376,10 @@ const Attendance = () => {
       buildingNameById,
     );
 
-    if (resolvedSites.length === 0 && singleSite) resolvedSites.push(singleSite);
-    if (resolvedMalls.length === 0 && singleMall) resolvedMalls.push(singleMall);
+    if (resolvedSites.length === 0 && singleSite)
+      resolvedSites.push(singleSite);
+    if (resolvedMalls.length === 0 && singleMall)
+      resolvedMalls.push(singleMall);
     if (resolvedBuildings.length === 0 && singleBuilding)
       resolvedBuildings.push(singleBuilding);
 

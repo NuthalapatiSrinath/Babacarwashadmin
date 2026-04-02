@@ -30,6 +30,7 @@ import {
   Car,
   Shield,
   Bell,
+  Bot,
 } from "lucide-react";
 
 const Sidebar = ({ isOpen, isMobile, onClose }) => {
@@ -323,6 +324,16 @@ const Sidebar = ({ isOpen, isMobile, onClose }) => {
                     to="/"
                     icon={LayoutDashboard}
                     label="Dashboard"
+                    onClick={handleLinkClick}
+                    isMobile={isMobile}
+                  />
+                )}
+
+                {hasPermission("aiAssistant", "view") && (
+                  <NavItem
+                    to="/ai/assistant"
+                    icon={Bot}
+                    label="AI Assistant"
                     onClick={handleLinkClick}
                     isMobile={isMobile}
                   />
