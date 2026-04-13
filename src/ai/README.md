@@ -16,7 +16,7 @@ This folder contains AI-related frontend code for the admin panel.
   - `/api/chat`
   - `/chat`
   - local dev ports `3002` and `3001`
-- Backend forwards requests to local Ollama (`llama3`)
+- Backend forwards requests to Gemini (`GEMINI_API_KEY` + `GEMINI_MODEL`)
 
 ## Future Extensions
 

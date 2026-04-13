@@ -51,7 +51,7 @@ const buildErrorMessage = (statusCode, rawMessage) => {
   if (statusCode === 502 || statusCode === 504) {
     return (
       rawMessage ||
-      "Local Ollama is not reachable. Make sure Ollama is running."
+      "AI provider is not reachable. Check backend AI configuration."
     );
   }
 
@@ -182,7 +182,7 @@ export const aiChatService = {
 
     throw new Error(
       lastError?.message ||
-        "Unable to connect to AI backend. Please check backend and Ollama.",
+        "Unable to connect to AI backend. Please check backend AI configuration.",
     );
   },
 

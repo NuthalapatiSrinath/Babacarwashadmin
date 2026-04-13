@@ -36,7 +36,7 @@ const createDbSummary = (response) => {
 const INITIAL_MESSAGES = [
   newMessage(
     "assistant",
-    "Hi there. I am your local AI assistant powered by Ollama. How can I help you today?",
+    "Hi there. I am your AI assistant powered by your backend Gemini setup. How can I help you today?",
   ),
 ];
 

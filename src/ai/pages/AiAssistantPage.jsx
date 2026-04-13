@@ -290,7 +290,7 @@ const AiAssistantPage = () => {
                   AI Command Center
                 </p>
                 <p className="mt-0.5 text-xs text-slate-200">
-                  Local Ollama intelligence with live database insights
+                  Gemini intelligence with live database insights
                 </p>
               </div>
             </div>
