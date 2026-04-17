@@ -1011,7 +1011,9 @@ const Dashboard = () => {
                       Collected
                     </p>
                     <p className="text-sm font-black text-emerald-700">
-                      {formatCurrency(selectedDailyFinancialStats?.collected || 0)}
+                      {formatCurrency(
+                        selectedDailyFinancialStats?.collected || 0,
+                      )}
                     </p>
                   </div>
                   <div className="rounded-xl border border-amber-100 bg-amber-50/80 px-3 py-2">
@@ -1019,7 +1021,9 @@ const Dashboard = () => {
                       Pending
                     </p>
                     <p className="text-sm font-black text-amber-700">
-                      {formatCurrency(selectedDailyFinancialStats?.pending || 0)}
+                      {formatCurrency(
+                        selectedDailyFinancialStats?.pending || 0,
+                      )}
                     </p>
                   </div>
                   <div className="rounded-xl border border-rose-100 bg-rose-50/80 px-3 py-2">
@@ -1027,7 +1031,9 @@ const Dashboard = () => {
                       Overdue
                     </p>
                     <p className="text-sm font-black text-rose-700">
-                      {formatCurrency(selectedDailyFinancialStats?.overdue || 0)}
+                      {formatCurrency(
+                        selectedDailyFinancialStats?.overdue || 0,
+                      )}
                     </p>
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50/90 px-3 py-2">
