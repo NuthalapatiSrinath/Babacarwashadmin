@@ -5,7 +5,16 @@ import { workRecordsService } from "../../api/workRecordsService";
 export const downloadWorkRecordsStatement = createAsyncThunk(
   "workRecords/downloadStatement",
   async (
-    { serviceType, month, year, workerId = "", workers = null },
+    {
+      serviceType,
+      month,
+      year,
+      workerId = "",
+      workers = null,
+      buildingWise = false,
+      buildingId = "",
+      buildingName = "",
+    },
     { rejectWithValue },
   ) => {
     try {
@@ -15,8 +24,19 @@ export const downloadWorkRecordsStatement = createAsyncThunk(
         year,
         workerId,
         workers,
+        { buildingWise, buildingId, buildingName },
       );
-      return { blob, serviceType, month, year, workerId, workers };
+      return {
+        blob,
+        serviceType,
+        month,
+        year,
+        workerId,
+        workers,
+        buildingWise,
+        buildingId,
+        buildingName,
+      };
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
@@ -26,15 +46,20 @@ export const downloadWorkRecordsStatement = createAsyncThunk(
 // Async thunk for fetching work records data (for preview/PDF)
 export const fetchWorkRecordsData = createAsyncThunk(
   "workRecords/fetchData",
-  async ({ serviceType, month, year, workerId = "" }, { rejectWithValue }) => {
+  async (
+    { serviceType, month, year, workerId = "", buildingId = "" },
+    { rejectWithValue },
+  ) => {
     try {
       const data = await workRecordsService.getStatementData(
         year,
         month,
         serviceType,
         workerId,
+        null,
+        { buildingId },
       );
-      return { data, serviceType, month, year, workerId };
+      return { data, serviceType, month, year, workerId, buildingId };
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }

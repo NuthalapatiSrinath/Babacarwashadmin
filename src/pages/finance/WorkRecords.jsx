@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import {
   FileSpreadsheet,
   Layers,
+  Building,
   Calendar,
   Filter,
   FileText,
@@ -16,6 +17,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { downloadWorkRecordsStatement } from "../../redux/slices/workRecordsSlice";
 import { fetchWorkers } from "../../redux/slices/workerSlice";
+import { fetchBuildings } from "../../redux/slices/buildingSlice";
 import { workRecordsService } from "../../api/workRecordsService";
 import { supervisorService } from "../../api/supervisorService";
 import CustomDropdown from "../../components/ui/CustomDropdown";
@@ -31,10 +33,98 @@ const loadImage = (url) => {
   });
 };
 
+const toNumberSafe = (value) => {
+  const parsed = Number(value || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const getResidenceDueAmount = (car) => {
+  return Math.max(
+    0,
+    toNumberSafe(car?.dueAmount ?? car?.duePayment ?? car?.balanceDue),
+  );
+};
+
+const getResidenceDueDate = (car) => {
+  return car?.dueDate || car?.duDate || "-";
+};
+
+const getWashMetrics = ({
+  rows,
+  daysInMonth,
+  isCarFormat,
+  year,
+  month,
+  columnTotals,
+}) => {
+  const safeDays = Math.max(0, Number(daysInMonth) || 0);
+  const hasColumnTotals =
+    Array.isArray(columnTotals) && columnTotals.length === safeDays;
+
+  const totals = hasColumnTotals
+    ? columnTotals.map((value) => toNumberSafe(value))
+    : new Array(safeDays).fill(0);
+
+  if (!hasColumnTotals && Array.isArray(rows)) {
+    rows.forEach((row) => {
+      const daily = isCarFormat ? row?.dailyMarks : row?.dailyCounts;
+      if (!Array.isArray(daily)) return;
+      daily.forEach((value, index) => {
+        if (index >= 0 && index < totals.length) {
+          totals[index] += toNumberSafe(value);
+        }
+      });
+    });
+  }
+
+  const totalWashes = totals.reduce((sum, value) => sum + toNumberSafe(value), 0);
+  const dayWiseAverage = safeDays > 0 ? totalWashes / safeDays : 0;
+
+  const now = new Date();
+  const isCurrentMonth =
+    Number(year) === now.getFullYear() && Number(month) === now.getMonth() + 1;
+  const todayIndex = now.getDate() - 1;
+  const todayWashes =
+    isCurrentMonth && todayIndex >= 0 && todayIndex < totals.length
+      ? toNumberSafe(totals[todayIndex])
+      : 0;
+
+  return {
+    todayWashes,
+    dayWiseAverage,
+  };
+};
+
+const getStatusSummaryMetrics = ({
+  statusCounts,
+  todayStatusCounts,
+  fallbackTodayWashes = 0,
+}) => {
+  const totalSummary = {
+    washes: toNumberSafe(statusCounts?.total),
+    completed: toNumberSafe(statusCounts?.completed),
+    pending: toNumberSafe(statusCounts?.pending),
+    rejected: toNumberSafe(statusCounts?.rejected),
+  };
+
+  const todaySummary = {
+    washes: toNumberSafe(todayStatusCounts?.total ?? fallbackTodayWashes),
+    completed: toNumberSafe(todayStatusCounts?.completed),
+    pending: toNumberSafe(todayStatusCounts?.pending),
+    rejected: toNumberSafe(todayStatusCounts?.rejected),
+  };
+
+  return {
+    today: todaySummary,
+    total: totalSummary,
+  };
+};
+
 const WorkRecords = () => {
   const dispatch = useDispatch();
   const pp = usePagePermissions("workRecords");
   const { workers: workersList } = useSelector((state) => state.worker);
+  const { buildings: buildingsList } = useSelector((state) => state.building);
   const userString = localStorage.getItem("user");
   const user = userString ? JSON.parse(userString) : null;
   const isSupervisor = user?.role === "supervisor";
@@ -49,6 +139,10 @@ const WorkRecords = () => {
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [pdfPageSize, setPdfPageSize] = useState("a4-landscape");
   const [backendTotals, setBackendTotals] = useState(null);
+  const [allBuildingsMeta, setAllBuildingsMeta] = useState({
+    total: 0,
+    buildingCounts: [],
+  });
   const dataFetchSeq = useRef(0);
   const recordsCacheRef = useRef(new Map());
 
@@ -81,6 +175,7 @@ const WorkRecords = () => {
     month: initialMonth,
     year: initialYear,
     workerId: "",
+    buildingId: "",
   });
 
   const serviceTypeOptions = [
@@ -140,7 +235,13 @@ const WorkRecords = () => {
     }
   }, [dispatch, filters.serviceType]);
 
-  const workersOptions = useMemo(() => {
+  useEffect(() => {
+    if (filters.serviceType === "residence") {
+      dispatch(fetchBuildings({ page: 1, limit: 1000, search: "" }));
+    }
+  }, [dispatch, filters.serviceType]);
+
+  const filteredWorkers = useMemo(() => {
     if (!workersList || workersList.length === 0) return [];
 
     const normalizeServiceType = (worker) =>
@@ -164,8 +265,191 @@ const WorkRecords = () => {
       filtered = filtered.filter((w) => teamWorkerIds.includes(w._id));
     }
 
-    return filtered.map((w) => ({ value: w._id, label: w.name }));
+    return filtered;
   }, [workersList, filters.serviceType, isSupervisor, teamWorkerIds]);
+
+  const workersOptions = useMemo(() => {
+    return filteredWorkers.map((w) => ({ value: w._id, label: w.name }));
+  }, [filteredWorkers]);
+
+  const selectedWorker = useMemo(() => {
+    if (!filters.workerId) return null;
+    return (
+      filteredWorkers.find(
+        (worker) => String(worker?._id || "") === String(filters.workerId),
+      ) || null
+    );
+  }, [filteredWorkers, filters.workerId]);
+
+  const buildingCountMap = useMemo(() => {
+    const map = new Map();
+    (allBuildingsMeta?.buildingCounts || []).forEach((entry) => {
+      const key = String(entry?.buildingId || "").trim();
+      if (!key) return;
+      map.set(key, toNumberSafe(entry?.count));
+    });
+    return map;
+  }, [allBuildingsMeta?.buildingCounts]);
+
+  const buildingOptions = useMemo(() => {
+    if (String(filters.serviceType).toLowerCase() !== "residence") {
+      return [{ value: "", label: "All Buildings" }];
+    }
+
+    const allAllowedBuildings =
+      isSupervisor && Array.isArray(user?.buildings) && user.buildings.length > 0
+        ? (buildingsList || []).filter((building) =>
+            user.buildings
+              .map((id) => String(id))
+              .includes(String(building?._id || "")),
+          )
+        : buildingsList || [];
+
+    const workerBuildingIds = new Set(
+      (selectedWorker?.buildings || [])
+        .map((building) => {
+          if (typeof building === "string") return building;
+          return building?._id || building?.id || "";
+        })
+        .map((id) => String(id || "").trim())
+        .filter((id) => !!id),
+    );
+
+    const allowedBuildings =
+      workerBuildingIds.size > 0
+        ? allAllowedBuildings.filter((building) =>
+            workerBuildingIds.has(String(building?._id || "")),
+          )
+        : selectedWorker
+          ? []
+          : allAllowedBuildings;
+
+    const allCount = toNumberSafe(allBuildingsMeta?.total);
+
+    return [
+      {
+        value: "",
+        label: `All Buildings (${allCount})`,
+      },
+      ...allowedBuildings.map((building) => {
+        const id = String(building?._id || "");
+        const count = buildingCountMap.get(id) || 0;
+        return {
+          value: id,
+          label: `${building?.name || "Unknown Building"} (${count})`,
+        };
+      }),
+    ];
+  }, [
+    filters.serviceType,
+    isSupervisor,
+    user?.buildings,
+    buildingsList,
+    buildingCountMap,
+    allBuildingsMeta?.total,
+    selectedWorker,
+  ]);
+
+  const selectedBuildingName = useMemo(() => {
+    if (String(filters.serviceType).toLowerCase() !== "residence") return "";
+    if (!filters.buildingId) return "";
+
+    const matchedBuilding = (buildingsList || []).find(
+      (building) => String(building?._id || "") === String(filters.buildingId),
+    );
+    if (matchedBuilding?.name) return matchedBuilding.name;
+
+    const matchedRow = (viewData || []).find(
+      (row) => String(row?.buildingId || "") === String(filters.buildingId),
+    );
+    return matchedRow?.buildingName || "";
+  }, [filters.serviceType, filters.buildingId, buildingsList, viewData]);
+
+  useEffect(() => {
+    if (!filters.buildingId) return;
+    const stillValid = buildingOptions.some(
+      (option) => String(option.value || "") === String(filters.buildingId),
+    );
+    if (!stillValid) {
+      setFilters((prev) => ({ ...prev, buildingId: "" }));
+    }
+  }, [buildingOptions, filters.buildingId]);
+
+  useEffect(() => {
+    if (String(filters.serviceType).toLowerCase() !== "residence") {
+      setFilters((prev) => (prev.buildingId ? { ...prev, buildingId: "" } : prev));
+    }
+  }, [filters.serviceType]);
+
+  useEffect(() => {
+    if (String(filters.serviceType).toLowerCase() !== "residence") {
+      setAllBuildingsMeta({ total: 0, buildingCounts: [] });
+      return;
+    }
+
+    if (availableMonths.length === 0) return;
+    if (isSupervisor && teamWorkerIds === null) return;
+
+    if (!filters.buildingId) {
+      setAllBuildingsMeta({
+        total: toNumberSafe(backendTotals?.total ?? viewData?.length ?? 0),
+        buildingCounts: Array.isArray(backendTotals?.buildingCounts)
+          ? backendTotals.buildingCounts
+          : [],
+      });
+      return;
+    }
+
+    let isActive = true;
+
+    const loadAllBuildingsMeta = async () => {
+      try {
+        const response = await workRecordsService.getStatementData(
+          filters.year,
+          filters.month,
+          filters.serviceType,
+          filters.serviceType === "residence" || filters.serviceType === "mall"
+            ? filters.workerId
+            : "",
+          isSupervisor && !filters.workerId ? teamWorkerIds : null,
+          { buildingId: "" },
+        );
+
+        if (!isActive) return;
+
+        const unfilteredData =
+          response?.data || (Array.isArray(response) ? response : []);
+
+        setAllBuildingsMeta({
+          total: toNumberSafe(response?.total ?? unfilteredData.length),
+          buildingCounts: Array.isArray(response?.buildingCounts)
+            ? response.buildingCounts
+            : [],
+        });
+      } catch (error) {
+        if (!isActive) return;
+        console.error("Failed to load all-building counts", error);
+      }
+    };
+
+    loadAllBuildingsMeta();
+
+    return () => {
+      isActive = false;
+    };
+  }, [
+    filters.serviceType,
+    filters.year,
+    filters.month,
+    filters.workerId,
+    filters.buildingId,
+    availableMonths.length,
+    isSupervisor,
+    teamWorkerIds,
+    backendTotals?.total,
+    backendTotals?.buildingCounts,
+    viewData?.length,
+  ]);
 
   const pageSizeOptions = [
     { value: "a4-landscape", label: "A4 Landscape" },
@@ -192,6 +476,7 @@ const WorkRecords = () => {
         month: filters.month,
         serviceType: filters.serviceType,
         workerId: filters.workerId || "",
+        buildingId: filters.buildingId || "",
         workersKey,
       });
 
@@ -217,6 +502,12 @@ const WorkRecords = () => {
             ? filters.workerId
             : "",
           isSupervisor && !filters.workerId ? teamWorkerIds : null,
+          {
+            buildingId:
+              String(filters.serviceType).toLowerCase() === "residence"
+                ? filters.buildingId
+                : "",
+          },
         );
         const data =
           response?.data || (Array.isArray(response) ? response : []);
@@ -227,6 +518,8 @@ const WorkRecords = () => {
               totalTips: response.totalTips || 0,
               total: response.total || data.length,
               statusCounts: response.statusCounts || null,
+              todayStatusCounts: response.todayStatusCounts || null,
+              buildingCounts: response.buildingCounts || [],
             }
           : null;
 
@@ -321,6 +614,7 @@ const WorkRecords = () => {
     filters.month,
     filters.year,
     filters.workerId,
+    filters.buildingId,
     availableMonths.length,
     teamWorkerIds,
   ]);
@@ -340,6 +634,14 @@ const WorkRecords = () => {
               : "",
           workers:
             isSupervisor && !filters.workerId ? teamWorkerIds || [] : null,
+          buildingId:
+            String(filters.serviceType).toLowerCase() === "residence"
+              ? filters.buildingId
+              : "",
+          buildingName:
+            String(filters.serviceType).toLowerCase() === "residence"
+              ? selectedBuildingName
+              : "",
         }),
       ).unwrap();
       const blob = result.blob;
@@ -366,6 +668,7 @@ const WorkRecords = () => {
     try {
       let data = viewData;
       let statusCounts = backendTotals?.statusCounts || null;
+      let todayStatusCounts = backendTotals?.todayStatusCounts || null;
       if (!data) {
         const response = await workRecordsService.getStatementData(
           filters.year,
@@ -375,9 +678,16 @@ const WorkRecords = () => {
             ? filters.workerId
             : "",
           isSupervisor && !filters.workerId ? teamWorkerIds : null,
+          {
+            buildingId:
+              String(filters.serviceType).toLowerCase() === "residence"
+                ? filters.buildingId
+                : "",
+          },
         );
         data = response?.data || (Array.isArray(response) ? response : []);
         statusCounts = response?.statusCounts || statusCounts;
+        todayStatusCounts = response?.todayStatusCounts || todayStatusCounts;
       }
 
       if (!data || data.length === 0) {
@@ -388,6 +698,8 @@ const WorkRecords = () => {
 
       const isCarFormat =
         data[0]?.parkingNo !== undefined || data[0]?.carNumber !== undefined;
+      const isResidenceCarFormat =
+        isCarFormat && String(filters.serviceType).toLowerCase() === "residence";
       const isMallWorkerFormat =
         !isCarFormat && String(filters.serviceType).toLowerCase() === "mall";
 
@@ -398,6 +710,11 @@ const WorkRecords = () => {
       const monthName =
         availableMonths.find((m) => m.value === filters.month)?.label || "";
       const pageWidth = doc.internal.pageSize.getWidth();
+      const selectedBuildingLabel =
+        String(filters.serviceType).toLowerCase() === "residence" &&
+        filters.buildingId
+          ? selectedBuildingName || ""
+          : "";
 
       try {
         const logoImg = await loadImage("/carwash.jpeg");
@@ -425,6 +742,17 @@ const WorkRecords = () => {
         { align: "center" },
       );
 
+      if (selectedBuildingLabel) {
+        doc.text(
+          `Building: ${selectedBuildingLabel.toUpperCase()}`,
+          pageWidth / 2,
+          56,
+          { align: "center" },
+        );
+      }
+
+      const pdfTableStartY = selectedBuildingLabel ? 62 : 58;
+
       const daysInMonth = new Date(filters.year, filters.month, 0).getDate();
       const daysHeader = Array.from({ length: daysInMonth }, (_, i) =>
         (i + 1).toString(),
@@ -446,8 +774,8 @@ const WorkRecords = () => {
             "Date of Start",
             "Cleaning",
             ...daysHeader,
-            "Total",
-            "Tips",
+            isResidenceCarFormat ? "Due Payment" : "Total",
+            isResidenceCarFormat ? "Due Date" : "Tips",
           ],
           ["", "", "", "", "", ...dayNames, "", ""],
         ];
@@ -455,6 +783,8 @@ const WorkRecords = () => {
         tableBody = data.map((car, index) => {
           const marks = car.dailyMarks || Array(daysInMonth).fill(0);
           const total = marks.reduce((sum, m) => sum + m, 0);
+          const dueAmount = getResidenceDueAmount(car);
+          const dueDate = getResidenceDueDate(car);
           return [
             index + 1,
             car.parkingNo || "-",
@@ -462,8 +792,8 @@ const WorkRecords = () => {
             car.dateOfStart || "-",
             car.cleaning || "W3",
             ...marks.map((m) => (m > 0 ? m.toString() : "")),
-            total,
-            car.tips || 0,
+            isResidenceCarFormat ? dueAmount.toFixed(2) : total,
+            isResidenceCarFormat ? dueDate : car.tips || 0,
           ];
         });
       } else {
@@ -656,7 +986,7 @@ const WorkRecords = () => {
       }
 
       autoTable(doc, {
-        startY: 58,
+        startY: pdfTableStartY,
         head: tableHead,
         body: tableBody,
         theme: "grid",
@@ -682,15 +1012,100 @@ const WorkRecords = () => {
         margin: { left: 10, right: 10 },
       });
 
+      const washMetrics = getWashMetrics({
+        rows: data,
+        daysInMonth,
+        isCarFormat,
+        year: filters.year,
+        month: filters.month,
+      });
+
       if (statusCounts) {
-        const finalY = doc.lastAutoTable?.finalY || 58;
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "bold");
-        doc.text(
-          `Status Summary: Total Washes ${statusCounts.total || 0} | Completed ${statusCounts.completed || 0} | Pending ${statusCounts.pending || 0} | Rejected ${statusCounts.rejected || 0}`,
-          10,
-          finalY + 8,
-        );
+        const statusSummary = getStatusSummaryMetrics({
+          statusCounts,
+          todayStatusCounts,
+          fallbackTodayWashes: washMetrics.todayWashes,
+        });
+
+        const marginX = 10;
+        const gap = 4;
+        const cardWidth = (pageWidth - marginX * 2 - gap) / 2;
+        const cardHeight = 28;
+        const lineGap = 5;
+        const pageHeight = doc.internal.pageSize.getHeight();
+        let cardY = (doc.lastAutoTable?.finalY || pdfTableStartY) + 6;
+
+        if (cardY + cardHeight > pageHeight - 6) {
+          doc.addPage();
+          cardY = 14;
+        }
+
+        const drawSummaryCard = ({
+          x,
+          title,
+          headerColor,
+          bodyColor,
+          borderColor,
+          metrics,
+          todayPrefix,
+        }) => {
+          doc.setDrawColor(...borderColor);
+          doc.setFillColor(...bodyColor);
+          doc.roundedRect(x, cardY, cardWidth, cardHeight, 2, 2, "FD");
+
+          doc.setFillColor(...headerColor);
+          doc.roundedRect(x, cardY, cardWidth, 6.5, 2, 2, "F");
+
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(9);
+          doc.setTextColor(255, 255, 255);
+          doc.text(title, x + 2.5, cardY + 4.6);
+
+          doc.setFontSize(8);
+          doc.setTextColor(33, 37, 41);
+
+          const lines = todayPrefix
+            ? [
+                ["Today Washes", metrics.washes],
+                ["Today Completed", metrics.completed],
+                ["Today Pending", metrics.pending],
+                ["Today Rejected", metrics.rejected],
+              ]
+            : [
+                ["Total Washes", metrics.washes],
+                ["Completed", metrics.completed],
+                ["Pending", metrics.pending],
+                ["Rejected", metrics.rejected],
+              ];
+
+          lines.forEach(([label, value], index) => {
+            const y = cardY + 10.5 + index * lineGap;
+            doc.setFont("helvetica", "bold");
+            doc.text(String(label), x + 2.5, y);
+            doc.setFont("helvetica", "normal");
+            doc.text(String(value), x + cardWidth - 2.5, y, { align: "right" });
+          });
+        };
+
+        drawSummaryCard({
+          x: marginX,
+          title: "TODAY SUMMARY",
+          headerColor: [13, 148, 136],
+          bodyColor: [240, 253, 250],
+          borderColor: [45, 212, 191],
+          metrics: statusSummary.today,
+          todayPrefix: true,
+        });
+
+        drawSummaryCard({
+          x: marginX + cardWidth + gap,
+          title: "TOTAL SUMMARY",
+          headerColor: [30, 64, 175],
+          bodyColor: [239, 246, 255],
+          borderColor: [147, 197, 253],
+          metrics: statusSummary.total,
+          todayPrefix: false,
+        });
       }
 
       doc.save(
@@ -715,8 +1130,24 @@ const WorkRecords = () => {
     const isCarFormat =
       viewData[0]?.parkingNo !== undefined ||
       viewData[0]?.carNumber !== undefined;
+    const isResidenceCarFormat =
+      isCarFormat && String(filters.serviceType).toLowerCase() === "residence";
     const isMallWorkerFormat =
       !isCarFormat && String(filters.serviceType).toLowerCase() === "mall";
+
+    const washMetrics = getWashMetrics({
+      rows: viewData,
+      daysInMonth,
+      isCarFormat,
+      year: filters.year,
+      month: filters.month,
+      columnTotals: backendTotals?.columnTotals,
+    });
+    const statusSummary = getStatusSummaryMetrics({
+      statusCounts: backendTotals?.statusCounts,
+      todayStatusCounts: backendTotals?.todayStatusCounts,
+      fallbackTodayWashes: washMetrics.todayWashes,
+    });
 
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -779,8 +1210,12 @@ const WorkRecords = () => {
                           </th>
                         );
                       })}
-                      <th className="border border-slate-300 p-1">Total</th>
-                      <th className="border border-slate-300 p-1">Tips</th>
+                      <th className="border border-slate-300 p-1">
+                        {isResidenceCarFormat ? "Due Payment" : "Total"}
+                      </th>
+                      <th className="border border-slate-300 p-1">
+                        {isResidenceCarFormat ? "Due Date" : "Tips"}
+                      </th>
                     </>
                   ) : (
                     <>
@@ -935,12 +1370,6 @@ const WorkRecords = () => {
                             className={`border border-slate-300 p-1 text-center ${isDeactivated ? "line-through" : ""}`}
                           >
                             {car.parkingNo || "-"}
-                            {car.customerName &&
-                              car.customerName !== "Unknown" && (
-                                <span className="text-xs text-gray-500 ml-1">
-                                  ({car.customerName})
-                                </span>
-                              )}
                           </td>
                           <td
                             className={`border border-slate-300 p-1 text-center ${isDeactivated ? "line-through" : ""}`}
@@ -1003,12 +1432,20 @@ const WorkRecords = () => {
                           <td
                             className={`border border-slate-300 p-1 text-center font-bold text-blue-600 ${isDeactivated ? "line-through" : ""}`}
                           >
-                            {isDeactivated ? "-" : totalScheduledDays}
+                            {isResidenceCarFormat
+                              ? getResidenceDueAmount(car).toFixed(2)
+                              : isDeactivated
+                                ? "-"
+                                : totalScheduledDays}
                           </td>
                           <td
                             className={`border border-slate-300 p-1 text-center ${isDeactivated ? "line-through" : ""}`}
                           >
-                            {isDeactivated ? "-" : car.tips || 0}
+                            {isResidenceCarFormat
+                              ? getResidenceDueDate(car)
+                              : isDeactivated
+                                ? "-"
+                                : car.tips || 0}
                           </td>
                         </tr>
                       );
@@ -1109,38 +1546,49 @@ const WorkRecords = () => {
                         );
                       })}
                       <td className="border border-slate-300 p-1 text-center font-bold text-blue-600">
-                        {backendTotals?.grandTotal ??
-                          viewData.reduce((sum, car) => {
-                            const monthStart = new Date(
-                              filters.year,
-                              filters.month - 1,
-                              1,
-                            );
-                            const isDeactivated =
-                              car.endDate && new Date(car.endDate) < monthStart;
-                            if (isDeactivated) return sum;
+                        {isResidenceCarFormat
+                          ? viewData
+                              .reduce(
+                                (sum, car) => sum + getResidenceDueAmount(car),
+                                0,
+                              )
+                              .toFixed(2)
+                          : backendTotals?.grandTotal ??
+                            viewData.reduce((sum, car) => {
+                              const monthStart = new Date(
+                                filters.year,
+                                filters.month - 1,
+                                1,
+                              );
+                              const isDeactivated =
+                                car.endDate &&
+                                new Date(car.endDate) < monthStart;
+                              if (isDeactivated) return sum;
 
-                            const totalDays = car.dailyMarks
-                              ? car.dailyMarks.reduce(
-                                  (s, mark) => s + (mark || 0),
-                                  0,
-                                )
-                              : 0;
-                            return sum + totalDays;
-                          }, 0)}
+                              const totalDays = car.dailyMarks
+                                ? car.dailyMarks.reduce(
+                                    (s, mark) => s + (mark || 0),
+                                    0,
+                                  )
+                                : 0;
+                              return sum + totalDays;
+                            }, 0)}
                       </td>
                       <td className="border border-slate-300 p-1 text-center font-bold text-blue-600">
-                        {backendTotals?.totalTips ??
-                          viewData.reduce((sum, car) => {
-                            const monthStart = new Date(
-                              filters.year,
-                              filters.month - 1,
-                              1,
-                            );
-                            const isDeactivated =
-                              car.endDate && new Date(car.endDate) < monthStart;
-                            return sum + (isDeactivated ? 0 : car.tips || 0);
-                          }, 0)}
+                        {isResidenceCarFormat
+                          ? "-"
+                          : backendTotals?.totalTips ??
+                            viewData.reduce((sum, car) => {
+                              const monthStart = new Date(
+                                filters.year,
+                                filters.month - 1,
+                                1,
+                              );
+                              const isDeactivated =
+                                car.endDate &&
+                                new Date(car.endDate) < monthStart;
+                              return sum + (isDeactivated ? 0 : car.tips || 0);
+                            }, 0)}
                       </td>
                     </tr>
                   ) : (
@@ -1214,13 +1662,86 @@ const WorkRecords = () => {
           </div>
 
           {shouldShowFinalSummary && backendTotals?.statusCounts && (
-            <div className="mt-3 p-3 rounded-lg border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 flex flex-wrap gap-4">
-              <span>Total Washes: {backendTotals.statusCounts.total || 0}</span>
-              <span>
-                Completed: {backendTotals.statusCounts.completed || 0}
-              </span>
-              <span>Pending: {backendTotals.statusCounts.pending || 0}</span>
-              <span>Rejected: {backendTotals.statusCounts.rejected || 0}</span>
+            <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <div className="rounded-xl border border-teal-200 bg-gradient-to-br from-teal-50 via-emerald-50 to-cyan-50 p-4 shadow-sm">
+                <div className="text-[11px] font-extrabold tracking-[0.15em] text-teal-700 uppercase mb-3">
+                  Today Summary
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-teal-100 bg-white/85 p-2">
+                    <div className="text-[11px] font-semibold text-teal-700">
+                      Today Washes
+                    </div>
+                    <div className="text-lg font-extrabold text-teal-900 leading-tight">
+                      {statusSummary.today.washes}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-teal-100 bg-white/85 p-2">
+                    <div className="text-[11px] font-semibold text-teal-700">
+                      Today Completed
+                    </div>
+                    <div className="text-lg font-extrabold text-teal-900 leading-tight">
+                      {statusSummary.today.completed}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-teal-100 bg-white/85 p-2">
+                    <div className="text-[11px] font-semibold text-teal-700">
+                      Today Pending
+                    </div>
+                    <div className="text-lg font-extrabold text-teal-900 leading-tight">
+                      {statusSummary.today.pending}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-teal-100 bg-white/85 p-2">
+                    <div className="text-[11px] font-semibold text-teal-700">
+                      Today Rejected
+                    </div>
+                    <div className="text-lg font-extrabold text-teal-900 leading-tight">
+                      {statusSummary.today.rejected}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 via-indigo-50 to-sky-50 p-4 shadow-sm">
+                <div className="text-[11px] font-extrabold tracking-[0.15em] text-blue-700 uppercase mb-3">
+                  Total Summary
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-blue-100 bg-white/85 p-2">
+                    <div className="text-[11px] font-semibold text-blue-700">
+                      Total Washes
+                    </div>
+                    <div className="text-lg font-extrabold text-blue-900 leading-tight">
+                      {statusSummary.total.washes}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-blue-100 bg-white/85 p-2">
+                    <div className="text-[11px] font-semibold text-blue-700">
+                      Completed
+                    </div>
+                    <div className="text-lg font-extrabold text-blue-900 leading-tight">
+                      {statusSummary.total.completed}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-blue-100 bg-white/85 p-2">
+                    <div className="text-[11px] font-semibold text-blue-700">
+                      Pending
+                    </div>
+                    <div className="text-lg font-extrabold text-blue-900 leading-tight">
+                      {statusSummary.total.pending}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-blue-100 bg-white/85 p-2">
+                    <div className="text-[11px] font-semibold text-blue-700">
+                      Rejected
+                    </div>
+                    <div className="text-lg font-extrabold text-blue-900 leading-tight">
+                      {statusSummary.total.rejected}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1267,7 +1788,7 @@ const WorkRecords = () => {
           <div className="flex items-center gap-2 mb-6 text-slate-400 text-xs font-bold uppercase tracking-wider">
             <Filter className="w-4 h-4" /> Statement Parameters
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 items-end">
             {pp.isToolbarVisible("serviceTypeFilter") && (
               <div>
                 <CustomDropdown
@@ -1278,6 +1799,7 @@ const WorkRecords = () => {
                       ...prev,
                       serviceType: val,
                       workerId: "",
+                      buildingId: "",
                     }))
                   }
                   options={serviceTypeOptions}
@@ -1335,6 +1857,22 @@ const WorkRecords = () => {
                     ]}
                     icon={Filter}
                     placeholder="Filter by Worker"
+                    searchable
+                  />
+                </div>
+              )}
+            {pp.isToolbarVisible("workerFilter") &&
+              String(filters.serviceType).toLowerCase() === "residence" && (
+                <div>
+                  <CustomDropdown
+                    label="Building (Optional)"
+                    value={filters.buildingId}
+                    onChange={(val) =>
+                      setFilters((prev) => ({ ...prev, buildingId: val || "" }))
+                    }
+                    options={buildingOptions}
+                    icon={Building}
+                    placeholder="Filter by Building"
                     searchable
                   />
                 </div>

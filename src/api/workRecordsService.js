@@ -8,6 +8,7 @@ export const workRecordsService = {
     year,
     workerId = "",
     workers = null,
+    options = {},
   ) => {
     const baseUrl =
       serviceType === "onewash" || serviceType === "mall"
@@ -30,6 +31,18 @@ export const workRecordsService = {
       params.workers = workers;
     }
 
+    if (options?.buildingWise) {
+      params.buildingWise = 1;
+    }
+
+    if (options?.buildingId) {
+      params.building = options.buildingId;
+    }
+
+    if (options?.buildingName) {
+      params.buildingName = options.buildingName;
+    }
+
     const response = await api.get(`${baseUrl}/export/statement/monthly`, {
       params,
       responseType: "blob",
@@ -45,6 +58,7 @@ export const workRecordsService = {
     serviceType,
     workerId = "",
     workers = null,
+    options = {},
   ) => {
     const baseUrl =
       serviceType === "onewash" || serviceType === "mall"
@@ -65,6 +79,10 @@ export const workRecordsService = {
 
     if (workers && workers.length > 0) {
       params.workers = workers;
+    }
+
+    if (options?.buildingId) {
+      params.building = options.buildingId;
     }
 
     // Hits the SAME endpoint but asks for JSON format
